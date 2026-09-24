@@ -61,6 +61,21 @@ design values intentionally differ from the app's CSS where `fixtures/README.md`
 Note the Figma MCP quota: Starter plans allow 20 read calls per month, so run `ai-qa analyze` on the
 fixture sparingly; extracted results are cached in `.qa/design-system.json`.
 
+### Validating feature-scoped runs
+
+The fixture's `/contact` page was added after the first analysis specifically to exercise this
+path. To replay it: check out the commit before the page existed, run `ai-qa analyze`, check out
+HEAD again, then `npx ai-qa changes` must report `new page /contact` plus the changed shared files
+(`src/main.tsx`, `src/components/Layout.tsx`, …) and nothing else; `npx ai-qa run --changed` must
+analyze, generate and execute tests for `/contact` only.
+
+### Dashboard
+
+`npx ai-qa ui` in the fixture (with `CLICKUP_API_TOKEN` exported if you want to try the
+*Log bug in ClickUp* button) serves the dashboard on http://127.0.0.1:4310. The page is a single
+static HTML string in `src/ui/page.ts`; the JSON it consumes comes from `buildOverview()` in
+`src/ui/server.ts`.
+
 ## Testing the ClickUp integration
 
 Unit tests cover the client with a fake `fetch`. To verify against a real workspace:

@@ -1,0 +1,393 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - heading "demo-shop" [level=1] [ref=e4]
+    - generic [ref=e5]: http://127.0.0.1:5173
+    - generic [ref=e6]:
+      - text: Run
+      - combobox "Run" [ref=e7]:
+        - option "2026-09-24 01:11:53 — 18 passed, 12 failed" [selected]
+        - option "2026-09-24 01:10:51 — 5 passed, 25 failed"
+        - option "2026-09-24 00:57:53 — 18 passed, 12 failed"
+        - option "2026-09-24 01:05:31 — 0 passed, 1 failed"
+        - option "2026-09-24 00:53:44 — 1 passed, 0 failed"
+        - option "2026-09-24 00:42:27 — 0 passed, 3 failed"
+        - option "2026-09-24 00:37:11 — 17 passed, 13 failed"
+    - generic [ref=e8]: ClickUp ready · list 901523571090
+  - generic [ref=e9]:
+    - generic [ref=e327]:
+      - generic [ref=e328]: 18passed
+      - generic [ref=e329]: 12failed
+      - generic [ref=e330]: 5distinct defects
+      - generic [ref=e331]: 30 scenarios
+    - generic "Each block is one scenario; click to jump to it" [ref=e332]:
+      - button "CHECKOUT-001 — passed" [ref=e333] [cursor=pointer]
+      - button "CHECKOUT-002 — failed" [ref=e334] [cursor=pointer]
+      - button "CHECKOUT-003 — failed" [ref=e335] [cursor=pointer]
+      - button "CHECKOUT-004 — passed" [ref=e336] [cursor=pointer]
+      - button "CHECKOUT-005 — passed" [ref=e337] [cursor=pointer]
+      - button "CHECKOUT-006 — passed" [ref=e338] [cursor=pointer]
+      - button "CHECKOUT-007 — passed" [ref=e339] [cursor=pointer]
+      - button "CHECKOUT-008 — failed" [ref=e340] [cursor=pointer]
+      - button "CHECKOUT-009 — failed" [ref=e341] [cursor=pointer]
+      - button "CHECKOUT-010 — failed" [ref=e342] [cursor=pointer]
+      - button "HOME-001 — passed" [ref=e343] [cursor=pointer]
+      - button "HOME-002 — passed" [ref=e344] [cursor=pointer]
+      - button "HOME-003 — failed" [ref=e345] [cursor=pointer]
+      - button "HOME-004 — passed" [ref=e346] [cursor=pointer]
+      - button "HOME-005 — passed" [ref=e347] [cursor=pointer]
+      - button "HOME-006 — failed" [ref=e348] [cursor=pointer]
+      - button "HOME-007 — failed" [ref=e349] [cursor=pointer]
+      - button "HOME-008 — failed" [ref=e350] [cursor=pointer]
+      - button "HOME-009 — failed" [ref=e351] [cursor=pointer]
+      - button "HOME-010 — passed" [ref=e352] [cursor=pointer]
+      - button "LOGIN-001 — passed" [ref=e353] [cursor=pointer]
+      - button "LOGIN-002 — passed" [ref=e354] [cursor=pointer]
+      - button "LOGIN-003 — passed" [ref=e355] [cursor=pointer]
+      - button "LOGIN-004 — passed" [ref=e356] [cursor=pointer]
+      - button "LOGIN-005 — passed" [ref=e357] [cursor=pointer]
+      - button "LOGIN-006 — passed" [ref=e358] [cursor=pointer]
+      - button "LOGIN-007 — passed" [ref=e359] [cursor=pointer]
+      - button "LOGIN-008 — passed" [ref=e360] [cursor=pointer]
+      - button "LOGIN-009 — failed" [ref=e361] [cursor=pointer]
+      - button "LOGIN-010 — failed" [ref=e362] [cursor=pointer]
+    - generic [ref=e363]:
+      - generic [ref=e364]:
+        - text: Page
+        - combobox "Page" [ref=e365]:
+          - option "all" [selected]
+          - option /
+          - option "/checkout"
+          - option "/login"
+      - generic [ref=e366]:
+        - text: Category
+        - combobox "Category" [ref=e367]:
+          - option "all" [selected]
+          - option "functional"
+          - option "responsive"
+          - option "visual"
+      - generic [ref=e368]:
+        - text: Result
+        - combobox "Result" [ref=e369]:
+          - option "all" [selected]
+          - option "passed"
+          - option "failed"
+          - option "flaky"
+          - option "not run"
+      - generic [ref=e370]: 30 shown
+    - generic [ref=e371]:
+      - heading "/10 scenarios, 5 failing" [level=2] [ref=e372]
+      - table [ref=e373]:
+        - rowgroup [ref=e374]:
+          - row [ref=e375]:
+            - columnheader "ID" [ref=e376]
+            - columnheader "Scenario" [ref=e377]
+            - columnheader "Type" [ref=e378]
+            - columnheader "Result" [ref=e379]
+            - columnheader "Analysis" [ref=e380]
+        - rowgroup [ref=e381]:
+          - row [ref=e382] [cursor=pointer]:
+            - cell "HOME-001" [ref=e383]
+            - cell "Home page shows hero and all three products with correct names, descriptions and prices catalog · high priority" [ref=e384]:
+              - text: Home page shows hero and all three products with correct names, descriptions and prices
+              - generic [ref=e385]: catalog · high priority
+            - cell "functional desktop" [ref=e386]: functionaldesktop
+            - cell "passed" [ref=e387]
+            - cell "—" [ref=e389]
+          - row [ref=e390] [cursor=pointer]:
+            - cell "HOME-002" [ref=e391]
+            - cell "Adding products updates the header cart badge with the total quantity cart · high priority" [ref=e392]:
+              - text: Adding products updates the header cart badge with the total quantity
+              - generic [ref=e393]: cart · high priority
+            - cell "functional desktop" [ref=e394]: functionaldesktop
+            - cell "passed" [ref=e395]
+            - cell "—" [ref=e397]
+          - row [ref=e398] [cursor=pointer]:
+            - cell "HOME-003" [ref=e399]
+            - cell "Cart badge accessible name uses correct singular grammar for one item cart · medium priority" [ref=e400]:
+              - text: Cart badge accessible name uses correct singular grammar for one item
+              - generic [ref=e401]: cart · medium priority
+            - cell "functional desktop" [ref=e402]: functionaldesktop
+            - cell "failed" [ref=e403]
+            - cell "product bug · BUG-005" [ref=e405]
+          - row [ref=e406] [cursor=pointer]:
+            - cell "HOME-004" [ref=e407]
+            - cell "Products added on Home carry to Checkout via client-side navigation, in catalog order cart · high priority" [ref=e408]:
+              - text: Products added on Home carry to Checkout via client-side navigation, in catalog order
+              - generic [ref=e409]: cart · high priority
+            - cell "functional desktop" [ref=e410]: functionaldesktop
+            - cell "passed" [ref=e411]
+            - cell "—" [ref=e413]
+          - row [ref=e414] [cursor=pointer]:
+            - cell "HOME-005" [ref=e415]
+            - cell "'Shop all products' header link scrolls to the product list without losing the cart navigation · high priority" [ref=e416]:
+              - text: "'Shop all products' header link scrolls to the product list without losing the cart"
+              - generic [ref=e417]: navigation · high priority
+            - cell "functional desktop" [ref=e418]: functionaldesktop
+            - cell "passed" [ref=e419]
+            - cell "—" [ref=e421]
+          - row [ref=e422] [cursor=pointer]:
+            - cell "HOME-006" [ref=e423]
+            - cell "Primary 'Add to cart' buttons match the Figma Button/Primary spec design-system · high priority" [ref=e424]:
+              - text: Primary 'Add to cart' buttons match the Figma Button/Primary spec
+              - generic [ref=e425]: design-system · high priority
+            - cell "visual desktop" [ref=e426]: visualdesktop
+            - cell "failed" [ref=e427]
+            - cell "design mismatch · BUG-003" [ref=e429]
+          - row [ref=e430] [cursor=pointer]:
+            - cell "HOME-007" [ref=e431]
+            - cell "Headings and product grid spacing match Figma typography and layout design-system · medium priority" [ref=e432]:
+              - text: Headings and product grid spacing match Figma typography and layout
+              - generic [ref=e433]: design-system · medium priority
+            - cell "visual desktop" [ref=e434]: visualdesktop
+            - cell "failed" [ref=e435]
+            - cell "design mismatch · BUG-003" [ref=e437]
+          - row [ref=e438] [cursor=pointer]:
+            - cell "HOME-008" [ref=e439]
+            - cell "On a 390px mobile viewport the nav collapses behind a menu button that opens and closes correctly navigation · high priority" [ref=e440]:
+              - text: On a 390px mobile viewport the nav collapses behind a menu button that opens and closes correctly
+              - generic [ref=e441]: navigation · high priority
+            - cell "responsive mobile" [ref=e442]: responsivemobile
+            - cell "failed" [ref=e443]
+            - cell "product bug · BUG-004" [ref=e445]
+          - row [ref=e446] [cursor=pointer]:
+            - cell "HOME-009" [ref=e447]
+            - cell "Mobile layout stacks hero and product cards in one column without horizontal scroll catalog · high priority" [ref=e448]:
+              - text: Mobile layout stacks hero and product cards in one column without horizontal scroll
+              - generic [ref=e449]: catalog · high priority
+            - cell "responsive mobile" [ref=e450]: responsivemobile
+            - cell "failed" [ref=e451]
+            - cell "product bug · BUG-004" [ref=e453]
+          - row [ref=e454] [cursor=pointer]:
+            - cell "HOME-010" [ref=e455]
+            - cell "Tablet viewport (834px) shows a usable header and product grid without overflow navigation · medium priority" [ref=e456]:
+              - text: Tablet viewport (834px) shows a usable header and product grid without overflow
+              - generic [ref=e457]: navigation · medium priority
+            - cell "responsive tablet" [ref=e458]: responsivetablet
+            - cell "passed" [ref=e459]
+            - cell "—" [ref=e461]
+    - generic [ref=e462]:
+      - heading "/checkout10 scenarios, 5 failing" [level=2] [ref=e463]
+      - table [ref=e464]:
+        - rowgroup [ref=e465]:
+          - row [ref=e466]:
+            - columnheader "ID" [ref=e467]
+            - columnheader "Scenario" [ref=e468]
+            - columnheader "Type" [ref=e469]
+            - columnheader "Result" [ref=e470]
+            - columnheader "Analysis" [ref=e471]
+        - rowgroup [ref=e472]:
+          - row [ref=e473] [cursor=pointer]:
+            - cell "CHECKOUT-001" [ref=e474]
+            - cell "Checkout lists cart lines with correct line prices, subtotal and total cart · high priority" [ref=e475]:
+              - text: Checkout lists cart lines with correct line prices, subtotal and total
+              - generic [ref=e476]: cart · high priority
+            - cell "functional desktop" [ref=e477]: functionaldesktop
+            - cell "passed" [ref=e478]
+            - cell "—" [ref=e480]
+          - row [ref=e481] [cursor=pointer]:
+            - cell "CHECKOUT-002" [ref=e482]
+            - cell "Valid coupon SAVE10 is applied and the discount is subtracted from the Total checkout · high priority" [ref=e483]:
+              - text: Valid coupon SAVE10 is applied and the discount is subtracted from the Total
+              - generic [ref=e484]: checkout · high priority
+            - cell "functional desktop" [ref=e485]: functionaldesktop
+            - cell "failed" [ref=e486]
+            - cell "product bug · BUG-001" [ref=e488]
+          - row [ref=e489]:
+            - cell [ref=e490]:
+              - generic [ref=e491]:
+                - generic [ref=e492]:
+                  - heading "Steps" [level=4] [ref=e493]
+                  - list [ref=e494]:
+                    - listitem [ref=e495]: Type 'save10' (lowercase) in the 'Coupon code' textbox
+                    - listitem [ref=e496]: Click 'Apply'
+                    - listitem [ref=e497]: Wait for the status message
+                    - listitem [ref=e498]: Read Subtotal, Discount and Total
+                  - heading "Expected" [level=4] [ref=e499]
+                  - list [ref=e500]:
+                    - listitem [ref=e501]: "Status message 'Coupon SAVE10 applied: 10% off' is shown"
+                    - listitem [ref=e502]: Subtotal is $18.00
+                    - listitem [ref=e503]: Discount row (data-testid=discount) shows −$1.80 (U+2212 minus)
+                    - listitem [ref=e504]: "Total is $16.20 (subtotal minus discount). A Total that stays $18.00 is a defect: the code sets totalCents = subtotalCents so the discount is never subtracted"
+                  - heading "Preconditions" [level=4] [ref=e505]
+                  - list [ref=e506]:
+                    - listitem [ref=e507]: Add 'Ceramic Mug' once on /, then go to /checkout via the 'Checkout' nav link
+                - generic [ref=e508]:
+                  - heading "Error" [level=4] [ref=e509]
+                  - generic [ref=e510]: "Error: expect(locator).toHaveText(expected) failed Locator: getByTestId('total') Expected: \"$16.20\" Received: \"$18.00\" Timeout: 5000ms Call log: - Expect \"toHaveText\" getByTestId('total') with timeout 5000ms - waiting for getByTestId('total') 14 × locator resolved to <dd data-testid=\"total\">$18.00</dd> - unexpected value \"$18.00\" 159 | await expect(discount(page)).toHaveText(`${MINUS}$1.80`); 160 | // Correct behaviour: Total = Subtotal - Discount. > 161 | await expect(total(page)).toHaveText('$16.20'); | ^ 162 | }); 163 | }); 164 | at D:\\projects\\qa-agent\\fixtures\\demo-shop\\.qa\\tests\\checkout.spec.ts:161:31 at D:\\projects\\qa-agent\\fixtures\\demo-shop\\.qa\\tests\\checkout.spec.ts:157:3"
+                  - heading "Analysis · PRODUCT BUG (97% confidence)" [level=4] [ref=e511]
+                  - paragraph [ref=e512]: "The checkout Total ignores the applied coupon discount: the Discount row shows −$1.80 but the Total stays $18.00 because totalCents is set to subtotalCents."
+                  - generic [ref=e513]:
+                    - generic [ref=e514]: "BUG-001: Checkout Total does not subtract the applied coupon discount (Total equals Subtotal)"
+                    - text: high · functional · tests CHECKOUT-002, CHECKOUT-003
+                    - generic [ref=e515]: "Root cause: src/pages/CheckoutPage.tsx:29 — `const totalCents = subtotalCents;` should be `subtotalCents - discountCents` (discountCents is computed on line 28)."
+                    - generic [ref=e516]:
+                      - text: Logged in ClickUp ·
+                      - link "open task 123ztrcx1mg" [ref=e517] [cursor=pointer]:
+                        - /url: https://app.clickup.com/t/123ztrcx1mg
+                  - heading "Screenshot" [level=4] [ref=e518]
+                  - link [ref=e519] [cursor=pointer]:
+                    - /url: /files/.qa/artifacts/runs/2026-09-24_01-11-53/screenshots/CHECKOUT-002_chromium-desktop.png
+                    - img "Final screenshot of CHECKOUT-002@chromium-desktop" [ref=e520]
+                  - heading "Video" [level=4] [ref=e521]
+                  - generic [ref=e523]:
+                    - link "Download trace" [ref=e524] [cursor=pointer]:
+                      - /url: /files/.qa/artifacts/runs/2026-09-24_01-11-53/traces/CHECKOUT-002_chromium-desktop.zip
+                    - link "Console & network log" [ref=e525] [cursor=pointer]:
+                      - /url: /files/.qa/artifacts/runs/2026-09-24_01-11-53/logs/CHECKOUT-002_chromium-desktop_console-network.json
+                    - link "Page snapshot at failure" [ref=e526] [cursor=pointer]:
+                      - /url: /files/.qa/artifacts/runs/2026-09-24_01-11-53/logs/CHECKOUT-002_chromium-desktop_error-context.md
+          - row [ref=e527] [cursor=pointer]:
+            - cell "CHECKOUT-003" [ref=e528]
+            - cell "WELCOME20 on a mixed cart and rounding on a single item give correct discount and Total checkout · high priority" [ref=e529]:
+              - text: WELCOME20 on a mixed cart and rounding on a single item give correct discount and Total
+              - generic [ref=e530]: checkout · high priority
+            - cell "functional desktop" [ref=e531]: functionaldesktop
+            - cell "failed" [ref=e532]
+            - cell "product bug · BUG-001" [ref=e534]
+          - row [ref=e535] [cursor=pointer]:
+            - cell "CHECKOUT-004" [ref=e536]
+            - 'cell "Coupon validation errors: empty, whitespace-only and unknown codes checkout · high priority" [ref=e537]':
+              - text: "Coupon validation errors: empty, whitespace-only and unknown codes"
+              - generic [ref=e538]: checkout · high priority
+            - cell "functional desktop" [ref=e539]: functionaldesktop
+            - cell "passed" [ref=e540]
+            - cell "—" [ref=e542]
+          - row [ref=e543] [cursor=pointer]:
+            - cell "CHECKOUT-005" [ref=e544]
+            - cell "Apply button shows a loading state while the coupon is validated checkout · medium priority" [ref=e545]:
+              - text: Apply button shows a loading state while the coupon is validated
+              - generic [ref=e546]: checkout · medium priority
+            - cell "functional desktop" [ref=e547]: functionaldesktop
+            - cell "passed" [ref=e548]
+            - cell "—" [ref=e550]
+          - row [ref=e551] [cursor=pointer]:
+            - cell "CHECKOUT-006" [ref=e552]
+            - cell "Removing lines updates totals and leads to the empty state with a way back cart · high priority" [ref=e553]:
+              - text: Removing lines updates totals and leads to the empty state with a way back
+              - generic [ref=e554]: cart · high priority
+            - cell "functional desktop" [ref=e555]: functionaldesktop
+            - cell "passed" [ref=e556]
+            - cell "—" [ref=e558]
+          - row [ref=e559] [cursor=pointer]:
+            - cell "CHECKOUT-007" [ref=e560]
+            - cell "Direct load of /checkout shows the empty cart state checkout · medium priority" [ref=e561]:
+              - text: Direct load of /checkout shows the empty cart state
+              - generic [ref=e562]: checkout · medium priority
+            - cell "functional desktop" [ref=e563]: functionaldesktop
+            - cell "passed" [ref=e564]
+            - cell "—" [ref=e566]
+          - row [ref=e567] [cursor=pointer]:
+            - cell "CHECKOUT-008" [ref=e568]
+            - cell "'Place order' gives user feedback and completes the order checkout · medium priority" [ref=e569]:
+              - text: "'Place order' gives user feedback and completes the order"
+              - generic [ref=e570]: checkout · medium priority
+            - cell "functional desktop" [ref=e571]: functionaldesktop
+            - cell "failed" [ref=e572]
+            - cell "product bug · BUG-002" [ref=e574]
+          - row [ref=e575] [cursor=pointer]:
+            - cell "CHECKOUT-009" [ref=e576]
+            - cell "Checkout heading, coupon controls and Place order button match Figma tokens checkout · medium priority" [ref=e577]:
+              - text: Checkout heading, coupon controls and Place order button match Figma tokens
+              - generic [ref=e578]: checkout · medium priority
+            - cell "visual desktop" [ref=e579]: visualdesktop
+            - cell "failed" [ref=e580]
+            - cell "design mismatch · BUG-003" [ref=e582]
+          - row [ref=e583] [cursor=pointer]:
+            - cell "CHECKOUT-010" [ref=e584]
+            - cell "Checkout fits a 390px mobile viewport without horizontal overflow checkout · medium priority" [ref=e585]:
+              - text: Checkout fits a 390px mobile viewport without horizontal overflow
+              - generic [ref=e586]: checkout · medium priority
+            - cell "responsive mobile" [ref=e587]: responsivemobile
+            - cell "failed" [ref=e588]
+            - cell "product bug · BUG-004" [ref=e590]
+    - generic [ref=e591]:
+      - heading "/login10 scenarios, 2 failing" [level=2] [ref=e592]
+      - table [ref=e593]:
+        - rowgroup [ref=e594]:
+          - row [ref=e595]:
+            - columnheader "ID" [ref=e596]
+            - columnheader "Scenario" [ref=e597]
+            - columnheader "Type" [ref=e598]
+            - columnheader "Result" [ref=e599]
+            - columnheader "Analysis" [ref=e600]
+        - rowgroup [ref=e601]:
+          - row [ref=e602] [cursor=pointer]:
+            - cell "LOGIN-001" [ref=e603]
+            - cell "Valid credentials sign the user in and show the welcome heading auth · high priority" [ref=e604]:
+              - text: Valid credentials sign the user in and show the welcome heading
+              - generic [ref=e605]: auth · high priority
+            - cell "functional desktop" [ref=e606]: functionaldesktop
+            - cell "passed" [ref=e607]
+            - cell "—" [ref=e609]
+          - row [ref=e610] [cursor=pointer]:
+            - cell "LOGIN-002" [ref=e611]
+            - cell "Submitting the empty form shows both field errors at once auth · high priority" [ref=e612]:
+              - text: Submitting the empty form shows both field errors at once
+              - generic [ref=e613]: auth · high priority
+            - cell "functional desktop" [ref=e614]: functionaldesktop
+            - cell "passed" [ref=e615]
+            - cell "—" [ref=e617]
+          - row [ref=e618] [cursor=pointer]:
+            - cell "LOGIN-003" [ref=e619]
+            - cell "Wrong credentials show a form-level alert, keep the form usable, and replace field errors auth · high priority" [ref=e620]:
+              - text: Wrong credentials show a form-level alert, keep the form usable, and replace field errors
+              - generic [ref=e621]: auth · high priority
+            - cell "functional desktop" [ref=e622]: functionaldesktop
+            - cell "passed" [ref=e623]
+            - cell "—" [ref=e625]
+          - row [ref=e626] [cursor=pointer]:
+            - cell "LOGIN-004" [ref=e627]
+            - cell "Malformed email addresses are rejected with the email error only auth · medium priority" [ref=e628]:
+              - text: Malformed email addresses are rejected with the email error only
+              - generic [ref=e629]: auth · medium priority
+            - cell "functional desktop" [ref=e630]: functionaldesktop
+            - cell "passed" [ref=e631]
+            - cell "—" [ref=e633]
+          - row [ref=e634] [cursor=pointer]:
+            - cell "LOGIN-005" [ref=e635]
+            - cell "Password shorter than 8 characters is rejected; exactly 8 characters is accepted for validation auth · medium priority" [ref=e636]:
+              - text: Password shorter than 8 characters is rejected; exactly 8 characters is accepted for validation
+              - generic [ref=e637]: auth · medium priority
+            - cell "functional desktop" [ref=e638]: functionaldesktop
+            - cell "passed" [ref=e639]
+            - cell "—" [ref=e641]
+          - row [ref=e642] [cursor=pointer]:
+            - cell "LOGIN-006" [ref=e643]
+            - cell "Submit button shows loading state while signing in auth · medium priority" [ref=e644]:
+              - text: Submit button shows loading state while signing in
+              - generic [ref=e645]: auth · medium priority
+            - cell "functional desktop" [ref=e646]: functionaldesktop
+            - cell "passed" [ref=e647]
+            - cell "—" [ref=e649]
+          - row [ref=e650] [cursor=pointer]:
+            - cell "LOGIN-007" [ref=e651]
+            - cell "Email is case-insensitive but password is case-sensitive auth · medium priority" [ref=e652]:
+              - text: Email is case-insensitive but password is case-sensitive
+              - generic [ref=e653]: auth · medium priority
+            - cell "functional desktop" [ref=e654]: functionaldesktop
+            - cell "passed" [ref=e655]
+            - cell "—" [ref=e657]
+          - row [ref=e658] [cursor=pointer]:
+            - cell "LOGIN-008" [ref=e659]
+            - cell "Header link opens the sign-in page and the form resets after navigating away navigation · medium priority" [ref=e660]:
+              - text: Header link opens the sign-in page and the form resets after navigating away
+              - generic [ref=e661]: navigation · medium priority
+            - cell "functional desktop" [ref=e662]: functionaldesktop
+            - cell "passed" [ref=e663]
+            - cell "—" [ref=e665]
+          - row [ref=e666] [cursor=pointer]:
+            - cell "LOGIN-009" [ref=e667]
+            - cell "Login form matches the Figma design tokens on desktop auth · medium priority" [ref=e668]:
+              - text: Login form matches the Figma design tokens on desktop
+              - generic [ref=e669]: auth · medium priority
+            - cell "visual desktop" [ref=e670]: visualdesktop
+            - cell "failed" [ref=e671]
+            - cell "design mismatch · BUG-003" [ref=e673]
+          - row [ref=e674] [cursor=pointer]:
+            - cell "LOGIN-010" [ref=e675]
+            - cell "Login page fits a 390px mobile viewport and header nav collapses auth · medium priority" [ref=e676]:
+              - text: Login page fits a 390px mobile viewport and header nav collapses
+              - generic [ref=e677]: auth · medium priority
+            - cell "responsive mobile" [ref=e678]: responsivemobile
+            - cell "failed" [ref=e679]
+            - cell "product bug · BUG-004" [ref=e681]

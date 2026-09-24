@@ -1,0 +1,384 @@
+{
+  "page": "/contact",
+  "generatedAt": "2026-09-24T02:06:52.612Z",
+  "inputHash": "d8be4b2b160b11e2ec413e702f35377261518412140b9f8ae2a97642708299eb",
+  "scenarios": [
+    {
+      "id": "CONTACT-001",
+      "page": "/contact",
+      "feature": "contact",
+      "category": "functional",
+      "priority": "high",
+      "title": "Send a contact message with valid data shows confirmation",
+      "preconditions": [
+        "Open / on desktop viewport (1440x900)"
+      ],
+      "steps": [
+        "Click nav link 'Contact' in the 'Main' navigation",
+        "Verify h1 'Contact us' and form 'Contact' with fields 'Name', 'Email', 'Message' are visible",
+        "Fill 'Name' with 'Ada Lovelace'",
+        "Fill 'Email' with 'ada@example.com'",
+        "Fill 'Message' with 'Hello, I have a question about my order.'",
+        "Click 'Send message'"
+      ],
+      "expectedResults": [
+        "URL is /contact and nav link 'Contact' is visually marked as the active link",
+        "After the short sending period the form is no longer shown",
+        "h1 reads 'Message sent'",
+        "Text 'Thanks Ada Lovelace, we reply within two working days.' is visible",
+        "No inline error messages are shown"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Name: Ada Lovelace",
+        "Email: ada@example.com",
+        "Message: Hello, I have a question about my order."
+      ],
+      "design": null,
+      "rationale": "Core happy path of the contact page; covers navigation, submit and the confirmation state.",
+      "approved": true
+    },
+    {
+      "id": "CONTACT-002",
+      "page": "/contact",
+      "feature": "contact",
+      "category": "functional",
+      "priority": "high",
+      "title": "Submitting an empty form shows both required-field errors and sends nothing",
+      "preconditions": [
+        "Open /contact on desktop viewport"
+      ],
+      "steps": [
+        "Leave 'Name', 'Email' and 'Message' empty",
+        "Click 'Send message'"
+      ],
+      "expectedResults": [
+        "Error 'Enter your name' is shown under the 'Name' field",
+        "Error 'Enter a valid email address' is shown under the 'Email' field",
+        "Both errors are visible at the same time",
+        "'Name' and 'Email' are marked invalid (aria-invalid=true)",
+        "h1 remains 'Contact us', the form is still shown and no 'Message sent' confirmation appears",
+        "Button still reads 'Send message' and is enabled"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [],
+      "design": null,
+      "rationale": "Validation gate for required fields; ensures nothing is submitted with missing data.",
+      "approved": true
+    },
+    {
+      "id": "CONTACT-003",
+      "page": "/contact",
+      "feature": "contact",
+      "category": "functional",
+      "priority": "high",
+      "title": "Whitespace-only name is rejected",
+      "preconditions": [
+        "Open /contact on desktop viewport"
+      ],
+      "steps": [
+        "Fill 'Name' with three spaces '   '",
+        "Fill 'Email' with 'ada@example.com'",
+        "Click 'Send message'"
+      ],
+      "expectedResults": [
+        "Error 'Enter your name' is shown under 'Name'",
+        "No error is shown for 'Email'",
+        "Form remains visible; no confirmation is shown"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Name: '   ' (whitespace only)",
+        "Email: ada@example.com"
+      ],
+      "design": null,
+      "rationale": "Boundary of the name rule: a name consisting only of spaces is not a real name.",
+      "approved": true
+    },
+    {
+      "id": "CONTACT-004",
+      "page": "/contact",
+      "feature": "contact",
+      "category": "functional",
+      "priority": "high",
+      "title": "Malformed email addresses are rejected, minimal valid address accepted",
+      "preconditions": [
+        "Open /contact on desktop viewport",
+        "'Name' filled with 'Ada Lovelace'"
+      ],
+      "steps": [
+        "Fill 'Email' with 'not-an-email' and click 'Send message'",
+        "Replace 'Email' with 'a@b' and click 'Send message'",
+        "Replace 'Email' with 'a b@c.d' and click 'Send message'",
+        "Replace 'Email' with 'a@b.c' and click 'Send message'"
+      ],
+      "expectedResults": [
+        "For 'not-an-email', 'a@b' and 'a b@c.d' the error 'Enter a valid email address' is shown under 'Email' (custom message, no native browser validation bubble), no error under 'Name', and the form stays visible",
+        "The previous email error is not shown once a valid address is submitted",
+        "For 'a@b.c' the form is submitted and h1 'Message sent' with 'Thanks Ada Lovelace, we reply within two working days.' is shown"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Invalid: not-an-email, a@b, a b@c.d",
+        "Valid: a@b.c",
+        "Name: Ada Lovelace"
+      ],
+      "design": null,
+      "rationale": "Covers email validation boundaries and the custom (non-native) error handling.",
+      "approved": true
+    },
+    {
+      "id": "CONTACT-005",
+      "page": "/contact",
+      "feature": "contact",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Message is optional and the confirmation greets the trimmed name",
+      "preconditions": [
+        "Open /contact on desktop viewport"
+      ],
+      "steps": [
+        "Fill 'Name' with '  Ada Lovelace  ' (leading and trailing spaces)",
+        "Fill 'Email' with 'ada@example.com'",
+        "Leave 'Message' empty",
+        "Click 'Send message'"
+      ],
+      "expectedResults": [
+        "No validation error is shown for the empty 'Message'",
+        "h1 'Message sent' is shown",
+        "Text reads exactly 'Thanks Ada Lovelace, we reply within two working days.' without extra spaces around the name"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Name: '  Ada Lovelace  '",
+        "Email: ada@example.com",
+        "Message: (empty)"
+      ],
+      "design": null,
+      "rationale": "Business rules: message is optional; name is trimmed in the confirmation.",
+      "approved": true
+    },
+    {
+      "id": "CONTACT-006",
+      "page": "/contact",
+      "feature": "contact",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Sending state disables the button and prevents double submit",
+      "preconditions": [
+        "Open /contact on desktop viewport",
+        "Fill 'Name' with 'Ada Lovelace' and 'Email' with 'ada@example.com'"
+      ],
+      "steps": [
+        "Click 'Send message'",
+        "Immediately observe the submit button",
+        "Try to click the button again while it is in the sending state",
+        "Wait for the request to finish"
+      ],
+      "expectedResults": [
+        "While sending, the button label reads 'Sending…' and the button is disabled with a visibly dimmed appearance",
+        "The second click does not trigger another submission",
+        "After completion h1 changes to 'Message sent' and the form is removed",
+        "The confirmation appears once only"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Name: Ada Lovelace",
+        "Email: ada@example.com"
+      ],
+      "design": null,
+      "rationale": "Loading state; protects against duplicate messages and verifies visible feedback.",
+      "approved": true
+    },
+    {
+      "id": "CONTACT-007",
+      "page": "/contact",
+      "feature": "contact",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Form is accessible by keyboard and errors are correctable and announced",
+      "preconditions": [
+        "Open /contact on desktop viewport"
+      ],
+      "steps": [
+        "Press Tab from the page start until the 'Name' field is focused (labels 'Name', 'Email', 'Message' must each be associated with their control)",
+        "Press Tab to 'Email' and type 'bad'",
+        "Press Enter to submit while focus is in 'Email'",
+        "Fill 'Name' with 'Ada Lovelace' and correct 'Email' to 'ada@example.com'",
+        "Tab to 'Send message' and press Enter"
+      ],
+      "expectedResults": [
+        "Clicking each label focuses its own field (Name, Email, Message)",
+        "Pressing Enter in a field submits the form and shows 'Enter your name' and 'Enter a valid email address'",
+        "Error messages are exposed to assistive technology (e.g. role='alert' or referenced via aria-describedby) and fields carry aria-invalid=true",
+        "After correcting the values, errors disappear and submitting via keyboard shows h1 'Message sent'"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Name: Ada Lovelace",
+        "Email: bad, then ada@example.com"
+      ],
+      "design": null,
+      "rationale": "Accessibility and recovery from errors; the page model notes there is no role='alert' on error messages and errors are not cleared while typing.",
+      "approved": true
+    },
+    {
+      "id": "CONTACT-008",
+      "page": "/contact",
+      "feature": "contact",
+      "category": "visual",
+      "priority": "high",
+      "title": "'Send message' button and inputs match Figma Button/Input specs",
+      "preconditions": [
+        "Open /contact on desktop viewport (1440x900)"
+      ],
+      "steps": [
+        "Locate the primary button 'Send message' in form 'Contact'",
+        "Inspect computed styles of the button",
+        "Inspect computed height of the 'Name' and 'Email' inputs"
+      ],
+      "expectedResults": [
+        "'Send message' has background #2563EB, text colour #FFFFFF, border-radius 8px, height 44px, horizontal padding 20px, Inter 16px / weight 600 / line-height 24px",
+        "'Name' and 'Email' inputs are 44px high (size/control-height)"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [],
+      "design": {
+        "screen": null,
+        "tokens": [
+          {
+            "element": "the 'Send message' button",
+            "properties": {
+              "backgroundColor": "#2563EB",
+              "color": "#FFFFFF",
+              "borderRadius": "8px",
+              "height": "44px",
+              "paddingLeft": "20px",
+              "paddingRight": "20px",
+              "fontFamily": "Inter",
+              "fontSize": "16px",
+              "fontWeight": "600",
+              "lineHeight": "24px"
+            }
+          },
+          {
+            "element": "the 'Name' input",
+            "properties": {
+              "height": "44px"
+            }
+          },
+          {
+            "element": "the 'Email' input",
+            "properties": {
+              "height": "44px"
+            }
+          }
+        ]
+      },
+      "rationale": "The Figma Primary button is #2563EB with 8px radius; source styles use #7c3aed and a 2px radius for .btn-primary, so this should catch the deviation.",
+      "approved": true
+    },
+    {
+      "id": "CONTACT-009",
+      "page": "/contact",
+      "feature": "contact",
+      "category": "responsive",
+      "priority": "medium",
+      "title": "Contact form is usable at mobile width without horizontal overflow",
+      "preconditions": [
+        "Open /contact on mobile viewport (390x844)"
+      ],
+      "steps": [
+        "Verify h1 'Contact us' and the form fields are visible",
+        "Check the document for horizontal scrolling",
+        "Submit the empty form with 'Send message'",
+        "Fill 'Name' 'Ada Lovelace', 'Email' 'ada@example.com' and tap 'Send message'"
+      ],
+      "expectedResults": [
+        "No horizontal scrollbar; page width equals viewport width (390px)",
+        "Labels and fields are stacked vertically with a page gutter of 24px, and fields fit within the viewport",
+        "Inline errors 'Enter your name' and 'Enter a valid email address' are fully visible without clipping",
+        "'Send message' is at least 44px high and tappable",
+        "Confirmation 'Message sent' / 'Thanks Ada Lovelace, we reply within two working days.' is fully visible and wraps without overflow"
+      ],
+      "viewport": "mobile",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [
+        "Name: Ada Lovelace",
+        "Email: ada@example.com"
+      ],
+      "design": null,
+      "rationale": "Form stacking and error/confirmation rendering on small screens; Figma mobile uses a 390px frame with 24px gutters.",
+      "approved": true
+    },
+    {
+      "id": "CONTACT-010",
+      "page": "/contact",
+      "feature": "contact",
+      "category": "responsive",
+      "priority": "medium",
+      "title": "Header navigation collapses to a menu button on mobile",
+      "preconditions": [
+        "Open /contact on mobile viewport (390x844)"
+      ],
+      "steps": [
+        "Observe the header",
+        "Check for horizontal overflow of the header/page",
+        "Tap button 'Open menu' if present",
+        "Verify links 'Home', 'Shop all products', 'Checkout', 'Sign in to your account', 'Contact'"
+      ],
+      "expectedResults": [
+        "Per the Figma mobile frame, the 'Main' navigation links are hidden and a 40x40 'Open menu' button is at the right with a 24px gutter",
+        "Logo 'Demo Shop' and the menu button fit in the 64px-high header without horizontal overflow or wrapped/overlapping text",
+        "Tapping 'Open menu' reveals all nav links, including 'Contact', and its aria-expanded becomes true"
+      ],
+      "viewport": "mobile",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [],
+      "design": {
+        "screen": null,
+        "tokens": []
+      },
+      "rationale": "Figma mobile shows the menu button at 390px, while the source only collapses the nav at max-width 320px, so the full nav may overflow at 390px.",
+      "approved": true
+    }
+  ]
+}

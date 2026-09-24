@@ -35,7 +35,7 @@ function loadRun(ctx: QaContext, id: string): TestRunResult | undefined {
 /** Everything the dashboard shows, assembled from the files the pipeline already writes. */
 export function buildOverview(ctx: QaContext, runId?: string): Overview {
   const runs = [...ctx.state.data.runs]
-    .reverse()
+    .sort((a, b) => b.id.localeCompare(a.id))
     .map((r) => ({
       id: r.id,
       startedAt: r.startedAt,
@@ -142,6 +142,9 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'GET' && url.pathname.startsWith('/files/')) {
         serveFile(ctx, url.pathname, res);
+      } else if (url.pathname === '/favicon.ico') {
+        res.writeHead(204);
+        res.end();
       } else {
         res.writeHead(404);
         res.end('Not found');

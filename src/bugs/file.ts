@@ -4,9 +4,11 @@ import { z } from 'zod';
 import { readJson, writeJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import { ClickUpClient, PRIORITY, type Fetch } from '../integrations/clickup.js';
+import { runDir } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
 import type { TestRunResult } from '../runner/results.js';
-import type { Issue, TriageResult } from '../triage/schema.js';
+import type { FiledBug } from '../state/state.js';
+import { TriageResultSchema, type Issue, type TriageResult } from '../triage/schema.js';
 import { environment, evidenceFor, renderBugMarkdown } from './report.js';
 
 const log = logger('file');
@@ -38,12 +40,49 @@ export class FilingUnavailable extends Error {
   }
 }
 
-/** Find a bug filed in an earlier run for the same scenarios. */
-function previouslyFiled(
-  ctx: QaContext,
-  issue: Issue,
-): { fingerprint: string; taskId?: string; url?: string } | undefined {
-  return Object.values(ctx.state.data.bugs).find((b) => b.fingerprint === issue.fingerprint);
+/** Source files named in a suspected root cause, without line numbers. */
+export function rootCauseFiles(text: string): string[] {
+  const matches =
+    text.match(/[\w@./-]+\.(?:tsx?|jsx?|mjs|cjs|css|scss|sass|less|vue|svelte|astro|html)\b/g) ?? [];
+  return [...new Set(matches.map((m) => m.replace(/^\.\//, '')))].sort();
+}
+
+/**
+ * Find a bug filed in an earlier run for the same defect: either the same scenarios exposed it
+ * (fingerprint), or a different test found the same classification/category pointing at the same
+ * source files (e.g. a new page's button failing the same design tokens as every other button).
+ */
+export function previouslyFiled(ctx: QaContext, issue: Issue): FiledBug | undefined {
+  const bugs = Object.values(ctx.state.data.bugs);
+  const exact = bugs.find((b) => b.fingerprint === issue.fingerprint);
+  if (exact) return exact;
+  const files = rootCauseFiles(issue.bug.suspectedRootCause);
+  if (files.length === 0) return undefined;
+  return bugs.find(
+    (b) =>
+      b.classification === issue.classification &&
+      b.category === issue.bug.category &&
+      b.files.some((f) => files.includes(f)),
+  );
+}
+
+/** Bugs filed before root-cause files were recorded: fill them in from their run's triage.json. */
+function backfillBugRecords(ctx: QaContext): void {
+  let changed = false;
+  for (const bug of Object.values(ctx.state.data.bugs)) {
+    if (bug.classification) continue;
+    const triage = readJson(
+      path.join(runDir(ctx.paths, bug.firstSeenRun), 'triage.json'),
+      TriageResultSchema,
+    );
+    const issue = triage?.issues.find((i) => i.fingerprint === bug.fingerprint);
+    if (!issue) continue;
+    bug.classification = issue.classification;
+    bug.category = issue.bug.category;
+    bug.files = rootCauseFiles(issue.bug.suspectedRootCause);
+    changed = true;
+  }
+  if (changed) ctx.state.save();
 }
 
 function filingFile(run: TestRunResult): string {
@@ -94,6 +133,7 @@ export async function fileIssues(
   log.info(`Filing ${issues.length} defect(s) into ClickUp list "${list.name}" (${list.id})`);
   const env = environment(ctx, run.runId);
   const results: FilingResult[] = [];
+  backfillBugRecords(ctx);
   for (const issue of issues) {
     const prior = previouslyFiled(ctx, issue);
     const filedAt = new Date().toISOString();
@@ -101,7 +141,7 @@ export async function fileIssues(
       if (prior?.taskId) {
         await client.addComment(
           prior.taskId,
-          `ai-qa run ${run.runId}: still failing (${issue.scenarioIds.join(', ')}).`,
+          `ai-qa run ${run.runId}: still failing (${issue.scenarioIds.join(', ')}) — ${issue.bug.title}`,
         );
         ctx.state.data.bugs[prior.fingerprint]!.lastSeenRun = run.runId;
         ctx.state.save();
@@ -136,6 +176,9 @@ export async function fileIssues(
         url: task.url,
         firstSeenRun: run.runId,
         lastSeenRun: run.runId,
+        classification: issue.classification,
+        category: issue.bug.category,
+        files: rootCauseFiles(issue.bug.suspectedRootCause),
       };
       ctx.state.save();
       const attachments: string[] = [];

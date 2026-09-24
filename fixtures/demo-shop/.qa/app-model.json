@@ -136,6 +136,100 @@
       ]
     },
     {
+      "route": "/contact",
+      "name": "Contact us",
+      "purpose": "Contact form where a visitor enters name, email and an optional message and sends it; on success the form is replaced by a confirmation.",
+      "files": [
+        "src/main.tsx",
+        "src/components/Layout.tsx",
+        "src/components/Button.tsx",
+        "src/pages/ContactPage.tsx",
+        "src/api/catalog.ts",
+        "src/cart.tsx",
+        "src/styles.css"
+      ],
+      "headings": [
+        "h1 'Contact us' (form state)",
+        "h1 'Message sent' (success state)"
+      ],
+      "interactiveElements": [
+        "link 'Demo Shop' (to /)",
+        "button 'Open menu' (aria-expanded; only visible at viewport width <= 320px)",
+        "nav 'Main' link 'Home'",
+        "nav 'Main' link 'Shop all products' (href /#products)",
+        "nav 'Main' link 'Checkout 3 items in cart' style name: text 'Checkout' plus badge with aria-label '<count> items in cart'",
+        "nav 'Main' link 'Sign in to your account'",
+        "nav 'Main' link 'Contact' (NavLink, gets class 'active' on /contact)",
+        "form 'Contact' (aria-label 'Contact', noValidate)",
+        "textbox 'Name' (input#name, text)",
+        "textbox 'Email' (input#contact-email, type=email)",
+        "textbox 'Message' (textarea#message, rows=5, vertically resizable)",
+        "button 'Send message' (reads 'Sending…' and is disabled while sending)"
+      ],
+      "forms": [
+        {
+          "name": "Contact",
+          "fields": [
+            {
+              "label": "Name",
+              "type": "text (input#name)",
+              "validation": [
+                "Required: trimmed value must be non-empty, otherwise error 'Enter your name'",
+                "aria-invalid set to true when the error is present"
+              ]
+            },
+            {
+              "label": "Email",
+              "type": "email (input#contact-email)",
+              "validation": [
+                "Must match /^\\S+@\\S+\\.\\S+$/, otherwise error 'Enter a valid email address'",
+                "Form has noValidate, so no native browser validation bubble; only the custom message",
+                "aria-invalid set to true when the error is present"
+              ]
+            },
+            {
+              "label": "Message",
+              "type": "textarea (rows=5)",
+              "validation": [
+                "No validation; optional and may be empty"
+              ]
+            }
+          ],
+          "submitLabel": "Send message",
+          "successBehavior": "After validation passes, button shows 'Sending…' and is disabled for about 400ms (sendMessage in src/api/catalog.ts), then the whole form is replaced by h1 'Message sent' and text 'Thanks <trimmed name>, we reply within two working days.' (class 'muted'). No way back to the form without reloading the page.",
+          "errorBehavior": "Invalid name and/or email shows inline <p class='error'> messages under the respective field (both can show at once); nothing is sent. Errors are recomputed on every submit and are not cleared while typing. There is no role='alert' on these messages. No handling of sendMessage failure (no try/catch), but the simulated API always resolves { ok: true }."
+        }
+      ],
+      "states": {
+        "loading": "Submit button text 'Sending…' and disabled (opacity 0.6, cursor not-allowed) for about 400ms during sendMessage",
+        "empty": "Initial state: all fields empty, no errors shown",
+        "error": "Inline field errors 'Enter your name' / 'Enter a valid email address'; no API error state exists in the code"
+      },
+      "dataDependencies": [
+        "sendMessage() in src/api/catalog.ts: simulated 400ms delay, ignores input, always returns { ok: true }",
+        "useCart() count from src/cart.tsx used only by the Layout header badge",
+        "Local component state only (name, email, message, errors, sending, sent); no persistence"
+      ],
+      "preconditions": [
+        "None: page is publicly reachable at /contact and via nav link 'Contact'"
+      ],
+      "responsiveBehavior": [
+        "@media (max-width: 320px): .menu-toggle shown, .main-nav hidden; when .open it becomes a vertical absolute dropdown at top 64px, left/right 0 (src/styles.css)",
+        "No media query targets the contact form; .auth has max-width 400px and inputs are width 100%",
+        "@media (max-width: 768px) only changes .product-grid (not used on this page)"
+      ],
+      "businessRules": [
+        "Name is validated with trim() but the untrimmed name is passed to sendMessage; the confirmation shows name.trim() (src/pages/ContactPage.tsx)",
+        "Email regex /^\\S+@\\S+\\.\\S+$/ (src/pages/ContactPage.tsx): a@b.c is accepted; 'a b@c.d' and 'a@b' are rejected",
+        "Message content is not validated and is discarded by sendMessage (void input) in src/api/catalog.ts, so nothing is actually stored or sent",
+        "Success confirmation says 'we reply within two working days' (hard-coded text)",
+        "Layout note: the h1 is 40px/48px (src/styles.css); .btn height 44px, border-radius 2px (.btn-secondary and inputs use --radius-md 8px), which is inconsistent with the design tokens (--radius-sm 4px / --radius-md 8px)",
+        "Styling tokens (src/styles.css :root): --color-primary #7c3aed, --color-primary-hover #6d28d9, --color-text #0f172a, --color-muted #475569, --color-surface #ffffff, --color-background #f8fafc, --color-border #e2e8f0, --color-success #16a34a, --color-danger #dc2626, --radius-sm 4px, --radius-md 8px, --radius-lg 12px, spacing --space-1 4px, -2 8px, -3 12px, -4 16px, -6 24px, -8 32px, -12 48px; font Inter, system-ui, -apple-system, 'Segoe UI', sans-serif",
+        "Error text uses --color-danger (#dc2626) on #f8fafc background; muted text uses --color-muted (#475569)",
+        "Textarea styling (border, radius, padding) is defined separately from input; textarea has no fixed height (rows=5)"
+      ]
+    },
+    {
       "route": "/login",
       "name": "Sign in",
       "purpose": "Email/password form backed by a simulated login API. Success replaces the form with a welcome heading.",
@@ -306,6 +400,33 @@
       "routes": [
         "/"
       ]
+    },
+    {
+      "name": "Send contact message",
+      "feature": "contact",
+      "steps": [
+        "Open /contact (or click nav link 'Contact')",
+        "See h1 'Contact us' and form 'Contact' with 'Name', 'Email', 'Message'",
+        "Fill 'Name' with 'Ada Lovelace', 'Email' with 'ada@example.com', optionally 'Message'",
+        "Click 'Send message' (button reads 'Sending…' and is disabled for about 400ms)",
+        "See h1 'Message sent' and 'Thanks Ada Lovelace, we reply within two working days.'; the form is gone"
+      ],
+      "routes": [
+        "/contact"
+      ]
+    },
+    {
+      "name": "Contact validation",
+      "feature": "contact",
+      "steps": [
+        "Open /contact and click 'Send message' with empty fields => 'Enter your name' and 'Enter a valid email address' both shown",
+        "Enter a whitespace-only name => 'Enter your name'",
+        "Enter 'not-an-email' or 'a@b' as email => 'Enter a valid email address'",
+        "Empty 'Message' with valid name and email is accepted"
+      ],
+      "routes": [
+        "/contact"
+      ]
     }
   ],
   "auth": "Simulated only. The only valid credentials are demo@shop.test / password123 (src/api/catalog.ts login). There is no session, token, storage or route guard; a successful login only swaps LoginPage's local view to 'Welcome back, Demo User'. All routes are public.",
@@ -318,7 +439,10 @@
     "Invalid coupon: any other string, e.g. BOGUS",
     "Products: Ceramic Mug $18.00 (id mug), Canvas Tote $24.00 (id tote), Dot Notebook $12.00 (id notebook)",
     "Example: 1 mug + 1 tote + 1 notebook => subtotal $54.00; with SAVE10 discount −$5.40; with WELCOME20 discount −$10.80",
-    "Discount rounding: Math.round(subtotalCents*rate); e.g. Dot Notebook only with WELCOME20 => −$2.40"
+    "Discount rounding: Math.round(subtotalCents*rate); e.g. Dot Notebook only with WELCOME20 => −$2.40",
+    "Contact: Name 'Ada Lovelace', Email 'ada@example.com', Message any text or empty (any values are accepted; the API is simulated and always succeeds)",
+    "Contact invalid email examples: 'not-an-email', 'a@b', 'a b@c.d' (rejected); 'a@b.c' (accepted)",
+    "Contact invalid name example: '   ' (whitespace only, rejected)"
   ],
   "styling": {
     "approach": "Single global plain stylesheet src/styles.css imported in src/main.tsx. It uses CSS custom properties on :root, BEM-ish utility classes (.btn, .btn-primary, .btn-secondary, .card, .container, etc.) and no CSS modules or CSS-in-JS. The Button component adds the classes btn btn-{variant}.",
@@ -356,26 +480,22 @@
     }
   },
   "unknowns": [
-    "index.html, vite config, tsconfig and package.json were not read; the page <title>, meta tags and exact dependency versions are unknown.",
-    "The react-router-dom version is unknown. It was not read; the code uses createBrowserRouter.",
-    "Whether the dev server serves SPA fallback for direct loads of /checkout and /login is not verified from code (Vite dev does by default).",
-    "'Place order' has no handler, so the intended post-order behaviour is unknown.",
-    "The intended behaviour for the Total with a coupon is unknown; the code sets total = subtotal, ignoring the discount.",
-    "Whether the 320px mobile-menu breakpoint is intended is unknown; the code only collapses the nav at max-width 320px.",
-    "No loading, error or empty states exist on the Home page (static data).",
-    "Focus management and keyboard behaviour beyond native elements were not verified in a browser; this analysis is from source only."
+    "src/cart.tsx was not re-read; header badge behavior on /contact is assumed to follow the existing analysis of Layout/cart (count from useCart)",
+    "Whether the 'Contact' NavLink 'active' style applies visually was not verified in a browser (only .main-nav a.active color is defined in CSS)",
+    "No focus management or aria-live announcement on the success state or on validation errors was found in the code (not verified in a browser)"
   ],
-  "analyzedAt": "2026-09-24T02:04:26.472Z",
+  "analyzedAt": "2026-09-24T02:05:47.202Z",
   "pageHashes": {
     "/": "d75db4b702b6f82199199ef2a1083e505d2ea76588a51631154dbc38ce411fad",
     "/checkout": "f102c520f1b4f2a0877a405cb7b9353a6fcb377a58874a54574f57890ce1a40e",
+    "/contact": "06242d3e3fc4c1546e0e65cf3c5c361225440423f9bc96b1927472f594d96a4a",
     "/login": "b55f679a27b85220764f85bcedee508b3bec08c759780cb238d60e919756ab14"
   },
   "globalFileHashes": {
-    "src/api/catalog.ts": "3e6f7df1d908be7277a8052406f16eb50af69ba03e58d47f57e46b40f66e86dd",
+    "src/api/catalog.ts": "00bfc9cdc1a11cf5f78ec52937227cc560017591757d652f1b3ddd0aade7bba5",
     "src/components/Button.tsx": "410b147e8e5329e39fbfba353fc7a0e23c15ce9c032f706422d421e1437d07ee",
-    "src/components/Layout.tsx": "ceb285a0f8c4eb605a23aac86245c08d4262f6170ae9cd9037dd0a85930d7f77",
-    "src/main.tsx": "29c0d0f2666fd21a24783abe2a36c16cd7eb02bf20253abda26139ced5298619",
-    "src/styles.css": "9b60854733a829678c9dc34895c98b25de18944cd4d0d6bbde940086aa4d180a"
+    "src/components/Layout.tsx": "0626874639df7b77e7179a91a337f63feb51d9d21978813153a9781ec30683d5",
+    "src/main.tsx": "f9b88997e3add04798ed50186f1e1b3705edda724d736ba2aa49d92d941eed1d",
+    "src/styles.css": "919241f1b8cc0d90dacfb8c55c9673a5e849ec5c3d86f12e275768c8d9d965dc"
   }
 }

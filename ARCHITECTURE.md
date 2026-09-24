@@ -15,7 +15,11 @@
    Failure classification starts with rules; the AI handles the ambiguous remainder and must cite
    the evidence it inspected.
 5. **Incremental and resumable.** Every stage hashes its inputs and is skipped when unchanged; runs
-   are checkpointed so `--resume` continues from the last completed stage.
+   are checkpointed so `--resume` continues from the last completed stage. Change detection is
+   per page: a page's own files are hashed separately from files shared by every page (router,
+   layout, global CSS), so adding a route re-analyzes and re-tests only the new page.
+6. **Humans decide what reaches the tracker.** Confirmed defects are presented in the report and
+   the dashboard; ClickUp tasks are created only on an explicit click or flag.
 
 ## Pipeline
 
@@ -27,13 +31,15 @@ init ──► analyze ──► design ──► scenarios ──► generate �
 | Stage | Module | Input | Output | Cache key |
 |---|---|---|---|---|
 | init | `discovery/detect.ts`, `init/init.ts` | package.json, file tree | `.qa/config.ts`, `project.json` | — |
-| analyze | `analyze/app.ts` | source files, project.json, rules | `app-model.json` (pages, forms, states, rules, test data, per-page file hashes) | hash of all source files |
+| changes | `changes/detect.ts` | project.json routes, per-page file hashes, optional Figma metadata | list of new/changed/removed pages, changed shared files, new/changed Figma frames | — (free; Figma part costs MCP calls) |
+| analyze | `analyze/app.ts` | source files, project.json, rules | `app-model.json` (pages, forms, states, rules, test data, per-page and shared-file hashes) | all-source hash for the fast path; otherwise only new/changed pages are re-analyzed and merged |
 | design | `design/figma.ts` | Figma MCP (metadata, variables, design context, screenshots) | `design-system.json`, `design/refs/*.png` | figma config + viewports |
 | scenarios | `scenarios/generate.ts` | page model, flows, design subset, viewports | `scenarios/<page>.json` | per page: page files hash + model + design |
 | generate | `generate/playwright.ts` | approved scenarios, page model, Playwright MCP (to confirm locators on the live app) | `tests/<page>.spec.ts`, validated with `playwright test --list`; up to 3 fix rounds | per spec: scenarios + model |
 | test | `runner/*` | specs, generated `playwright.config.ts` | `artifacts/runs/<id>/` evidence + `results.json` | — |
 | triage | `triage/*` | outcomes + evidence + scenario + source + design | `triage.json` (per-failure verdicts, consolidated issues) | — |
-| file | `bugs/*`, `integrations/clickup.ts` | fileable issues | ClickUp tasks + attachments, `filing.json`, `state.bugs` | fingerprint of scenario ids |
+| file | `bugs/*`, `integrations/clickup.ts` | fileable issues; off unless `--file` / `clickup.autoFile` | ClickUp tasks + attachments, `filing.json`, `state.bugs` | fingerprint of scenario ids |
+| ui | `ui/server.ts`, `ui/page.ts` | scenarios, run results, triage, filing | local dashboard (`/api/overview`, `/files/*`, `POST /api/file` to log one issue) | — |
 | report | `report/report.ts` | everything above | `reports/<id>/report.md|html`, `bugs/*.md` | — |
 
 ## Modules
@@ -49,7 +55,10 @@ src/
                           structured output, tracks cost
   ai/context.ts           shared system prompt, project rules, Figma URL parsing
   discovery/detect.ts     deterministic framework/route/test detection
-  analyze/app.ts          AppModel schema + analysis task
+  analyze/app.ts          AppModel schema; full analysis and per-route incremental analysis + merge
+  changes/detect.ts       deterministic code change detection (per-page + shared-file hashes) and
+                          opt-in Figma change detection (frame list + page structure hashes)
+  ui/server.ts, ui/page.ts local dashboard server (node:http) and its single static page
   design/schema.ts        DesignSystem schema with observed/inferred/unknown certainty
   design/figma.ts         extraction task (read-only Figma tools), reference image download,
                           rate-limit reporting, back-fill of missing references

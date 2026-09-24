@@ -38,6 +38,10 @@ const FiledBugSchema = z.object({
   url: z.string().optional(),
   firstSeenRun: z.string(),
   lastSeenRun: z.string(),
+  /** Used to recognise the same defect when different tests expose it in a later run. */
+  classification: z.string().optional(),
+  category: z.string().optional(),
+  files: z.array(z.string()).default([]),
 });
 export type FiledBug = z.infer<typeof FiledBugSchema>;
 
