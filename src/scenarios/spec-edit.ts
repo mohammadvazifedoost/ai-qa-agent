@@ -276,3 +276,63 @@ export function removeTestBlock(source: string, id: string): RemoveResult {
   }
   return { code, removed: calls.length };
 }
+
+export interface UpsertResult {
+  code: string;
+  action: 'replaced' | 'added';
+}
+
+/** Strip the common indentation, then indent every line after the first with `indent`. */
+function reindent(block: string, indent: string): string {
+  const lines = block.replace(/\r\n/g, '\n').trim().split('\n');
+  const common = Math.min(...lines.filter((l) => l.trim()).map((l) => /^[ \t]*/.exec(l)![0].length));
+  return lines
+    .map((l, i) => {
+      const body = l.trim() ? l.slice(common) : '';
+      return i === 0 || !body ? body : indent + body;
+    })
+    .join('\n');
+}
+
+/** End of a call statement: after its `)` and an optional `;`. */
+function statementEnd(tokens: Token[], source: string, close: number): number {
+  const next = tokens[close + 1];
+  return next && next.kind === 'punct' && source[next.start] === ';' ? next.end : tokens[close]!.end;
+}
+
+/**
+ * Put one scenario's test into a spec: replace the existing `test('<id>: …')` statement in place,
+ * or add it after the last test (inside the same `describe`, at the same indentation). `block`
+ * must be exactly that one test statement. Everything else in the file is left untouched.
+ */
+export function upsertTestBlock(source: string, id: string, block: string): UpsertResult {
+  const blockTokens = tokenize(block).filter((t) => t.kind !== 'comment');
+  const blockCalls = findTestCalls(block, blockTokens);
+  if (blockCalls.length !== 1 || !titleHasId(blockCalls[0]!.title, id)) {
+    throw new Error(`The new code must contain exactly one test titled "${id}: …".`);
+  }
+  const only = blockCalls[0]!;
+  if (only.first !== 0 || statementEnd(blockTokens, block, only.close) !== blockTokens.at(-1)!.end) {
+    throw new Error(`The new code must contain only the test for ${id}, with no other statements.`);
+  }
+
+  const tokens = tokenize(source);
+  const calls = findTestCalls(source, tokens);
+  const mine = calls.filter((c) => titleHasId(c.title, id));
+  if (mine.length > 1) throw new Error(`${id} has ${mine.length} tests in the file; edit the spec by hand.`);
+  const anchor =
+    mine[0] ?? calls.reduce<TestCall | undefined>((a, c) => (!a || c.close > a.close ? c : a), undefined);
+  if (!anchor)
+    throw new Error('The spec has no tests to place the new one next to; generate the whole file.');
+  const start = tokens[anchor.first]!.start;
+  if (!onlySpaceBefore(source, start)) {
+    throw new Error(`The test next to ${id} is not a standalone statement; edit the spec by hand.`);
+  }
+  const indent = source.slice(lineStart(source, start), start);
+  const code = reindent(block, indent);
+  const end = statementEnd(tokens, source, anchor.close);
+  if (mine.length === 1) {
+    return { code: source.slice(0, start) + code + source.slice(end), action: 'replaced' };
+  }
+  return { code: source.slice(0, end) + '\n\n' + indent + code + source.slice(end), action: 'added' };
+}

@@ -379,7 +379,7 @@ program
     if (info.kind && !info.credentialsPresent) {
       console.log(
         pc.yellow(
-          `${info.name} filing is disabled: its credentials are not set in this shell (see ai-qa-agent doctor).`,
+          `${info.name} filing is disabled: set ${info.missingEnv.join(' and ')} in this shell (see ai-qa-agent doctor).`,
         ),
       );
     }

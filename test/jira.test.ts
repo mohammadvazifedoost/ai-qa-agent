@@ -4,7 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { QaConfigSchema, type QaConfigInput } from '../src/config/schema.js';
 import { markdownToAdf } from '../src/integrations/adf.js';
 import { JiraClient, JiraError } from '../src/integrations/jira.js';
-import { createTracker, FilingUnavailable, trackerInfo, trackerKind } from '../src/integrations/tracker.js';
+import {
+  createTracker,
+  FilingUnavailable,
+  trackerInfo,
+  trackerKind,
+  trackerStatuses,
+} from '../src/integrations/tracker.js';
 import { makeProject } from './helpers.js';
 
 interface Call {
@@ -210,9 +216,18 @@ describe('tracker selection', () => {
       name: 'Jira',
       noun: 'issue',
       credentialsPresent: false,
+      missingEnv: ['JIRA_API_TOKEN', 'JIRA_EMAIL'],
       target: 'project SHOP',
     });
-    expect(trackerInfo(config, { JIRA_API_TOKEN: 't', JIRA_EMAIL: 'a@b.c' }).credentialsPresent).toBe(true);
+    expect(trackerInfo(config, { JIRA_API_TOKEN: 't' }).missingEnv).toEqual(['JIRA_EMAIL']);
+    expect(
+      trackerInfo(QaConfigSchema.parse({ ...base, jira: { ...jira, email: 'qa@example.com' } }), {})
+        .missingEnv,
+    ).toEqual(['JIRA_API_TOKEN']);
+    expect(trackerInfo(config, { JIRA_API_TOKEN: 't', JIRA_EMAIL: 'a@b.c' })).toMatchObject({
+      credentialsPresent: true,
+      missingEnv: [],
+    });
     expect(() => createTracker(config, {})).toThrow(FilingUnavailable);
     expect(() => createTracker(config, { JIRA_API_TOKEN: 't' })).toThrow(/JIRA_EMAIL/);
     expect(createTracker(config, { JIRA_API_TOKEN: 't', JIRA_EMAIL: 'a@b.c' }).noun).toBe('issue');
@@ -229,5 +244,49 @@ describe('tracker selection', () => {
     const fields = JSON.parse(calls[0]!.init.body as string).fields;
     expect(fields.labels).toEqual(['qa', 'bug']);
     expect(fields.priority).toEqual({ name: 'Highest' });
+  });
+});
+
+describe('trackerStatuses', () => {
+  const base: QaConfigInput = {
+    project: { name: 'x' },
+    app: { baseUrl: 'http://localhost:3000' },
+    source: { include: ['src'] },
+  };
+  const jira = { baseUrl: 'https://acme.atlassian.net', projectKey: 'SHOP' };
+  const creds = { JIRA_API_TOKEN: 't', JIRA_EMAIL: 'qa@example.com' };
+
+  it('always lists Jira, and ClickUp only when configured', async () => {
+    const statuses = await trackerStatuses(QaConfigSchema.parse(base), {});
+    expect(statuses).toEqual([
+      expect.objectContaining({ kind: 'jira', state: 'not-configured', active: false, missingEnv: [] }),
+    ]);
+  });
+
+  it('reports missing credentials by name without calling Jira', async () => {
+    const { fetch, calls } = fakeFetch(() => ({ status: 200, body: {} }));
+    const [s] = await trackerStatuses(
+      QaConfigSchema.parse({ ...base, jira }),
+      { JIRA_API_TOKEN: 't' },
+      fetch,
+    );
+    expect(s).toMatchObject({ state: 'missing-credentials', missingEnv: ['JIRA_EMAIL'], active: true });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('checks the connection and describes the project, or reports the error', async () => {
+    const ok = fakeFetch(() => ({ status: 200, body: { id: '10000', key: 'SHOP', name: 'Shop' } }));
+    const config = QaConfigSchema.parse({ ...base, jira, clickup: { listId: '1' }, tracker: 'jira' });
+    const statuses = await trackerStatuses(config, creds, ok.fetch);
+    expect(statuses.map((s) => [s.kind, s.state, s.active])).toEqual([
+      ['jira', 'connected', true],
+      ['clickup', 'missing-credentials', false],
+    ]);
+    expect(statuses[0]!.detail).toBe('project "Shop" (SHOP) on https://acme.atlassian.net');
+
+    const denied = fakeFetch(() => ({ status: 401, body: { errorMessages: ['Unauthorized'] } }));
+    const [s] = await trackerStatuses(QaConfigSchema.parse({ ...base, jira }), creds, denied.fetch);
+    expect(s!.state).toBe('error');
+    expect(s!.detail).toMatch(/401/);
   });
 });

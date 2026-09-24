@@ -17,7 +17,7 @@ const log = logger('scenarios');
 /** Checks that an edited spec still loads and declares `expectedIds`; returns problems (empty = OK). */
 export type SpecValidator = (ctx: QaContext, file: string, expectedIds: string[]) => Promise<string[]>;
 
-const playwrightValidator: SpecValidator = (ctx, file, expectedIds) => {
+export const playwrightValidator: SpecValidator = (ctx, file, expectedIds) => {
   writePlaywrightConfig(ctx.paths, ctx.config);
   return validateSpec(
     ctx,

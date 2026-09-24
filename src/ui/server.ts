@@ -9,7 +9,13 @@ import {
   recordFiling,
   type FilingResult,
 } from '../bugs/file.js';
-import { createTracker, trackerInfo, type IssueTracker } from '../integrations/tracker.js';
+import {
+  createTracker,
+  trackerInfo,
+  trackerStatuses,
+  type IssueTracker,
+  type TrackerStatus,
+} from '../integrations/tracker.js';
 import { readJson, sha256, slugify } from '../core/fs.js';
 import type { TestOutcome } from '../runner/results.js';
 import type { BugDraft, Issue } from '../triage/schema.js';
@@ -17,8 +23,16 @@ import { logger } from '../core/logger.js';
 import { runDir } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
 import { TestRunResultSchema, type TestRunResult } from '../runner/results.js';
+import { scenarioTestStates, writeScenarioTest, type ScenarioTestState } from '../generate/scenario-test.js';
+import { loadAppModel } from '../analyze/app.js';
+import { runScenarioTest, runScenarioTests } from '../runner/rerun.js';
+import { runTests } from '../runner/run.js';
+import { listTestIds } from '../scenarios/spec-edit.js';
+import { specPath } from '../generate/playwright.js';
+import { draftScenario, saveScenario, ScenarioInputError } from '../scenarios/author.js';
 import { loadAllScenarios } from '../scenarios/generate.js';
 import { removeScenarios } from '../scenarios/manage.js';
+import { CATEGORIES } from '../scenarios/schema.js';
 import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
 import { PAGE_HTML } from './page.js';
 
@@ -33,6 +47,8 @@ export interface Overview {
     noun: 'task' | 'issue';
     configured: boolean;
     tokenPresent: boolean;
+    /** Names of the credential environment variables that are not set. */
+    missingEnv: string[];
     target: string | null;
   };
   runs: Array<{ id: string; startedAt: string; status: string; stats: TestRunResult['stats'] | null }>;
@@ -49,6 +65,12 @@ export interface Overview {
     tasksPending: boolean;
   } | null;
   scenarios: ReturnType<typeof loadAllScenarios>;
+  /** Choices for the add/edit scenario form. */
+  authoring: { pages: string[]; viewports: string[]; categories: readonly string[] };
+  /** Approved scenarios whose test is missing or older than the scenario (up-to-date ones are absent). */
+  testStates: Record<string, ScenarioTestState>;
+  /** The test run started from the dashboard that is running now, or the last one. */
+  job: Job | null;
 }
 
 export interface TaskLink {
@@ -184,11 +206,19 @@ export async function buildOverview(ctx: QaContext, runId?: string): Promise<Ove
       noun: info.noun,
       configured: info.kind !== null,
       tokenPresent: info.credentialsPresent,
+      missingEnv: info.missingEnv,
       target: info.target,
     },
     runs,
     run,
     scenarios: loadAllScenarios(ctx),
+    authoring: {
+      pages: loadAppModel(ctx)?.pages.map((p) => p.route) ?? [],
+      viewports: Object.keys(ctx.config.viewports),
+      categories: CATEGORIES,
+    },
+    testStates: scenarioTestStates(ctx),
+    job,
   };
 }
 
@@ -248,7 +278,8 @@ export function adhocIssue(
 ): Issue | undefined {
   const outcome = test.outcomes.find((o) => o.key === key);
   if (!outcome) return undefined;
-  const failure = triage?.failures.find((f) => f.key === key);
+  // The analysis of a test that was run again since describes an earlier failure.
+  const failure = outcome.rerunAt ? undefined : triage?.failures.find((f) => f.key === key);
   const scenario = loadAllScenarios(ctx).find((s) => s.id === outcome.scenarioId);
   const category =
     scenario?.category === 'visual' || scenario?.category === 'responsive' ? scenario.category : 'functional';
@@ -311,8 +342,120 @@ async function handleFile(ctx: QaContext, body: string): Promise<{ status: numbe
   }
 }
 
-/** Deletions edit spec and scenario files; run them one at a time. */
-let deleting: Promise<unknown> = Promise.resolve();
+/** Saves, deletions and test generation edit scenario and spec files; run them one at a time. */
+let writing: Promise<unknown> = Promise.resolve();
+
+/** A long test run started from the dashboard; the page polls GET /api/job until it is done. */
+export interface Job {
+  kind: 'run-all' | 'run-not-run';
+  label: string;
+  status: 'running' | 'done' | 'failed';
+  startedAt: string;
+  finishedAt?: string;
+  /** The run the results are in (known once it started). */
+  runId?: string;
+  message?: string;
+}
+
+let job: Job | null = null;
+
+/** Start a job unless one is running; it runs in the write queue so it never overlaps other edits. */
+function startJob(
+  kind: Job['kind'],
+  label: string,
+  work: (setRun: (runId: string) => void) => Promise<string>,
+): { status: number; payload: unknown } {
+  if (job?.status === 'running')
+    return { status: 409, payload: { error: `${job.label} is still running.`, job } };
+  const current: Job = { kind, label, status: 'running', startedAt: new Date().toISOString() };
+  job = current;
+  serially(() => work((runId) => (current.runId = runId)))
+    .then((message) => Object.assign(current, { status: 'done', message }))
+    .catch((err: unknown) => {
+      log.error(`${label}: ${(err as Error).message}`);
+      Object.assign(current, { status: 'failed', message: (err as Error).message });
+    })
+    .finally(() => (current.finishedAt = new Date().toISOString()));
+  return { status: 202, payload: current };
+}
+
+const summary = (stats: TestRunResult['stats']): string =>
+  `${stats.passed} passed, ${stats.failed} failed${stats.flaky ? `, ${stats.flaky} flaky` : ''}`;
+
+/** A new run with every test, like `ai-qa-agent test`. */
+function handleRunAll(ctx: QaContext): { status: number; payload: unknown } {
+  return startJob('run-all', 'Running all tests', async (setRun) => {
+    const record = ctx.state.startRun({ command: 'test' });
+    setRun(record.id);
+    try {
+      const res = await runTests(ctx, record.id);
+      ctx.state.finishRun(record, 'completed');
+      return `All tests ran: ${summary(res.stats)}.`;
+    } catch (err) {
+      ctx.state.finishRun(record, 'failed', (err as Error).message);
+      throw err;
+    }
+  });
+}
+
+/** Approved scenarios that have a test but no result in the run. */
+function notRunIds(ctx: QaContext, runId: string | undefined): string[] {
+  const ran = new Set(
+    (runId ? (loadRun(ctx, runId)?.outcomes ?? []) : []).map((o) => o.scenarioId).filter(Boolean),
+  );
+  const tests = new Map<string, string[]>();
+  return loadAllScenarios(ctx)
+    .filter((s) => {
+      if (!s.approved || ran.has(s.id)) return false;
+      const spec = specPath(ctx, s.page);
+      if (!tests.has(spec))
+        tests.set(spec, fs.existsSync(spec) ? listTestIds(fs.readFileSync(spec, 'utf8')) : []);
+      return tests.get(spec)!.includes(s.id);
+    })
+    .map((s) => s.id);
+}
+
+function handleRunNotRun(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { runId } = JSON.parse(body || '{}') as { runId?: unknown };
+  if (runId !== undefined && typeof runId !== 'string')
+    return { status: 400, payload: { error: 'runId must be a string' } };
+  const ids = notRunIds(ctx, runId);
+  if (ids.length === 0)
+    return { status: 400, payload: { error: 'Every test already has a result in this run.' } };
+  return startJob(
+    'run-not-run',
+    `Running ${ids.length} not-run test${ids.length === 1 ? '' : 's'}`,
+    async (setRun) => {
+      if (runId) setRun(runId);
+      const res = await runScenarioTests(ctx, ids, { runId });
+      setRun(res.runId);
+      const stats = {
+        passed: res.outcomes.filter((o) => o.status === 'passed').length,
+        failed: res.outcomes.filter((o) => o.status === 'failed').length,
+        flaky: res.outcomes.filter((o) => o.status === 'flaky').length,
+        skipped: 0,
+      };
+      return (
+        `Ran ${ids.length - res.missing.length} of ${ids.length} tests: ${summary(stats)}.` +
+        (res.missing.length ? ` No result for ${res.missing.join(', ')}.` : '')
+      );
+    },
+  );
+}
+
+/** Tracker checks contact the tracker; reuse the answer for a minute unless a refresh asks. */
+let trackerCache: { at: number; value: TrackerStatus[] } | undefined;
+async function trackerStatus(ctx: QaContext, fresh: boolean): Promise<TrackerStatus[]> {
+  if (!fresh && trackerCache && Date.now() - trackerCache.at < 60_000) return trackerCache.value;
+  trackerCache = { at: Date.now(), value: await trackerStatuses(ctx.config) };
+  return trackerCache.value;
+}
+
+function serially<T>(fn: () => T | Promise<T>): Promise<T> {
+  const task = writing.then(fn);
+  writing = task.catch(() => undefined);
+  return task;
+}
 
 async function handleDeleteScenario(
   ctx: QaContext,
@@ -320,17 +463,77 @@ async function handleDeleteScenario(
 ): Promise<{ status: number; payload: unknown }> {
   const { id, reason } = JSON.parse(body || '{}') as { id?: unknown; reason?: unknown };
   if (typeof id !== 'string' || !id.trim()) return { status: 400, payload: { error: 'id is required' } };
-  const task = deleting.then(() =>
-    removeScenarios(ctx, [id], { reason: typeof reason === 'string' ? reason.trim() : undefined }),
-  );
-  deleting = task.catch(() => undefined);
   try {
-    const [removed] = await task;
+    const [removed] = await serially(() =>
+      removeScenarios(ctx, [id], { reason: typeof reason === 'string' ? reason.trim() : undefined }),
+    );
     return { status: 200, payload: removed };
   } catch (err) {
     const message = (err as Error).message;
     return {
       status: /^Unknown scenario|already removed/.test(message) ? 404 : 409,
+      payload: { error: message },
+    };
+  }
+}
+
+async function handleSaveScenario(
+  ctx: QaContext,
+  body: string,
+): Promise<{ status: number; payload: unknown }> {
+  const { id, scenario } = JSON.parse(body || '{}') as { id?: unknown; scenario?: unknown };
+  if (id !== undefined && typeof id !== 'string')
+    return { status: 400, payload: { error: 'id must be a string' } };
+  try {
+    return { status: 200, payload: await serially(() => saveScenario(ctx, scenario, id)) };
+  } catch (err) {
+    if (err instanceof ScenarioInputError) return { status: 400, payload: { error: err.message } };
+    throw err;
+  }
+}
+
+async function handleDraftScenario(
+  ctx: QaContext,
+  body: string,
+): Promise<{ status: number; payload: unknown }> {
+  const { page, description } = JSON.parse(body || '{}') as { page?: unknown; description?: unknown };
+  if (typeof page !== 'string' || typeof description !== 'string') {
+    return { status: 400, payload: { error: 'page and description are required' } };
+  }
+  try {
+    return { status: 200, payload: await draftScenario(ctx, { page, description }) };
+  } catch (err) {
+    if (err instanceof ScenarioInputError) return { status: 400, payload: { error: err.message } };
+    return { status: 502, payload: { error: `The AI could not draft it: ${(err as Error).message}` } };
+  }
+}
+
+async function handleWriteTest(ctx: QaContext, body: string): Promise<{ status: number; payload: unknown }> {
+  const { id } = JSON.parse(body || '{}') as { id?: unknown };
+  if (typeof id !== 'string' || !id.trim()) return { status: 400, payload: { error: 'id is required' } };
+  try {
+    return { status: 200, payload: await serially(() => writeScenarioTest(ctx, id)) };
+  } catch (err) {
+    const message = (err as Error).message;
+    return {
+      status: /^Unknown scenario|not approved/.test(message) ? 404 : 500,
+      payload: { error: message },
+    };
+  }
+}
+
+async function handleRunTest(ctx: QaContext, body: string): Promise<{ status: number; payload: unknown }> {
+  const { id, runId } = JSON.parse(body || '{}') as { id?: unknown; runId?: unknown };
+  if (typeof id !== 'string' || !id.trim()) return { status: 400, payload: { error: 'id is required' } };
+  if (runId !== undefined && typeof runId !== 'string') {
+    return { status: 400, payload: { error: 'runId must be a string' } };
+  }
+  try {
+    return { status: 200, payload: await serially(() => runScenarioTest(ctx, id, { runId })) };
+  } catch (err) {
+    const message = (err as Error).message;
+    return {
+      status: /^Unknown scenario|has no test yet/.test(message) ? 404 : 500,
       payload: { error: message },
     };
   }
@@ -357,6 +560,28 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/scenarios/delete') {
         const { status, payload } = await handleDeleteScenario(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/scenarios/save') {
+        const { status, payload } = await handleSaveScenario(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/scenarios/draft') {
+        const { status, payload } = await handleDraftScenario(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'GET' && url.pathname === '/api/trackers') {
+        json(res, 200, { trackers: await trackerStatus(ctx, url.searchParams.has('fresh')) });
+      } else if (req.method === 'GET' && url.pathname === '/api/job') {
+        json(res, 200, { job });
+      } else if (req.method === 'POST' && url.pathname === '/api/runs/all') {
+        const { status, payload } = handleRunAll(ctx);
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/runs/not-run') {
+        const { status, payload } = handleRunNotRun(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/scenarios/run') {
+        const { status, payload } = await handleRunTest(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/scenarios/test') {
+        const { status, payload } = await handleWriteTest(ctx, await readBody(req));
         json(res, status, payload);
       } else if (req.method === 'GET' && url.pathname.startsWith('/files/')) {
         serveFile(ctx, url.pathname, res);

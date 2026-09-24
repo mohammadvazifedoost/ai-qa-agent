@@ -8,8 +8,9 @@ import { logger } from '../core/logger.js';
 import type { DesignSystemFile } from '../design/schema.js';
 import type { QaContext } from '../pipeline/context.js';
 import {
+  AiScenarioSchema,
+  isPersonScenario,
   ScenarioFileSchema,
-  ScenarioSchema,
   type RemovedScenario,
   type Scenario,
   type ScenarioFile,
@@ -23,6 +24,11 @@ export function scenarioFilePath(ctx: QaContext, route: string): string {
 
 export function pageSlug(route: string): string {
   return route === '/' ? 'home' : slugify(route);
+}
+
+/** Id prefix of a page's scenarios, e.g. "/order-history" → "ORDERHISTORY". */
+export function scenarioIdPrefix(route: string): string {
+  return pageSlug(route).toUpperCase().replace(/-/g, '');
 }
 
 export function loadDesign(ctx: QaContext): DesignSystemFile | undefined {
@@ -163,6 +169,30 @@ export function dropRemoved(scenarios: Scenario[], removed: readonly RemovedScen
   });
 }
 
+/** Prompt section listing scenarios a person wrote or edited, which the AI must leave alone. */
+export function personSection(person: readonly Scenario[]): string {
+  if (person.length === 0) return '';
+  return `## Scenarios written by a person — keep as they are
+These are maintained by a person and are kept exactly as written. Do not return them, do not return scenarios that test the same thing, and do not reuse their ids.
+${person.map((s) => `- ${s.id}: ${s.title}`).join('\n')}
+`;
+}
+
+/**
+ * Merge the AI's scenarios with the ones a person owns: person scenarios win on id and title,
+ * and the result is ordered by id.
+ */
+export function mergePersonScenarios(ai: Scenario[], person: readonly Scenario[]): Scenario[] {
+  const ids = new Set(person.map((s) => s.id));
+  const titles = new Set(person.map((s) => normalizeTitle(s.title)));
+  const kept = ai.filter((s) => {
+    const hit = ids.has(s.id) || titles.has(normalizeTitle(s.title));
+    if (hit) log.warn(`Dropping ${s.id} "${s.title}": it collides with a scenario written by a person`);
+    return !hit;
+  });
+  return [...kept, ...person].sort((a, b) => a.id.localeCompare(b.id));
+}
+
 async function generateForPage(
   ctx: QaContext,
   app: AppModelFile,
@@ -171,7 +201,9 @@ async function generateForPage(
   existing: ScenarioFile | undefined,
   max: number,
 ): Promise<Scenario[]> {
-  const prefix = pageSlug(page.route).toUpperCase().replace(/-/g, '');
+  const prefix = scenarioIdPrefix(page.route);
+  const person = existing?.scenarios.filter(isPersonScenario) ?? [];
+  const aiExisting = existing?.scenarios.filter((s) => !isPersonScenario(s)) ?? [];
   const flows = app.flows.filter((f) => f.routes.includes(page.route));
   const res = await ctx.ai.run({
     name: `scenarios-${pageSlug(page.route)}`,
@@ -194,7 +226,7 @@ ${JSON.stringify(designForPage(design, page.route), null, 2)}
 ## Viewports available
 ${JSON.stringify(ctx.config.viewports)}
 
-${existing ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(existing.scenarios, null, 2)}\n` : ''}${removedSection(existing?.removed ?? [])}
+${aiExisting.length ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(aiExisting, null, 2)}\n` : ''}${personSection(person)}${removedSection(existing?.removed ?? [])}
 ## Instructions
 - Produce at most ${max} high-value scenarios for this page across categories: functional, visual, responsive. Quality over quantity: no trivial duplicates.
 - functional: happy paths, validation, empty/error/loading states, navigation, and business rules (calculations!).
@@ -205,15 +237,18 @@ ${existing ? `## Existing scenarios (keep ids stable for scenarios that still ap
 - ids: "${prefix}-001", "${prefix}-002", ... (reuse existing ids when updating).
 - source.figma = the expectation comes from Figma data; source.code = derived from reading code.
 - Set approved: true for new scenarios.${projectRules(ctx)}`,
-    schema: z.object({ scenarios: z.array(ScenarioSchema) }),
+    schema: z.object({ scenarios: z.array(AiScenarioSchema) }),
     tools: ['Read', 'Glob', 'Grep'],
   });
   const viewports = Object.keys(ctx.config.viewports);
-  return dropRemoved(res.output.scenarios, existing?.removed ?? []).map((s) => {
+  // Strip ownership fields in case an engine returns them anyway: only a person sets them.
+  const fromAi = res.output.scenarios.map(({ origin: _o, editedAt: _e, ...s }: Scenario): Scenario => s);
+  const ai = dropRemoved(fromAi, existing?.removed ?? []).map((s) => {
     if (!viewports.includes(s.viewport)) {
       log.warn(`Scenario ${s.id} uses unknown viewport "${s.viewport}", using "${viewports[0]}"`);
       return { ...s, viewport: viewports[0]! };
     }
     return s;
   });
+  return mergePersonScenarios(ai, person);
 }

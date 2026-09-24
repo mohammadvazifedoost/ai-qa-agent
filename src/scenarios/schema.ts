@@ -35,8 +35,17 @@ export const ScenarioSchema = z.object({
     .nullable(),
   rationale: z.string().describe('Why this scenario matters / what risk it covers'),
   approved: z.boolean(),
+  /** Who wrote it. Missing means the AI; `person` scenarios are never rewritten or dropped by regeneration. */
+  origin: z.enum(['ai', 'person']).optional(),
+  /** When a person last added or edited it (ISO timestamp). */
+  editedAt: z.string().optional(),
 });
 export type Scenario = z.infer<typeof ScenarioSchema>;
+
+/** What the AI returns: it cannot claim a scenario was written by a person. */
+export const AiScenarioSchema = ScenarioSchema.omit({ origin: true, editedAt: true });
+
+export const isPersonScenario = (s: Pick<Scenario, 'origin'>): boolean => s.origin === 'person';
 
 /** A scenario a person deleted. Kept so regeneration does not bring it back, and for `restore`. */
 export const RemovedScenarioSchema = z.object({

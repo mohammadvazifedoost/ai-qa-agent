@@ -18,9 +18,10 @@ import { ScenarioFileSchema, type Scenario } from '../scenarios/schema.js';
 const log = logger('generate');
 
 /** Browser tools the generator may use to verify selectors on the running app (no arbitrary code execution). */
-const BROWSER_TOOLS = [
+export const BROWSER_TOOLS = [
   'mcp__playwright__browser_navigate',
   'mcp__playwright__browser_snapshot',
+  'mcp__playwright__browser_find',
   'mcp__playwright__browser_click',
   'mcp__playwright__browser_type',
   'mcp__playwright__browser_fill_form',
@@ -58,7 +59,7 @@ export function specPath(ctx: QaContext, route: string): string {
   return path.join(ctx.paths.testsDir, `${pageSlug(route)}.spec.ts`);
 }
 
-function designSummary(ctx: QaContext, route: string): unknown {
+export function designSummary(ctx: QaContext, route: string): unknown {
   if (!fs.existsSync(ctx.paths.designSystem)) return null;
   const ds = JSON.parse(fs.readFileSync(ctx.paths.designSystem, 'utf8')) as {
     screens: Array<{ name: string; route: string | null; viewport: string }>;
@@ -70,8 +71,21 @@ function designSummary(ctx: QaContext, route: string): unknown {
     .map((s) => ({ name: s.name, viewport: s.viewport, hasReferenceImage: refs.has(s.name) }));
 }
 
-function buildPrompt(ctx: QaContext, page: PageModel, scenarios: Scenario[], file: string): string {
+/** How every generated test must be written; shared by whole-file and single-test generation. */
+export function testRules(ctx: QaContext): string {
   const viewports = Object.keys(ctx.config.viewports);
+  return `- Tag every test: { tag: ['@<category>', '@<feature>', '@<viewport>', '@<priority>'] } where viewport is one of ${viewports.map((v) => `@${v}`).join(', ')} — the tag selects the browser viewport the test runs in. Use the scenario's own values.
+- Encode the scenario's expectedResults as assertions. They describe CORRECT behaviour; never weaken them to match what the code currently does. A failing test is how bugs are found.
+- Locators: prefer getByRole / getByLabel / getByText with exact accessible names; use getByTestId only where the page model lists a data-testid. No CSS/XPath selectors unless nothing else identifies the element.
+- No page.waitForTimeout / arbitrary sleeps. Rely on auto-waiting assertions (toBeVisible, toHaveText, toHaveURL...). To observe a transient loading state, assert it right after the action that triggers it.
+- Build preconditions through the UI (e.g. add products on / before visiting /checkout; the cart is in-memory, so navigate client-side via links instead of page.goto when state must survive).
+- Use test.step() for each scenario step so the report shows progress. Keep helpers local to the file.
+- Visual scenarios: use qa.expectDesignTokens with the scenario's design.tokens, and qa.compareWithDesign only when design.screen is set and has a reference image. Call qa.compareWithDesign FIRST (right after reaching the designed state), then token checks; use expect.soft for any extra custom visual assertions so every design check runs and is reported.
+- Responsive scenarios: use qa.expectNoHorizontalOverflow() where overflow matters, and assert visibility of responsive elements.
+- Never modify application code. You may use the browser tools to open the running app and confirm accessible names before writing locators.`;
+}
+
+function buildPrompt(ctx: QaContext, page: PageModel, scenarios: Scenario[], file: string): string {
   return `Write a Playwright test file (TypeScript) that implements these approved test scenarios for ${page.route}.
 The file will be saved as ${rel(ctx.root, file)}. The app runs at ${ctx.config.app.baseUrl} (baseURL is configured; use relative URLs like page.goto('${page.route}')).
 
@@ -89,15 +103,7 @@ ${HELPER_API}
 
 ## Rules
 - One test per scenario. Title MUST start with the scenario id: test('CHECKOUT-002: <title>', ...).
-- Tag every test: { tag: ['@<category>', '@<feature>', '@<viewport>', '@<priority>'] } where viewport is one of ${viewports.map((v) => `@${v}`).join(', ')} — the tag selects the browser viewport the test runs in. Use the scenario's own values.
-- Encode the scenario's expectedResults as assertions. They describe CORRECT behaviour; never weaken them to match what the code currently does. A failing test is how bugs are found.
-- Locators: prefer getByRole / getByLabel / getByText with exact accessible names; use getByTestId only where the page model lists a data-testid. No CSS/XPath selectors unless nothing else identifies the element.
-- No page.waitForTimeout / arbitrary sleeps. Rely on auto-waiting assertions (toBeVisible, toHaveText, toHaveURL...). To observe a transient loading state, assert it right after the action that triggers it.
-- Build preconditions through the UI (e.g. add products on / before visiting /checkout; the cart is in-memory, so navigate client-side via links instead of page.goto when state must survive).
-- Use test.step() for each scenario step so the report shows progress. Keep helpers local to the file.
-- Visual scenarios: use qa.expectDesignTokens with the scenario's design.tokens, and qa.compareWithDesign only when design.screen is set and has a reference image. Call qa.compareWithDesign FIRST (right after reaching the designed state), then token checks; use expect.soft for any extra custom visual assertions so every design check runs and is reported.
-- Responsive scenarios: use qa.expectNoHorizontalOverflow() where overflow matters, and assert visibility of responsive elements.
-- Never modify application code. You may use the browser tools to open the running app and confirm accessible names before writing locators.
+${testRules(ctx)}
 - Return the complete file content in "code", and the scenario ids implemented in "coveredScenarioIds".${projectRules(ctx)}`;
 }
 
@@ -157,6 +163,33 @@ export interface GenerateScope {
   force?: boolean;
 }
 
+/** Per page: its approved scenarios and whether its spec is up to date with them. */
+function specTasks(ctx: QaContext, pages: PageModel[]) {
+  return pages.map((page) => {
+    const scenarios = (
+      readJson(scenarioFilePath(ctx, page.route), ScenarioFileSchema)?.scenarios ?? []
+    ).filter((s) => s.approved);
+    const file = specPath(ctx, page.route);
+    const hash = specHash(ctx, page, scenarios);
+    const key = specKey(ctx, file);
+    const fresh = fs.existsSync(file) && ctx.state.data.generatedSpecs[key] === hash;
+    return { page, scenarios, file, hash, key, fresh };
+  });
+}
+
+/**
+ * Fingerprint of everything in a scenario that its test encodes (not who wrote it or why), stored in
+ * `state.scenarioTests` when its test is written so an edit shows the test is out of date.
+ */
+export function scenarioTestHash(s: Scenario): string {
+  const { approved: _a, origin: _o, editedAt: _e, rationale: _r, ...tested } = s;
+  return sha256(JSON.stringify(tested));
+}
+
+export function recordScenarioTests(ctx: QaContext, scenarios: readonly Scenario[]): void {
+  for (const s of scenarios) ctx.state.data.scenarioTests[s.id] = scenarioTestHash(s);
+}
+
 export async function generateTests(ctx: QaContext, scope: GenerateScope = {}): Promise<string[]> {
   const app = loadAppModel(ctx);
   if (!app) throw new Error('No .qa/app-model.json. Run `ai-qa-agent analyze` first.');
@@ -166,23 +199,12 @@ export async function generateTests(ctx: QaContext, scope: GenerateScope = {}): 
   const pages = selectPages(app.pages, scope.page).filter(
     (p) => !scope.pages || scope.pages.includes(p.route),
   );
-  const todo = pages
-    .map((page) => {
-      const scenarios = (
-        readJson(scenarioFilePath(ctx, page.route), ScenarioFileSchema)?.scenarios ?? []
-      ).filter((s) => s.approved);
-      const file = specPath(ctx, page.route);
-      const hash = specHash(ctx, page, scenarios);
-      const key = specKey(ctx, file);
-      const fresh = fs.existsSync(file) && ctx.state.data.generatedSpecs[key] === hash;
-      return { page, scenarios, file, hash, key, fresh };
-    })
-    .filter((t) => {
-      if (t.scenarios.length === 0)
-        log.warn(`No approved scenarios for ${t.page.route}; run \`ai-qa-agent scenarios\``);
-      else if (t.fresh && !scope.force) log.info(`${t.key} is up to date`);
-      return t.scenarios.length > 0 && (!t.fresh || scope.force);
-    });
+  const todo = specTasks(ctx, pages).filter((t) => {
+    if (t.scenarios.length === 0)
+      log.warn(`No approved scenarios for ${t.page.route}; run \`ai-qa-agent scenarios\``);
+    else if (t.fresh && !scope.force) log.info(`${t.key} is up to date`);
+    return t.scenarios.length > 0 && (!t.fresh || scope.force);
+  });
   if (todo.length === 0) return written;
 
   // The generator explores the live app to confirm locators, so make sure it is running.
@@ -220,6 +242,7 @@ export async function generateTests(ctx: QaContext, scope: GenerateScope = {}): 
         throw new Error(`Could not generate a valid ${t.key}:\n${problems.join('\n')}`);
       }
       ctx.state.data.generatedSpecs[t.key] = t.hash;
+      recordScenarioTests(ctx, t.scenarios);
       ctx.state.save();
       written.push(t.file);
       log.info(`Generated ${t.key} (${t.scenarios.length} scenarios)`);

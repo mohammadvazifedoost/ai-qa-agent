@@ -122,6 +122,12 @@
   .chip-other {
     @apply bg-line text-muted;
   }
+  .chip-person {
+    @apply bg-accent-soft text-accent;
+  }
+  .chip-todo {
+    @apply bg-flaky-soft text-flaky;
+  }
   .pill {
     @apply inline-block rounded-full px-2.5 py-[3px] text-xs font-bold;
   }
