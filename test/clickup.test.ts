@@ -149,3 +149,21 @@ describe('renderBugMarkdown', () => {
     }
   });
 });
+
+describe('ClickUpClient.taskExists', () => {
+  it('reports existing, deleted and missing tasks', async () => {
+    const existing = fakeFetch(() => ({
+      status: 200,
+      body: { id: 'a', url: 'https://app.clickup.com/t/a', status: { status: 'to do' } },
+    }));
+    expect(await new ClickUpClient('pk', existing.fetch).taskExists('a')).toEqual({
+      exists: true,
+      url: 'https://app.clickup.com/t/a',
+      status: 'to do',
+    });
+    const deleted = fakeFetch(() => ({ status: 200, body: { id: 'b', deleted: true } }));
+    expect((await new ClickUpClient('pk', deleted.fetch).taskExists('b')).exists).toBe(false);
+    const missing = fakeFetch(() => ({ status: 404, body: { err: 'Task not found', ECODE: 'ITEM_013' } }));
+    expect(await new ClickUpClient('pk', missing.fetch).taskExists('c')).toEqual({ exists: false });
+  });
+});

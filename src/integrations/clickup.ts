@@ -76,6 +76,26 @@ export class ClickUpClient {
     return parsed.data;
   }
 
+  /** Whether a task still exists (deleted tasks answer 404 or `deleted: true`). */
+  async taskExists(taskId: string): Promise<{ exists: boolean; url?: string; status?: string }> {
+    try {
+      const t = await this.request(
+        'GET',
+        `/task/${encodeURIComponent(taskId)}`,
+        z.looseObject({
+          id: z.string(),
+          url: z.string().optional(),
+          deleted: z.boolean().optional(),
+          status: z.looseObject({ status: z.string() }).optional(),
+        }),
+      );
+      return { exists: t.deleted !== true, url: t.url, status: t.status?.status };
+    } catch (err) {
+      if (err instanceof ClickUpError && (err.status === 404 || err.status === 400)) return { exists: false };
+      throw err;
+    }
+  }
+
   /** Cheap authenticated call used to verify token + list access before filing anything. */
   getList(listId: string): Promise<z.infer<typeof ListResponse>> {
     return this.request('GET', `/list/${encodeURIComponent(listId)}`, ListResponse);

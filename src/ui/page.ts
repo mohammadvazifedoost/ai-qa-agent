@@ -104,8 +104,7 @@ select,.toggle{font:inherit;padding:7px 10px;border:1px solid var(--line-strong)
 .btn{display:inline-block;border:0;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer;background:var(--accent);color:var(--accent-ink);text-decoration:none;line-height:1.4}
 .btn:disabled{opacity:.55;cursor:default}
 .btn.ghost{background:var(--accent-soft);color:var(--accent)}
-.tasklink{font-size:13px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
-.tasklink:hover{color:var(--accent)}
+a.btn.ghost:hover{text-decoration:underline}
 @media (max-width:640px){
   .row{grid-template-columns:14px minmax(0,1fr)}
   .row .open{grid-column:1/3;grid-template-columns:14px minmax(0,1fr)}
@@ -290,11 +289,13 @@ function action(sc, status) {
   const body = cu.issue ? { issueId: cu.issue.id } : { failureKey: cu.outcome.key };
   const disabled = can ? '' : 'disabled title="ClickUp token missing in the shell that started ai-qa ui"';
   const call = ' onclick="event.stopPropagation(); fileBug(this, ' + esc(JSON.stringify(body)) + ')"';
-  // A click always creates a task. Tasks created earlier are shown as a small link beside it.
-  const earlier = cu.filed
-    ? '<a class="tasklink" href="' + esc(cu.filed.url || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Created ' + esc((cu.filed.filedAt || '').slice(0, 16).replace('T', ' ')) + '">view ' + esc(cu.filed.taskId) + '</a>'
-    : '';
-  return earlier + '<button class="btn" ' + disabled + call + '>Create task</button>';
+  // The server checked ClickUp: if a task for this defect still exists there, link to it;
+  // otherwise (never created, or deleted in ClickUp) offer to create one.
+  const task = data.run.tasks[cu.outcome.key];
+  if (task && task.exists) {
+    return '<a class="btn ghost" href="' + esc(task.url || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="' + esc(task.status ? 'Status in ClickUp: ' + task.status : '') + '">Open task ' + esc(task.taskId) + '</a>';
+  }
+  return '<button class="btn" ' + disabled + call + '>Create task</button>';
 }
 
 async function fileBug(btn, body) {

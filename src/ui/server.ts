@@ -1,7 +1,15 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { fileIssues, FilingUnavailable, loadFiling, recordFiling, type FilingResult } from '../bugs/file.js';
+import {
+  fileIssues,
+  FilingUnavailable,
+  loadFiling,
+  previouslyFiled,
+  recordFiling,
+  type FilingResult,
+} from '../bugs/file.js';
+import { ClickUpClient } from '../integrations/clickup.js';
 import { readJson, sha256, slugify } from '../core/fs.js';
 import type { TestOutcome } from '../runner/results.js';
 import type { BugDraft, Issue } from '../triage/schema.js';
@@ -26,8 +34,91 @@ export interface Overview {
     failures: TriageResult['failures'];
     issues: TriageResult['issues'];
     filing: FilingResult[];
+    /** Per failed outcome key: the ClickUp task known for its defect, verified against ClickUp. */
+    tasks: Record<string, TaskLink>;
   } | null;
   scenarios: ReturnType<typeof loadAllScenarios>;
+}
+
+export interface TaskLink {
+  taskId: string;
+  url?: string;
+  /** True when ClickUp confirmed the task exists; false when it was deleted or never verified. */
+  exists: boolean;
+  verified: boolean;
+  status?: string;
+}
+
+/** Existence checks are cached briefly so the dashboard does not hit ClickUp on every reload. */
+const taskCache = new Map<string, { at: number; value: Omit<TaskLink, 'taskId'> }>();
+const TASK_CACHE_MS = 60_000;
+
+async function verifyTask(
+  client: ClickUpClient | undefined,
+  taskId: string,
+): Promise<Omit<TaskLink, 'taskId'>> {
+  if (!client) return { exists: false, verified: false };
+  const hit = taskCache.get(taskId);
+  if (hit && Date.now() - hit.at < TASK_CACHE_MS) return hit.value;
+  try {
+    const r = await client.taskExists(taskId);
+    const value = { exists: r.exists, verified: true, url: r.url, status: r.status };
+    taskCache.set(taskId, { at: Date.now(), value });
+    return value;
+  } catch (err) {
+    log.warn(`Could not verify task ${taskId} in ClickUp: ${(err as Error).message}`);
+    return { exists: false, verified: false };
+  }
+}
+
+/** The task recorded for a failed outcome: filed in this run, or for the same defect in an earlier run. */
+function knownTask(
+  ctx: QaContext,
+  test: TestRunResult,
+  triage: TriageResult | undefined,
+  filing: FilingResult[],
+  key: string,
+): { taskId: string; url?: string } | undefined {
+  const outcome = test.outcomes.find((o) => o.key === key);
+  if (!outcome) return undefined;
+  const issue = triage?.issues.find((i) => i.failureKeys.includes(key)) ?? adhocIssue(ctx, test, triage, key);
+  const filed = filing.find(
+    (f) => f.taskId && (f.issueId === issue?.id || f.issueId === adhocIssueId(outcome)),
+  );
+  if (filed?.taskId) return { taskId: filed.taskId, url: filed.url };
+  const prior = issue ? previouslyFiled(ctx, issue) : undefined;
+  return prior?.taskId ? { taskId: prior.taskId, url: prior.url } : undefined;
+}
+
+/** Resolve and verify the ClickUp task for every failed/flaky outcome of a run. */
+async function taskLinks(
+  ctx: QaContext,
+  test: TestRunResult,
+  triage: TriageResult | undefined,
+  filing: FilingResult[],
+): Promise<Record<string, TaskLink>> {
+  const cfg = ctx.config.clickup;
+  const token = cfg && process.env[cfg.tokenEnv];
+  const client = token ? new ClickUpClient(token) : undefined;
+  const failed = test.outcomes.filter((o) => o.status === 'failed' || o.status === 'flaky');
+  const entries = await Promise.all(
+    failed.map(async (o) => {
+      const known = knownTask(ctx, test, triage, filing, o.key);
+      if (!known) return null;
+      const v = await verifyTask(client, known.taskId);
+      return [
+        o.key,
+        {
+          taskId: known.taskId,
+          url: v.url ?? known.url,
+          exists: v.exists,
+          verified: v.verified,
+          status: v.status,
+        },
+      ] as const;
+    }),
+  );
+  return Object.fromEntries(entries.filter((e): e is NonNullable<typeof e> => e !== null));
 }
 
 function loadRun(ctx: QaContext, id: string): TestRunResult | undefined {
@@ -35,7 +126,7 @@ function loadRun(ctx: QaContext, id: string): TestRunResult | undefined {
 }
 
 /** Everything the dashboard shows, assembled from the files the pipeline already writes. */
-export function buildOverview(ctx: QaContext, runId?: string): Overview {
+export async function buildOverview(ctx: QaContext, runId?: string): Promise<Overview> {
   const runs = [...ctx.state.data.runs]
     .sort((a, b) => b.id.localeCompare(a.id))
     .map((r) => ({
@@ -50,13 +141,15 @@ export function buildOverview(ctx: QaContext, runId?: string): Overview {
   let run: Overview['run'] = null;
   if (test) {
     const triage = readJson(path.join(test.runDir, 'triage.json'), TriageResultSchema);
+    const filing = loadFiling(test)?.results ?? [];
     run = {
       id: test.runId,
       stats: test.stats,
       outcomes: test.outcomes,
       failures: triage?.failures ?? [],
       issues: triage?.issues ?? [],
-      filing: loadFiling(test)?.results ?? [],
+      filing,
+      tasks: await taskLinks(ctx, test, triage, filing),
     };
   }
   const cfg = ctx.config.clickup;
@@ -183,6 +276,7 @@ async function handleFile(ctx: QaContext, body: string): Promise<{ status: numbe
       force: true,
     });
     recordFiling(test, [result!], 'filed', 'Filed from the dashboard');
+    if (result!.taskId) taskCache.delete(result!.taskId);
     return { status: result!.action === 'failed' ? 502 : 200, payload: result };
   } catch (err) {
     if (err instanceof FilingUnavailable)
@@ -199,7 +293,7 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(PAGE_HTML);
       } else if (req.method === 'GET' && url.pathname === '/api/overview') {
-        json(res, 200, buildOverview(ctx, url.searchParams.get('run') ?? undefined));
+        json(res, 200, await buildOverview(ctx, url.searchParams.get('run') ?? undefined));
       } else if (req.method === 'POST' && url.pathname === '/api/file') {
         const { status, payload } = await handleFile(ctx, await readBody(req));
         json(res, status, payload);

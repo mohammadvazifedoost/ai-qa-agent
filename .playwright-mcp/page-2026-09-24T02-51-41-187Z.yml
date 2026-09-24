@@ -1,0 +1,94 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - paragraph [ref=e4]:
+      - text: demo-shop
+      - generic [ref=e13]: http://127.0.0.1:5173
+    - list [ref=e14]:
+      - listitem [ref=e132]:
+        - button "All pages 6 4" [ref=e133] [cursor=pointer]:
+          - generic [ref=e134]: All pages
+          - generic [ref=e135]:
+            - generic [ref=e136]: "6"
+            - generic [ref=e137]: "4"
+      - listitem [ref=e138]:
+        - button / [ref=e139] [cursor=pointer]
+      - listitem [ref=e141]:
+        - button "/checkout" [ref=e142] [cursor=pointer]
+      - listitem [ref=e144]:
+        - button "/contact 6 4" [ref=e145] [cursor=pointer]:
+          - generic [ref=e146]: /contact
+          - generic [ref=e147]:
+            - generic [ref=e148]: "6"
+            - generic [ref=e149]: "4"
+      - listitem [ref=e150]:
+        - button "/login" [ref=e151] [cursor=pointer]
+    - generic [ref=e5]:
+      - generic [ref=e153]: ClickUp
+      - text: ready · list 901523571090
+  - main [ref=e6]:
+    - generic [ref=e7]:
+      - heading "Test results" [level=1] [ref=e8]
+      - generic [ref=e9]:
+        - text: Run
+        - combobox "Run" [ref=e10]:
+          - option "2026-09-24 02:05:06" [selected]
+          - option "2026-09-24 01:11:53"
+          - option "2026-09-24 01:10:51"
+          - option "2026-09-24 01:05:31"
+          - option "2026-09-24 00:57:53"
+          - option "2026-09-24 00:53:44"
+          - option "2026-09-24 00:42:27"
+          - option "2026-09-24 00:37:11"
+    - generic [ref=e11]:
+      - generic [ref=e154]:
+        - generic [ref=e155]:
+          - generic [ref=e156]: 6/10
+          - generic [ref=e157]: tests passed in this run
+          - generic [ref=e158]: 3distinct defects
+        - img "6 passed, 4 failed, 0 flaky" [ref=e159]
+        - generic [ref=e162]:
+          - generic [ref=e163]: 6 passed
+          - generic [ref=e165]: 4 failed
+          - generic [ref=e167]: 30 not in this run
+      - generic [ref=e169]:
+        - group "Show" [ref=e170]:
+          - button "All" [pressed] [ref=e171] [cursor=pointer]
+          - button "Failures" [ref=e172] [cursor=pointer]
+          - button "Passing" [ref=e173] [cursor=pointer]
+        - generic [ref=e174]:
+          - text: Type
+          - combobox "Type" [ref=e175]:
+            - option "all types"
+            - option "functional"
+            - option "responsive" [selected]
+            - option "visual"
+        - generic [ref=e176]:
+          - checkbox "show scenarios not in this run" [ref=e177]
+          - text: show scenarios not in this run
+        - generic [ref=e178]: 2 shown
+      - generic [ref=e179]:
+        - heading "/contact" [level=2] [ref=e180]
+        - generic [ref=e181]: 2 · 2 failing
+      - list [ref=e182]:
+        - listitem [ref=e183]:
+          - button "failed CONTACT-009 Contact form is usable at mobile width without horizontal overflow product bug" [ref=e184] [cursor=pointer]:
+            - generic "failed" [ref=e185]
+            - generic [ref=e186]: CONTACT-009
+            - generic [ref=e187]:
+              - text: Contact form is usable at mobile width without horizontal overflow
+              - generic [ref=e188]: product bug
+          - generic [ref=e189]:
+            - link "view 123ztrcx1n9" [ref=e190] [cursor=pointer]:
+              - /url: https://app.clickup.com/t/123ztrcx1n9
+            - button "Create task" [ref=e191] [cursor=pointer]
+        - listitem [ref=e192]:
+          - button "failed CONTACT-010 Header navigation collapses to a menu button on mobile product bug" [ref=e193] [cursor=pointer]:
+            - generic "failed" [ref=e194]
+            - generic [ref=e195]: CONTACT-010
+            - generic [ref=e196]:
+              - text: Header navigation collapses to a menu button on mobile
+              - generic [ref=e197]: product bug
+          - generic [ref=e198]:
+            - link "view 123ztrcx1n9" [ref=e199] [cursor=pointer]:
+              - /url: https://app.clickup.com/t/123ztrcx1n9
+            - button "Create task" [ref=e200] [cursor=pointer]

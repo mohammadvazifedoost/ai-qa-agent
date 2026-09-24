@@ -212,11 +212,13 @@ pipeline writes — no database, no external service.
   Clicking a row opens a modal with what happened (analysis, root cause, expected vs actual), the
   evidence (screenshot, video, trace, console/network log, page snapshot) and, collapsed, the test
   error and the scenario's steps.
-- Every failed row has a *Create task* button; a click always creates a ClickUp task from the
-  bug report (consolidated for confirmed defects; for failures the analyzer did not confirm it is
-  built from the scenario and the error and tagged `needs-verification`). Tasks created earlier for
-  the same test are shown as a small *view* link next to the button. Filters: All / Failures /
-  Passing, type (functional, visual, responsive) and page.
+- Every failed row has either an *Open task* link or a *Create task* button. The dashboard checks
+  ClickUp for the task recorded for that defect (from this run or an earlier run of the same
+  defect, cached for a minute); if it still exists you get the link, otherwise — never created, or
+  deleted in ClickUp — the button. A click creates the task from the bug report (consolidated for
+  confirmed defects; for failures the analyzer did not confirm it is built from the scenario and
+  the error and tagged `needs-verification`). Filters: All / Failures / Passing, type (functional,
+  visual, responsive) and page.
 - The token must be in the environment of the shell that started the UI
   (`CLICKUP_API_TOKEN=pk_... npx ai-qa ui`). Filing results are written back to the run so the
   report and the dashboard stay consistent.
