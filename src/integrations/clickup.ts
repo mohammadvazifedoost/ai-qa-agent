@@ -38,6 +38,7 @@ export interface NewTask {
   markdown: string;
   tags: string[];
   priority: number;
+  status?: string;
 }
 
 /**
@@ -90,6 +91,7 @@ export class ClickUpClient {
         markdown_content: task.markdown,
         tags: task.tags,
         priority: task.priority,
+        ...(task.status ? { status: task.status } : {}),
       }),
     );
   }

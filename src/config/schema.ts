@@ -67,6 +67,8 @@ export const QaConfigSchema = z.object({
       /** Name of the environment variable that holds the ClickUp personal API token. */
       tokenEnv: z.string().default('CLICKUP_API_TOKEN'),
       tags: z.array(z.string()).default(['ai-qa']),
+      /** Status new tasks are created in, e.g. "to do". Omit to use the list's default status. */
+      status: z.string().optional(),
       attachEvidence: z.boolean().default(true),
     })
     .optional(),

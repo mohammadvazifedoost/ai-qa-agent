@@ -34,6 +34,7 @@ describe('ClickUpClient', () => {
       markdown: '# md',
       tags: ['ai-qa'],
       priority: PRIORITY.high,
+      status: 'to do',
     });
     expect(task.url).toBe('https://app.clickup.com/t/86abc');
     expect(calls[0]!.url).toBe('https://api.clickup.com/api/v2/list/123/task');
@@ -43,7 +44,19 @@ describe('ClickUpClient', () => {
       markdown_content: '# md',
       tags: ['ai-qa'],
       priority: 2,
+      status: 'to do',
     });
+  });
+
+  it('omits status when not configured so the list default applies', async () => {
+    const { fetch, calls } = fakeFetch(() => ({ status: 200, body: { id: '1', name: 'x' } }));
+    await new ClickUpClient('pk', fetch).createTask('123', {
+      name: 'B',
+      markdown: '',
+      tags: [],
+      priority: 3,
+    });
+    expect(JSON.parse(calls[0]!.init.body as string)).not.toHaveProperty('status');
   });
 
   it('uploads attachments as multipart form data', async () => {

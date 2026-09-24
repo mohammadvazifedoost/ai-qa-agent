@@ -117,6 +117,7 @@ export async function fileBugs(
           issue.bug.category,
         ],
         priority: PRIORITY[issue.bug.severity],
+        status: cfg.status,
       });
       ctx.state.data.bugs[issue.fingerprint] = {
         fingerprint: issue.fingerprint,

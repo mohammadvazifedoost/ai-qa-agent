@@ -21,6 +21,7 @@ export default defineConfig({
   clickup: {
     listId: "901523571090",
     tokenEnv: "CLICKUP_API_TOKEN",
+    status: "to do",
   },
   ai: {
     model: 'sonnet',

@@ -111,6 +111,7 @@ export default defineConfig({
     listId: '901523571090',
     tokenEnv: 'CLICKUP_API_TOKEN',   // the token is read from this env var, never from config
     tags: ['ai-qa'],
+    status: 'to do',                 // optional; default is the list's first status
     attachEvidence: true,
   },
   browsers: ['chromium'],            // chromium | firefox | webkit
