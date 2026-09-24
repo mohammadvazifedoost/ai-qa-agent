@@ -1,0 +1,490 @@
+- generic [ref=f1e2]:
+  - banner [ref=f1e3]:
+    - heading "demo-shop" [level=1] [ref=f1e9]
+    - generic [ref=f1e10]: http://127.0.0.1:5173
+    - generic [ref=f1e5]:
+      - text: Run
+      - combobox "Run" [ref=f1e6]:
+        - option "2026-09-24 02:05:06 — 6 passed, 4 failed" [selected]
+        - option "2026-09-24 01:11:53 — 18 passed, 12 failed"
+        - option "2026-09-24 01:10:51 — 5 passed, 25 failed"
+        - option "2026-09-24 01:05:31 — 0 passed, 1 failed"
+        - option "2026-09-24 00:57:53 — 18 passed, 12 failed"
+        - option "2026-09-24 00:53:44 — 1 passed, 0 failed"
+        - option "2026-09-24 00:42:27 — 0 passed, 3 failed"
+        - option "2026-09-24 00:37:11 — 17 passed, 13 failed"
+    - generic [ref=f1e11]: ClickUp ready · list 901523571090
+  - generic [ref=f1e7]:
+    - generic [ref=f1e926]:
+      - generic [ref=f1e927]: 6passed
+      - generic [ref=f1e928]: 4failed
+      - generic [ref=f1e929]: 3distinct defects
+      - generic [ref=f1e930]: 40 scenarios
+    - generic "Each block is one scenario; click to jump to it" [ref=f1e931]:
+      - button "CHECKOUT-001 — none" [ref=f1e932] [cursor=pointer]
+      - button "CHECKOUT-002 — none" [ref=f1e933] [cursor=pointer]
+      - button "CHECKOUT-003 — none" [ref=f1e934] [cursor=pointer]
+      - button "CHECKOUT-004 — none" [ref=f1e935] [cursor=pointer]
+      - button "CHECKOUT-005 — none" [ref=f1e936] [cursor=pointer]
+      - button "CHECKOUT-006 — none" [ref=f1e937] [cursor=pointer]
+      - button "CHECKOUT-007 — none" [ref=f1e938] [cursor=pointer]
+      - button "CHECKOUT-008 — none" [ref=f1e939] [cursor=pointer]
+      - button "CHECKOUT-009 — none" [ref=f1e940] [cursor=pointer]
+      - button "CHECKOUT-010 — none" [ref=f1e941] [cursor=pointer]
+      - button "CONTACT-001 — passed" [ref=f1e942] [cursor=pointer]
+      - button "CONTACT-002 — passed" [ref=f1e943] [cursor=pointer]
+      - button "CONTACT-003 — passed" [ref=f1e944] [cursor=pointer]
+      - button "CONTACT-004 — passed" [ref=f1e945] [cursor=pointer]
+      - button "CONTACT-005 — passed" [ref=f1e946] [cursor=pointer]
+      - button "CONTACT-006 — passed" [ref=f1e947] [cursor=pointer]
+      - button "CONTACT-007 — failed" [ref=f1e948] [cursor=pointer]
+      - button "CONTACT-008 — failed" [ref=f1e949] [cursor=pointer]
+      - button "CONTACT-009 — failed" [ref=f1e950] [cursor=pointer]
+      - button "CONTACT-010 — failed" [ref=f1e951] [cursor=pointer]
+      - button "HOME-001 — none" [ref=f1e952] [cursor=pointer]
+      - button "HOME-002 — none" [ref=f1e953] [cursor=pointer]
+      - button "HOME-003 — none" [ref=f1e954] [cursor=pointer]
+      - button "HOME-004 — none" [ref=f1e955] [cursor=pointer]
+      - button "HOME-005 — none" [ref=f1e956] [cursor=pointer]
+      - button "HOME-006 — none" [ref=f1e957] [cursor=pointer]
+      - button "HOME-007 — none" [ref=f1e958] [cursor=pointer]
+      - button "HOME-008 — none" [ref=f1e959] [cursor=pointer]
+      - button "HOME-009 — none" [ref=f1e960] [cursor=pointer]
+      - button "HOME-010 — none" [ref=f1e961] [cursor=pointer]
+      - button "LOGIN-001 — none" [ref=f1e962] [cursor=pointer]
+      - button "LOGIN-002 — none" [ref=f1e963] [cursor=pointer]
+      - button "LOGIN-003 — none" [ref=f1e964] [cursor=pointer]
+      - button "LOGIN-004 — none" [ref=f1e965] [cursor=pointer]
+      - button "LOGIN-005 — none" [ref=f1e966] [cursor=pointer]
+      - button "LOGIN-006 — none" [ref=f1e967] [cursor=pointer]
+      - button "LOGIN-007 — none" [ref=f1e968] [cursor=pointer]
+      - button "LOGIN-008 — none" [ref=f1e969] [cursor=pointer]
+      - button "LOGIN-009 — none" [ref=f1e970] [cursor=pointer]
+      - button "LOGIN-010 — none" [ref=f1e971] [cursor=pointer]
+    - generic [ref=f1e972]:
+      - generic [ref=f1e973]:
+        - text: Page
+        - combobox "Page" [ref=f1e974]:
+          - option "all" [selected]
+          - option /
+          - option "/checkout"
+          - option "/contact"
+          - option "/login"
+      - generic [ref=f1e975]:
+        - text: Category
+        - combobox "Category" [ref=f1e976]:
+          - option "all" [selected]
+          - option "functional"
+          - option "responsive"
+          - option "visual"
+      - generic [ref=f1e977]:
+        - text: Result
+        - combobox "Result" [ref=f1e978]:
+          - option "all" [selected]
+          - option "passed"
+          - option "failed"
+          - option "flaky"
+          - option "not run"
+      - generic [ref=f1e979]: 40 shown
+    - generic [ref=f1e980]:
+      - heading "/10 scenarios" [level=2] [ref=f1e981]
+      - table [ref=f1e982]:
+        - rowgroup [ref=f1e983]:
+          - row [ref=f1e984]:
+            - columnheader "ID" [ref=f1e985]
+            - columnheader "Scenario" [ref=f1e986]
+            - columnheader "Type" [ref=f1e987]
+            - columnheader "Result" [ref=f1e988]
+            - columnheader "Analysis" [ref=f1e989]
+        - rowgroup [ref=f1e990]:
+          - row [ref=f1e991] [cursor=pointer]:
+            - cell "HOME-001" [ref=f1e992]
+            - cell "Home page shows hero and all three products with correct names, descriptions and prices catalog · high priority" [ref=f1e993]:
+              - text: Home page shows hero and all three products with correct names, descriptions and prices
+              - generic [ref=f1e994]: catalog · high priority
+            - cell "functional desktop" [ref=f1e995]: functionaldesktop
+            - cell "not run" [ref=f1e996]
+            - cell "—" [ref=f1e998]
+          - row [ref=f1e999] [cursor=pointer]:
+            - cell "HOME-002" [ref=f1e1000]
+            - cell "Adding products updates the header cart badge with the total quantity cart · high priority" [ref=f1e1001]:
+              - text: Adding products updates the header cart badge with the total quantity
+              - generic [ref=f1e1002]: cart · high priority
+            - cell "functional desktop" [ref=f1e1003]: functionaldesktop
+            - cell "not run" [ref=f1e1004]
+            - cell "—" [ref=f1e1006]
+          - row [ref=f1e1007] [cursor=pointer]:
+            - cell "HOME-003" [ref=f1e1008]
+            - cell "Cart badge accessible name uses correct singular grammar for one item cart · medium priority" [ref=f1e1009]:
+              - text: Cart badge accessible name uses correct singular grammar for one item
+              - generic [ref=f1e1010]: cart · medium priority
+            - cell "functional desktop" [ref=f1e1011]: functionaldesktop
+            - cell "not run" [ref=f1e1012]
+            - cell "—" [ref=f1e1014]
+          - row [ref=f1e1015] [cursor=pointer]:
+            - cell "HOME-004" [ref=f1e1016]
+            - cell "Products added on Home carry to Checkout via client-side navigation, in catalog order cart · high priority" [ref=f1e1017]:
+              - text: Products added on Home carry to Checkout via client-side navigation, in catalog order
+              - generic [ref=f1e1018]: cart · high priority
+            - cell "functional desktop" [ref=f1e1019]: functionaldesktop
+            - cell "not run" [ref=f1e1020]
+            - cell "—" [ref=f1e1022]
+          - row [ref=f1e1023] [cursor=pointer]:
+            - cell "HOME-005" [ref=f1e1024]
+            - cell "'Shop all products' header link scrolls to the product list without losing the cart navigation · high priority" [ref=f1e1025]:
+              - text: "'Shop all products' header link scrolls to the product list without losing the cart"
+              - generic [ref=f1e1026]: navigation · high priority
+            - cell "functional desktop" [ref=f1e1027]: functionaldesktop
+            - cell "not run" [ref=f1e1028]
+            - cell "—" [ref=f1e1030]
+          - row [ref=f1e1031] [cursor=pointer]:
+            - cell "HOME-006" [ref=f1e1032]
+            - cell "Primary 'Add to cart' buttons match the Figma Button/Primary spec design-system · high priority" [ref=f1e1033]:
+              - text: Primary 'Add to cart' buttons match the Figma Button/Primary spec
+              - generic [ref=f1e1034]: design-system · high priority
+            - cell "visual desktop" [ref=f1e1035]: visualdesktop
+            - cell "not run" [ref=f1e1036]
+            - cell "—" [ref=f1e1038]
+          - row [ref=f1e1039] [cursor=pointer]:
+            - cell "HOME-007" [ref=f1e1040]
+            - cell "Headings and product grid spacing match Figma typography and layout design-system · medium priority" [ref=f1e1041]:
+              - text: Headings and product grid spacing match Figma typography and layout
+              - generic [ref=f1e1042]: design-system · medium priority
+            - cell "visual desktop" [ref=f1e1043]: visualdesktop
+            - cell "not run" [ref=f1e1044]
+            - cell "—" [ref=f1e1046]
+          - row [ref=f1e1047] [cursor=pointer]:
+            - cell "HOME-008" [ref=f1e1048]
+            - cell "On a 390px mobile viewport the nav collapses behind a menu button that opens and closes correctly navigation · high priority" [ref=f1e1049]:
+              - text: On a 390px mobile viewport the nav collapses behind a menu button that opens and closes correctly
+              - generic [ref=f1e1050]: navigation · high priority
+            - cell "responsive mobile" [ref=f1e1051]: responsivemobile
+            - cell "not run" [ref=f1e1052]
+            - cell "—" [ref=f1e1054]
+          - row [ref=f1e1055] [cursor=pointer]:
+            - cell "HOME-009" [ref=f1e1056]
+            - cell "Mobile layout stacks hero and product cards in one column without horizontal scroll catalog · high priority" [ref=f1e1057]:
+              - text: Mobile layout stacks hero and product cards in one column without horizontal scroll
+              - generic [ref=f1e1058]: catalog · high priority
+            - cell "responsive mobile" [ref=f1e1059]: responsivemobile
+            - cell "not run" [ref=f1e1060]
+            - cell "—" [ref=f1e1062]
+          - row [ref=f1e1063] [cursor=pointer]:
+            - cell "HOME-010" [ref=f1e1064]
+            - cell "Tablet viewport (834px) shows a usable header and product grid without overflow navigation · medium priority" [ref=f1e1065]:
+              - text: Tablet viewport (834px) shows a usable header and product grid without overflow
+              - generic [ref=f1e1066]: navigation · medium priority
+            - cell "responsive tablet" [ref=f1e1067]: responsivetablet
+            - cell "not run" [ref=f1e1068]
+            - cell "—" [ref=f1e1070]
+    - generic [ref=f1e1071]:
+      - heading "/checkout10 scenarios" [level=2] [ref=f1e1072]
+      - table [ref=f1e1073]:
+        - rowgroup [ref=f1e1074]:
+          - row [ref=f1e1075]:
+            - columnheader "ID" [ref=f1e1076]
+            - columnheader "Scenario" [ref=f1e1077]
+            - columnheader "Type" [ref=f1e1078]
+            - columnheader "Result" [ref=f1e1079]
+            - columnheader "Analysis" [ref=f1e1080]
+        - rowgroup [ref=f1e1081]:
+          - row [ref=f1e1082] [cursor=pointer]:
+            - cell "CHECKOUT-001" [ref=f1e1083]
+            - cell "Checkout lists cart lines with correct line prices, subtotal and total cart · high priority" [ref=f1e1084]:
+              - text: Checkout lists cart lines with correct line prices, subtotal and total
+              - generic [ref=f1e1085]: cart · high priority
+            - cell "functional desktop" [ref=f1e1086]: functionaldesktop
+            - cell "not run" [ref=f1e1087]
+            - cell "—" [ref=f1e1089]
+          - row [ref=f1e1090] [cursor=pointer]:
+            - cell "CHECKOUT-002" [ref=f1e1091]
+            - cell "Valid coupon SAVE10 is applied and the discount is subtracted from the Total checkout · high priority" [ref=f1e1092]:
+              - text: Valid coupon SAVE10 is applied and the discount is subtracted from the Total
+              - generic [ref=f1e1093]: checkout · high priority
+            - cell "functional desktop" [ref=f1e1094]: functionaldesktop
+            - cell "not run" [ref=f1e1095]
+            - cell "—" [ref=f1e1097]
+          - row [ref=f1e1098] [cursor=pointer]:
+            - cell "CHECKOUT-003" [ref=f1e1099]
+            - cell "WELCOME20 on a mixed cart and rounding on a single item give correct discount and Total checkout · high priority" [ref=f1e1100]:
+              - text: WELCOME20 on a mixed cart and rounding on a single item give correct discount and Total
+              - generic [ref=f1e1101]: checkout · high priority
+            - cell "functional desktop" [ref=f1e1102]: functionaldesktop
+            - cell "not run" [ref=f1e1103]
+            - cell "—" [ref=f1e1105]
+          - row [ref=f1e1106] [cursor=pointer]:
+            - cell "CHECKOUT-004" [ref=f1e1107]
+            - 'cell "Coupon validation errors: empty, whitespace-only and unknown codes checkout · high priority" [ref=f1e1108]':
+              - text: "Coupon validation errors: empty, whitespace-only and unknown codes"
+              - generic [ref=f1e1109]: checkout · high priority
+            - cell "functional desktop" [ref=f1e1110]: functionaldesktop
+            - cell "not run" [ref=f1e1111]
+            - cell "—" [ref=f1e1113]
+          - row [ref=f1e1114] [cursor=pointer]:
+            - cell "CHECKOUT-005" [ref=f1e1115]
+            - cell "Apply button shows a loading state while the coupon is validated checkout · medium priority" [ref=f1e1116]:
+              - text: Apply button shows a loading state while the coupon is validated
+              - generic [ref=f1e1117]: checkout · medium priority
+            - cell "functional desktop" [ref=f1e1118]: functionaldesktop
+            - cell "not run" [ref=f1e1119]
+            - cell "—" [ref=f1e1121]
+          - row [ref=f1e1122] [cursor=pointer]:
+            - cell "CHECKOUT-006" [ref=f1e1123]
+            - cell "Removing lines updates totals and leads to the empty state with a way back cart · high priority" [ref=f1e1124]:
+              - text: Removing lines updates totals and leads to the empty state with a way back
+              - generic [ref=f1e1125]: cart · high priority
+            - cell "functional desktop" [ref=f1e1126]: functionaldesktop
+            - cell "not run" [ref=f1e1127]
+            - cell "—" [ref=f1e1129]
+          - row [ref=f1e1130] [cursor=pointer]:
+            - cell "CHECKOUT-007" [ref=f1e1131]
+            - cell "Direct load of /checkout shows the empty cart state checkout · medium priority" [ref=f1e1132]:
+              - text: Direct load of /checkout shows the empty cart state
+              - generic [ref=f1e1133]: checkout · medium priority
+            - cell "functional desktop" [ref=f1e1134]: functionaldesktop
+            - cell "not run" [ref=f1e1135]
+            - cell "—" [ref=f1e1137]
+          - row [ref=f1e1138] [cursor=pointer]:
+            - cell "CHECKOUT-008" [ref=f1e1139]
+            - cell "'Place order' gives user feedback and completes the order checkout · medium priority" [ref=f1e1140]:
+              - text: "'Place order' gives user feedback and completes the order"
+              - generic [ref=f1e1141]: checkout · medium priority
+            - cell "functional desktop" [ref=f1e1142]: functionaldesktop
+            - cell "not run" [ref=f1e1143]
+            - cell "—" [ref=f1e1145]
+          - row [ref=f1e1146] [cursor=pointer]:
+            - cell "CHECKOUT-009" [ref=f1e1147]
+            - cell "Checkout heading, coupon controls and Place order button match Figma tokens checkout · medium priority" [ref=f1e1148]:
+              - text: Checkout heading, coupon controls and Place order button match Figma tokens
+              - generic [ref=f1e1149]: checkout · medium priority
+            - cell "visual desktop" [ref=f1e1150]: visualdesktop
+            - cell "not run" [ref=f1e1151]
+            - cell "—" [ref=f1e1153]
+          - row [ref=f1e1154] [cursor=pointer]:
+            - cell "CHECKOUT-010" [ref=f1e1155]
+            - cell "Checkout fits a 390px mobile viewport without horizontal overflow checkout · medium priority" [ref=f1e1156]:
+              - text: Checkout fits a 390px mobile viewport without horizontal overflow
+              - generic [ref=f1e1157]: checkout · medium priority
+            - cell "responsive mobile" [ref=f1e1158]: responsivemobile
+            - cell "not run" [ref=f1e1159]
+            - cell "—" [ref=f1e1161]
+    - generic [ref=f1e1162]:
+      - heading "/contact10 scenarios, 4 failing" [level=2] [ref=f1e1163]
+      - table [ref=f1e1164]:
+        - rowgroup [ref=f1e1165]:
+          - row [ref=f1e1166]:
+            - columnheader "ID" [ref=f1e1167]
+            - columnheader "Scenario" [ref=f1e1168]
+            - columnheader "Type" [ref=f1e1169]
+            - columnheader "Result" [ref=f1e1170]
+            - columnheader "Analysis" [ref=f1e1171]
+        - rowgroup [ref=f1e1172]:
+          - row [ref=f1e1173] [cursor=pointer]:
+            - cell "CONTACT-001" [ref=f1e1174]
+            - cell "Send a contact message with valid data shows confirmation contact · high priority" [ref=f1e1175]:
+              - text: Send a contact message with valid data shows confirmation
+              - generic [ref=f1e1176]: contact · high priority
+            - cell "functional desktop" [ref=f1e1177]: functionaldesktop
+            - cell "passed" [ref=f1e1178]
+            - cell "—" [ref=f1e1180]
+          - row [ref=f1e1181] [cursor=pointer]:
+            - cell "CONTACT-002" [ref=f1e1182]
+            - cell "Submitting an empty form shows both required-field errors and sends nothing contact · high priority" [ref=f1e1183]:
+              - text: Submitting an empty form shows both required-field errors and sends nothing
+              - generic [ref=f1e1184]: contact · high priority
+            - cell "functional desktop" [ref=f1e1185]: functionaldesktop
+            - cell "passed" [ref=f1e1186]
+            - cell "—" [ref=f1e1188]
+          - row [ref=f1e1189] [cursor=pointer]:
+            - cell "CONTACT-003" [ref=f1e1190]
+            - cell "Whitespace-only name is rejected contact · high priority" [ref=f1e1191]:
+              - text: Whitespace-only name is rejected
+              - generic [ref=f1e1192]: contact · high priority
+            - cell "functional desktop" [ref=f1e1193]: functionaldesktop
+            - cell "passed" [ref=f1e1194]
+            - cell "—" [ref=f1e1196]
+          - row [ref=f1e1197] [cursor=pointer]:
+            - cell "CONTACT-004" [ref=f1e1198]
+            - cell "Malformed email addresses are rejected, minimal valid address accepted contact · high priority" [ref=f1e1199]:
+              - text: Malformed email addresses are rejected, minimal valid address accepted
+              - generic [ref=f1e1200]: contact · high priority
+            - cell "functional desktop" [ref=f1e1201]: functionaldesktop
+            - cell "passed" [ref=f1e1202]
+            - cell "—" [ref=f1e1204]
+          - row [ref=f1e1205] [cursor=pointer]:
+            - cell "CONTACT-005" [ref=f1e1206]
+            - cell "Message is optional and the confirmation greets the trimmed name contact · medium priority" [ref=f1e1207]:
+              - text: Message is optional and the confirmation greets the trimmed name
+              - generic [ref=f1e1208]: contact · medium priority
+            - cell "functional desktop" [ref=f1e1209]: functionaldesktop
+            - cell "passed" [ref=f1e1210]
+            - cell "—" [ref=f1e1212]
+          - row [ref=f1e1213] [cursor=pointer]:
+            - cell "CONTACT-006" [ref=f1e1214]
+            - cell "Sending state disables the button and prevents double submit contact · medium priority" [ref=f1e1215]:
+              - text: Sending state disables the button and prevents double submit
+              - generic [ref=f1e1216]: contact · medium priority
+            - cell "functional desktop" [ref=f1e1217]: functionaldesktop
+            - cell "passed" [ref=f1e1218]
+            - cell "—" [ref=f1e1220]
+          - row [ref=f1e1221] [cursor=pointer]:
+            - cell "CONTACT-007" [ref=f1e1222]
+            - cell "Form is accessible by keyboard and errors are correctable and announced contact · medium priority" [ref=f1e1223]:
+              - text: Form is accessible by keyboard and errors are correctable and announced
+              - generic [ref=f1e1224]: contact · medium priority
+            - cell "functional desktop" [ref=f1e1225]: functionaldesktop
+            - cell "failed" [ref=f1e1226]
+            - cell "product bug · BUG-001" [ref=f1e1228]
+          - row [ref=f1e1229] [cursor=pointer]:
+            - cell "CONTACT-008" [ref=f1e1230]
+            - cell "'Send message' button and inputs match Figma Button/Input specs contact · high priority" [ref=f1e1231]:
+              - text: "'Send message' button and inputs match Figma Button/Input specs"
+              - generic [ref=f1e1232]: contact · high priority
+            - cell "visual desktop" [ref=f1e1233]: visualdesktop
+            - cell "failed" [ref=f1e1234]
+            - cell "design mismatch · BUG-002" [ref=f1e1236]
+          - row [ref=f1e1237]:
+            - cell [ref=f1e1238]:
+              - generic [ref=f1e1239]:
+                - generic [ref=f1e1240]:
+                  - heading "Steps" [level=4] [ref=f1e1241]
+                  - list [ref=f1e1242]:
+                    - listitem [ref=f1e1243]: Locate the primary button 'Send message' in form 'Contact'
+                    - listitem [ref=f1e1244]: Inspect computed styles of the button
+                    - listitem [ref=f1e1245]: Inspect computed height of the 'Name' and 'Email' inputs
+                  - heading "Expected" [level=4] [ref=f1e1246]
+                  - list [ref=f1e1247]:
+                    - listitem [ref=f1e1248]: "'Send message' has background #2563EB, text colour #FFFFFF, border-radius 8px, height 44px, horizontal padding 20px, Inter 16px / weight 600 / line-height 24px"
+                    - listitem [ref=f1e1249]: "'Name' and 'Email' inputs are 44px high (size/control-height)"
+                  - heading "Preconditions" [level=4] [ref=f1e1250]
+                  - list [ref=f1e1251]:
+                    - listitem [ref=f1e1252]: Open /contact on desktop viewport (1440x900)
+                - generic [ref=f1e1253]:
+                  - heading "Error" [level=4] [ref=f1e1254]
+                  - generic [ref=f1e1255]: "Error: Design token mismatch for 'Send message' button: backgroundColor: expected #2563EB, actual #7C3AED borderRadius: expected 8px, actual 2px expect(received).toEqual(expected) // deep equality - Expected - 1 + Received + 14 - Array [] + Array [ + Object { + \"actual\": \"#7C3AED\", + \"expected\": \"#2563EB\", + \"ok\": false, + \"property\": \"backgroundColor\", + }, + Object { + \"actual\": \"2px\", + \"expected\": \"8px\", + \"ok\": false, + \"property\": \"borderRadius\", + }, + ] at ..\\..\\..\\..\\src\\playwright\\index.ts:131 129 | failed.map((c) => ` ${c.property}: expected ${c.expected}, actual ${c.actual}`).join('\\n'), 130 | ) > 131 | .toEqual([]); | ^ 132 | } 133 | 134 | /** at QaHelpers.expectDesignTokens (D:\\projects\\qa-agent\\src\\playwright\\index.ts:131:8) at D:\\projects\\qa-agent\\fixtures\\demo-shop\\.qa\\tests\\contact.spec.ts:392:9 at D:\\projects\\qa-agent\\fixtures\\demo-shop\\.qa\\tests\\contact.spec.ts:390:7"
+                  - heading "Analysis · DESIGN MISMATCH (95% confidence)" [level=4] [ref=f1e1256]
+                  - paragraph [ref=f1e1257]: "The 'Send message' primary button renders with background #7C3AED and 2px radius, but the Figma Button/Primary spec is #2563EB with an 8px radius."
+                  - generic [ref=f1e1258]:
+                    - generic [ref=f1e1259]: "BUG-002: Primary button ('Send message') uses purple #7C3AED and 2px radius instead of Figma #2563EB and 8px"
+                    - text: medium · visual · tests CONTACT-008
+                    - generic [ref=f1e1260]: "Root cause: src/styles.css:2 sets --color-primary: #7c3aed (used by .btn-primary at line 161); src/styles.css:155 hard-codes border-radius: 2px on .btn instead of var(--radius-md). Affects every primary button, not only the contact page."
+                    - button "Log bug in ClickUp" [ref=f1e1262] [cursor=pointer]
+                  - heading "Screenshot" [level=4] [ref=f1e1263]
+                  - link [ref=f1e1264] [cursor=pointer]:
+                    - /url: /files/.qa/artifacts/runs/2026-09-24_02-05-06/screenshots/CONTACT-008_chromium-desktop.png
+                    - img "Final screenshot of CONTACT-008@chromium-desktop" [ref=f1e1265]
+                  - heading "Video" [level=4] [ref=f1e1266]
+                  - generic [ref=f1e1268]:
+                    - link "Download trace" [ref=f1e1269] [cursor=pointer]:
+                      - /url: /files/.qa/artifacts/runs/2026-09-24_02-05-06/traces/CONTACT-008_chromium-desktop.zip
+                    - link "Console & network log" [ref=f1e1270] [cursor=pointer]:
+                      - /url: /files/.qa/artifacts/runs/2026-09-24_02-05-06/logs/CONTACT-008_chromium-desktop_console-network.json
+                    - link "Page snapshot at failure" [ref=f1e1271] [cursor=pointer]:
+                      - /url: /files/.qa/artifacts/runs/2026-09-24_02-05-06/logs/CONTACT-008_chromium-desktop_error-context.md
+          - row [ref=f1e1272] [cursor=pointer]:
+            - cell "CONTACT-009" [ref=f1e1273]
+            - cell "Contact form is usable at mobile width without horizontal overflow contact · medium priority" [ref=f1e1274]:
+              - text: Contact form is usable at mobile width without horizontal overflow
+              - generic [ref=f1e1275]: contact · medium priority
+            - cell "responsive mobile" [ref=f1e1276]: responsivemobile
+            - cell "failed" [ref=f1e1277]
+            - cell "product bug · BUG-003" [ref=f1e1279]
+          - row [ref=f1e1280] [cursor=pointer]:
+            - cell "CONTACT-010" [ref=f1e1281]
+            - cell "Header navigation collapses to a menu button on mobile contact · medium priority" [ref=f1e1282]:
+              - text: Header navigation collapses to a menu button on mobile
+              - generic [ref=f1e1283]: contact · medium priority
+            - cell "responsive mobile" [ref=f1e1284]: responsivemobile
+            - cell "failed" [ref=f1e1285]
+            - cell "product bug · BUG-003" [ref=f1e1287]
+    - generic [ref=f1e1288]:
+      - heading "/login10 scenarios" [level=2] [ref=f1e1289]
+      - table [ref=f1e1290]:
+        - rowgroup [ref=f1e1291]:
+          - row [ref=f1e1292]:
+            - columnheader "ID" [ref=f1e1293]
+            - columnheader "Scenario" [ref=f1e1294]
+            - columnheader "Type" [ref=f1e1295]
+            - columnheader "Result" [ref=f1e1296]
+            - columnheader "Analysis" [ref=f1e1297]
+        - rowgroup [ref=f1e1298]:
+          - row [ref=f1e1299] [cursor=pointer]:
+            - cell "LOGIN-001" [ref=f1e1300]
+            - cell "Valid credentials sign the user in and show the welcome heading auth · high priority" [ref=f1e1301]:
+              - text: Valid credentials sign the user in and show the welcome heading
+              - generic [ref=f1e1302]: auth · high priority
+            - cell "functional desktop" [ref=f1e1303]: functionaldesktop
+            - cell "not run" [ref=f1e1304]
+            - cell "—" [ref=f1e1306]
+          - row [ref=f1e1307] [cursor=pointer]:
+            - cell "LOGIN-002" [ref=f1e1308]
+            - cell "Submitting the empty form shows both field errors at once auth · high priority" [ref=f1e1309]:
+              - text: Submitting the empty form shows both field errors at once
+              - generic [ref=f1e1310]: auth · high priority
+            - cell "functional desktop" [ref=f1e1311]: functionaldesktop
+            - cell "not run" [ref=f1e1312]
+            - cell "—" [ref=f1e1314]
+          - row [ref=f1e1315] [cursor=pointer]:
+            - cell "LOGIN-003" [ref=f1e1316]
+            - cell "Wrong credentials show a form-level alert, keep the form usable, and replace field errors auth · high priority" [ref=f1e1317]:
+              - text: Wrong credentials show a form-level alert, keep the form usable, and replace field errors
+              - generic [ref=f1e1318]: auth · high priority
+            - cell "functional desktop" [ref=f1e1319]: functionaldesktop
+            - cell "not run" [ref=f1e1320]
+            - cell "—" [ref=f1e1322]
+          - row [ref=f1e1323] [cursor=pointer]:
+            - cell "LOGIN-004" [ref=f1e1324]
+            - cell "Malformed email addresses are rejected with the email error only auth · medium priority" [ref=f1e1325]:
+              - text: Malformed email addresses are rejected with the email error only
+              - generic [ref=f1e1326]: auth · medium priority
+            - cell "functional desktop" [ref=f1e1327]: functionaldesktop
+            - cell "not run" [ref=f1e1328]
+            - cell "—" [ref=f1e1330]
+          - row [ref=f1e1331] [cursor=pointer]:
+            - cell "LOGIN-005" [ref=f1e1332]
+            - cell "Password shorter than 8 characters is rejected; exactly 8 characters is accepted for validation auth · medium priority" [ref=f1e1333]:
+              - text: Password shorter than 8 characters is rejected; exactly 8 characters is accepted for validation
+              - generic [ref=f1e1334]: auth · medium priority
+            - cell "functional desktop" [ref=f1e1335]: functionaldesktop
+            - cell "not run" [ref=f1e1336]
+            - cell "—" [ref=f1e1338]
+          - row [ref=f1e1339] [cursor=pointer]:
+            - cell "LOGIN-006" [ref=f1e1340]
+            - cell "Submit button shows loading state while signing in auth · medium priority" [ref=f1e1341]:
+              - text: Submit button shows loading state while signing in
+              - generic [ref=f1e1342]: auth · medium priority
+            - cell "functional desktop" [ref=f1e1343]: functionaldesktop
+            - cell "not run" [ref=f1e1344]
+            - cell "—" [ref=f1e1346]
+          - row [ref=f1e1347] [cursor=pointer]:
+            - cell "LOGIN-007" [ref=f1e1348]
+            - cell "Email is case-insensitive but password is case-sensitive auth · medium priority" [ref=f1e1349]:
+              - text: Email is case-insensitive but password is case-sensitive
+              - generic [ref=f1e1350]: auth · medium priority
+            - cell "functional desktop" [ref=f1e1351]: functionaldesktop
+            - cell "not run" [ref=f1e1352]
+            - cell "—" [ref=f1e1354]
+          - row [ref=f1e1355] [cursor=pointer]:
+            - cell "LOGIN-008" [ref=f1e1356]
+            - cell "Header link opens the sign-in page and the form resets after navigating away navigation · medium priority" [ref=f1e1357]:
+              - text: Header link opens the sign-in page and the form resets after navigating away
+              - generic [ref=f1e1358]: navigation · medium priority
+            - cell "functional desktop" [ref=f1e1359]: functionaldesktop
+            - cell "not run" [ref=f1e1360]
+            - cell "—" [ref=f1e1362]
+          - row [ref=f1e1363] [cursor=pointer]:
+            - cell "LOGIN-009" [ref=f1e1364]
+            - cell "Login form matches the Figma design tokens on desktop auth · medium priority" [ref=f1e1365]:
+              - text: Login form matches the Figma design tokens on desktop
+              - generic [ref=f1e1366]: auth · medium priority
+            - cell "visual desktop" [ref=f1e1367]: visualdesktop
+            - cell "not run" [ref=f1e1368]
+            - cell "—" [ref=f1e1370]
+          - row [ref=f1e1371] [cursor=pointer]:
+            - cell "LOGIN-010" [ref=f1e1372]
+            - cell "Login page fits a 390px mobile viewport and header nav collapses auth · medium priority" [ref=f1e1373]:
+              - text: Login page fits a 390px mobile viewport and header nav collapses
+              - generic [ref=f1e1374]: auth · medium priority
+            - cell "responsive mobile" [ref=f1e1375]: responsivemobile
+            - cell "not run" [ref=f1e1376]
+            - cell "—" [ref=f1e1378]
