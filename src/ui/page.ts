@@ -8,7 +8,7 @@ export const PAGE_HTML = String.raw`<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ai-qa results</title>
+<title>AI QA Agent — test results</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
@@ -17,7 +17,7 @@ export const PAGE_HTML = String.raw`<!doctype html>
 <div class="grid min-h-screen grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)]">
   <aside class="bg-rail text-rail-ink lg:sticky lg:top-0 lg:h-screen lg:overflow-auto">
     <div class="px-5 pb-4 pt-5 lg:pb-5 lg:pt-6">
-      <p class="m-0 text-[11.5px] font-bold uppercase tracking-[0.12em] text-rail-muted">ai-qa</p>
+      <p class="m-0 text-[11.5px] font-bold uppercase tracking-[0.12em] text-rail-muted">AI QA Agent</p>
       <p class="m-0 mt-1 text-xl font-extrabold tracking-tight" id="project">…</p>
       <p class="m-0 mt-0.5 text-xs text-rail-muted break-all" id="url"></p>
       <label class="mt-4 block text-xs font-semibold text-rail-muted">Run

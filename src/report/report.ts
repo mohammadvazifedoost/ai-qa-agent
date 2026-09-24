@@ -27,7 +27,7 @@ export function buildMarkdown(
 ): string {
   const s = run.stats;
   const out: string[] = [];
-  out.push(`# QA report — ${ctx.config.project.name}`, '');
+  out.push(`# AI QA Agent report — ${ctx.config.project.name}`, '');
   out.push(`Run \`${run.runId}\` against ${ctx.config.app.baseUrl}`, '');
   out.push('## Summary', '');
   out.push(
@@ -169,7 +169,7 @@ export function writeReport(
   const markdown = path.join(dir, 'report.md');
   const html = path.join(dir, 'report.html');
   fs.writeFileSync(markdown, md);
-  fs.writeFileSync(html, markdownToHtml(md, `QA report ${run.runId}`));
+  fs.writeFileSync(html, markdownToHtml(md, `AI QA Agent report ${run.runId}`));
   const env = environment(ctx, run.runId);
   for (const issue of triage?.issues ?? []) {
     fs.writeFileSync(

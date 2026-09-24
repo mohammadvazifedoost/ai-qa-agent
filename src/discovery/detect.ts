@@ -177,7 +177,7 @@ function detectExistingTests(root: string): string[] {
 export function detectProject(root: string): ProjectInfo {
   const pkgPath = path.join(root, 'package.json');
   if (!fs.existsSync(pkgPath)) {
-    throw new Error(`No package.json found in ${root}. Run ai-qa inside a web project.`);
+    throw new Error(`No package.json found in ${root}. Run AI QA Agent inside a web project.`);
   }
   const pkg = PackageJson.parse(JSON.parse(fs.readFileSync(pkgPath, 'utf8')));
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };

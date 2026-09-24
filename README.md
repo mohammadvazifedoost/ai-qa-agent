@@ -1,6 +1,7 @@
-# @company/ai-qa
+# AI QA Agent
 
-An AI-powered QA agent for web projects. Install it into any web application and it will:
+An AI-powered QA agent for web projects, published as the npm package `@company/ai-qa` with the
+command `ai-qa`. Install it into any web application and it will:
 
 1. read your **Figma** design and your **source code**,
 2. write prioritized **test scenarios** (functional, visual, responsive),
@@ -193,7 +194,7 @@ Add `figma` / `clickup` to `.qa/config.ts` later at any time; the next run picks
 
 1. Claude Code must have the official Figma MCP server (`https://mcp.figma.com/mcp`) authorized:
    run `claude mcp add --transport http figma https://mcp.figma.com/mcp` once and complete the
-   OAuth login when prompted inside Claude Code. `ai-qa` passes the same server to its AI tasks.
+   OAuth login when prompted inside Claude Code. AI QA Agent passes the same server to its AI tasks.
 2. Put the file URL in `figma.fileUrl`. The agent lists pages and frames, reads variables, text
    styles and component specs, and downloads a 1:1 screenshot of each screen frame to
    `.qa/design/refs/`.
@@ -204,7 +205,7 @@ Add `figma` / `clickup` to `.qa/config.ts` later at any time; the next run picks
 everything `unknown`. Tokens are never invented.
 
 **Figma plan limits.** The Figma MCP server allows only 20 read calls **per month** on Starter
-plans (200+/day with a Dev/Full seat on paid plans). `ai-qa` reports when calls were rejected,
+plans (200+/day with a Dev/Full seat on paid plans). AI QA Agent reports when calls were rejected,
 keeps the partial result, and fetches missing reference screenshots on the next run.
 
 ## ClickUp setup
@@ -213,7 +214,7 @@ keeps the partial result, and fetches missing reference screenshots on the next 
    `export CLICKUP_API_TOKEN=pk_...` (or set the variable in CI).
 2. Put the target list id in `clickup.listId` (from the list URL or the API). `ai-qa doctor`
    verifies the token and shows the list name.
-3. Confirmed defects become tasks named `[ai-qa] <title>` with a markdown description (severity,
+3. Confirmed defects become tasks named `[AI QA Agent] <title>` with a markdown description (severity,
    category, page, steps, expected/actual, root cause, environment, test ids) and the screenshot,
    video, trace and design-diff images attached. Priority maps from severity.
 
@@ -246,7 +247,7 @@ pipeline writes — no database, no external service.
 
 ## Playwright setup
 
-`ai-qa` generates `.qa/playwright.config.ts` from your config on every run: one project per
+AI QA Agent generates `.qa/playwright.config.ts` from your config on every run: one project per
 browser × viewport, video/trace/screenshot always on, JSON reporter. Tests select their viewport
 through tags (`@desktop`, `@mobile`, …). You can run them yourself:
 

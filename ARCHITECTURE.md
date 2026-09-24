@@ -1,4 +1,4 @@
-# Architecture
+# AI QA Agent — Architecture
 
 ## Principles
 

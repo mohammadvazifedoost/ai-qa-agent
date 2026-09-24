@@ -1,7 +1,7 @@
 {
   "name": "@company/ai-qa",
   "version": "0.1.0",
-  "description": "AI-powered QA agent: Figma + source analysis, scenario and Playwright test generation, failure triage and ClickUp bug filing.",
+  "description": "AI QA Agent: Figma + source analysis, scenario and Playwright test generation, failure triage and ClickUp bug reports.",
   "type": "module",
   "license": "UNLICENSED",
   "private": true,

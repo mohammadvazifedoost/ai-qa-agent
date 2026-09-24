@@ -2,7 +2,7 @@
 
 ## demo-shop
 
-A small Vite + React + React Router shop used to validate `@company/ai-qa` end to end.
+A small Vite + React + React Router shop used to validate AI QA Agent end to end.
 It is intentionally **not** perfect. This file lives outside the fixture's project root so the
 AI agent cannot read the answers while it analyzes the app.
 

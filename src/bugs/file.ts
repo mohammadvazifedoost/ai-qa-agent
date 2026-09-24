@@ -143,7 +143,7 @@ export async function fileIssues(
       if (prior?.taskId) {
         await client.addComment(
           prior.taskId,
-          `ai-qa run ${run.runId}: still failing (${issue.scenarioIds.join(', ')}) — ${issue.bug.title}`,
+          `AI QA Agent run ${run.runId}: still failing (${issue.scenarioIds.join(', ')}) — ${issue.bug.title}`,
         );
         ctx.state.data.bugs[prior.fingerprint]!.lastSeenRun = run.runId;
         ctx.state.save();
@@ -161,7 +161,7 @@ export async function fileIssues(
       }
       const evidence = evidenceFor(issue, run);
       const task = await client.createTask(cfg.listId, {
-        name: `[ai-qa] ${issue.bug.title}`,
+        name: `[AI QA Agent] ${issue.bug.title}`,
         markdown: renderBugMarkdown(issue, env, evidence),
         tags: [
           ...cfg.tags,

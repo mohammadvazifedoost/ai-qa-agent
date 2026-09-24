@@ -104,7 +104,7 @@ export function renderBugMarkdown(issue: Issue, env: BugEnvironment, evidence: E
       ...e.design.map((d) => `  - Design comparison: \`${d}\``),
     ]),
     '',
-    '_Filed automatically by ai-qa after failure analysis. The test failed on every retry._',
+    '_Reported by AI QA Agent after failure analysis. The test failed on every retry._',
   ];
   return lines
     .filter((l, i, all) => !(l === '' && all[i - 1] === ''))

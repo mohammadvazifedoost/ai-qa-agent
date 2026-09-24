@@ -55,7 +55,7 @@ const program = new Command();
 program
   .name('ai-qa')
   .description(
-    'AI QA agent: design + code analysis, Playwright test generation, failure triage, ClickUp bugs',
+    'AI QA Agent: design + code analysis, Playwright test generation, failure triage, ClickUp bugs',
   )
   .version('0.1.0')
   .option('-C, --cwd <dir>', 'target project root', process.cwd())
@@ -294,7 +294,7 @@ program
     const addr = server.address();
     const url =
       typeof addr === 'object' && addr ? `http://${o.host}:${addr.port}/` : `http://${o.host}:${o.port}/`;
-    console.log(`ai-qa dashboard: ${pc.bold(url)}  (Ctrl+C to stop)`);
+    console.log(`AI QA Agent dashboard: ${pc.bold(url)}  (Ctrl+C to stop)`);
     if (ctx.config.clickup && !process.env[ctx.config.clickup.tokenEnv]) {
       console.log(
         pc.yellow(`ClickUp filing is disabled: ${ctx.config.clickup.tokenEnv} is not set in this shell.`),

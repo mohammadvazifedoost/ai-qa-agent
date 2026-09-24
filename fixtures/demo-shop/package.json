@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Fixture app for validating @company/ai-qa. Contains intentional bugs.",
+  "description": "Fixture app for validating AI QA Agent. Contains intentional bugs.",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build": "tsc -b && vite build",
