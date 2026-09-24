@@ -7,6 +7,7 @@ import { rel } from './core/paths.js';
 import { initProject } from './init/init.js';
 import { createContext } from './pipeline/context.js';
 import { extractDesign } from './design/figma.js';
+import { analyzeApp } from './analyze/app.js';
 
 const log = logger('cli');
 const program = new Command();
@@ -61,11 +62,13 @@ program
 
 program
   .command('analyze')
-  .description('analyze the Figma design (and, later stages, the application source)')
+  .description('analyze the application source and the Figma design')
   .option('--refresh', 'ignore cached results and re-analyze')
-  .action(async (o: { refresh?: boolean }) => {
+  .option('--skip-design', 'only analyze the application source')
+  .action(async (o: { refresh?: boolean; skipDesign?: boolean }) => {
     const ctx = await createContext(root());
-    await extractDesign(ctx, { force: o.refresh });
+    await analyzeApp(ctx, { force: o.refresh });
+    if (!o.skipDesign) await extractDesign(ctx, { force: o.refresh });
   });
 
 program.parseAsync().catch((err: unknown) => {

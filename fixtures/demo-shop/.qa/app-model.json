@@ -1,0 +1,374 @@
+{
+  "summary": "demo-shop is a Vite + React 18/19 + TypeScript SPA using react-router-dom's createBrowserRouter (src/main.tsx). It has three routes (/, /checkout, /login) under a shared Layout (header + nav + main). There is no backend: the catalog, coupon validation and login are simulated in src/api/catalog.ts with setTimeout delays. Cart state is in-memory React context (src/cart.tsx), so it is lost on a full page reload. Styling is one plain CSS file with custom properties (src/styles.css). Suspicious logic found: the checkout Total ignores the discount, the \"Place order\" button has no handler, login success is not shared with any other page, and the mobile menu breakpoint is only 320px. I did not read index.html, package.json or vite config (unknowns).",
+  "pages": [
+    {
+      "route": "/",
+      "name": "Home / Product list",
+      "purpose": "Landing page with hero and a grid of 3 products; the user can add products to the in-memory cart.",
+      "files": [
+        "src/main.tsx",
+        "src/components/Layout.tsx",
+        "src/components/Button.tsx",
+        "src/pages/HomePage.tsx",
+        "src/api/catalog.ts",
+        "src/cart.tsx",
+        "src/styles.css"
+      ],
+      "headings": [
+        "h1: Everyday goods, made well",
+        "h2: Products (section#products, aria-labelledby=products-heading)",
+        "h3: Ceramic Mug",
+        "h3: Canvas Tote",
+        "h3: Dot Notebook"
+      ],
+      "interactiveElements": [
+        "link 'Demo Shop' (logo, to /)",
+        "button 'Open menu' (menu-toggle, aria-expanded; only visible at viewport width <= 320px)",
+        "nav 'Main'",
+        "link 'Home' (NavLink to /, class 'active' when on /)",
+        "link 'Shop all products' (plain <a href=\"/#products\">; causes a full page load, not client-side navigation, so the cart resets)",
+        "link 'Checkout N items in cart' (NavLink to /checkout; contains span.cart-badge with aria-label='N items in cart' and text N; the link's accessible name includes the badge label)",
+        "link 'Sign in to your account' (NavLink to /login)",
+        "button 'Add Ceramic Mug to cart' (visible text 'Add to cart', aria-label overrides it)",
+        "button 'Add Canvas Tote to cart' (visible text 'Add to cart')",
+        "button 'Add Dot Notebook to cart' (visible text 'Add to cart')"
+      ],
+      "forms": [],
+      "states": {
+        "loading": null,
+        "empty": null,
+        "error": null
+      },
+      "dataDependencies": [
+        "PRODUCTS constant in src/api/catalog.ts (static, synchronous, no fetch)",
+        "CartContext via useCart().add (src/cart.tsx)",
+        "formatPrice(cents) => '$' + (cents/100).toFixed(2)"
+      ],
+      "preconditions": [
+        "None. Public page."
+      ],
+      "responsiveBehavior": [
+        "@media (max-width: 768px): .product-grid changes from 3 columns (repeat(3, 1fr)) to 1 column",
+        "@media (max-width: 320px): .menu-toggle shown (display:block); .main-nav hidden unless .open (then a vertical absolute dropdown at top:64px). Above 320px the nav is always shown and the toggle is hidden (display:none)."
+      ],
+      "businessRules": [
+        "Products (src/api/catalog.ts): Ceramic Mug 'Hand-glazed, 350 ml.' $18.00 (1800c); Canvas Tote 'Heavyweight organic cotton.' $24.00 (2400c); Dot Notebook 'A5, 160 pages, lay-flat.' $12.00 (1200c).",
+        "Each click on 'Add ... to cart' increments that product's quantity by 1 (src/cart.tsx add). There is no feedback other than the header cart badge count.",
+        "Cart badge count = sum of quantities across lines (src/cart.tsx).",
+        "Cart lines are ordered by PRODUCTS order (mug, tote, notebook), not by the order they were added.",
+        "The cart is React state only; there is no persistence, so it is lost on reload and on the 'Shop all products' link (full page load).",
+        "The menu toggle's aria-label stays 'Open menu' even when the menu is open (src/components/Layout.tsx); only aria-expanded changes."
+      ]
+    },
+    {
+      "route": "/checkout",
+      "name": "Checkout",
+      "purpose": "Shows cart lines, lets the user remove items and apply a coupon, and shows the order summary.",
+      "files": [
+        "src/main.tsx",
+        "src/components/Layout.tsx",
+        "src/components/Button.tsx",
+        "src/pages/CheckoutPage.tsx",
+        "src/api/catalog.ts",
+        "src/cart.tsx",
+        "src/styles.css"
+      ],
+      "headings": [
+        "Empty cart: h1 'Your cart is empty'",
+        "Non-empty cart: h1 'Checkout'"
+      ],
+      "interactiveElements": [
+        "Empty state: link 'Browse products' (to /)",
+        "list 'Order items' (ul aria-label)",
+        "button 'Remove Ceramic Mug' / 'Remove Canvas Tote' / 'Remove Dot Notebook' (visible text 'Remove'; removes the whole line regardless of quantity)",
+        "textbox 'Coupon code' (input#coupon, placeholder 'e.g. SAVE10', no type attribute)",
+        "button 'Apply' (secondary; becomes 'Applying…' and disabled while checking)",
+        "button 'Place order' (primary, full width; NO onClick handler, so it does nothing)",
+        "Header nav links same as on / (Home, Shop all products, Checkout N items in cart, Sign in to your account)"
+      ],
+      "forms": [
+        {
+          "name": "Coupon form (form.coupon, noValidate, no accessible name)",
+          "fields": [
+            {
+              "label": "Coupon code",
+              "type": "text (input#coupon, no type attribute)",
+              "validation": [
+                "Empty or whitespace-only on submit => error 'Enter a coupon code' (role=alert, class error); no API call",
+                "Code is trimmed and uppercased before lookup, so it is case-insensitive: 'save10' works",
+                "Unknown code => 'Invalid coupon code' (role=alert)",
+                "Valid codes: SAVE10 (10%), WELCOME20 (20%)"
+              ]
+            }
+          ],
+          "submitLabel": "Apply",
+          "successBehavior": "After a 300ms simulated delay, shows p[role=status].success: 'Coupon {CODE} applied: {N}% off' (e.g. 'Coupon SAVE10 applied: 10% off'). A 'Discount' row appears in the summary, with data-testid=discount showing '−$X.XX'. The Total is NOT reduced (see businessRules).",
+          "errorBehavior": "Shows p[role=alert].error with 'Enter a coupon code' or 'Invalid coupon code'. A previously applied coupon is replaced by the error state, so the discount row disappears."
+        }
+      ],
+      "states": {
+        "loading": "While the coupon is being validated (300ms), the Apply button reads 'Applying…' and is disabled (opacity 0.6).",
+        "empty": "When the cart has no lines: h1 'Your cart is empty', text 'Add a product to start checking out.', link 'Browse products' to /. The cart is always empty on a direct load or reload of /checkout, because state is in memory.",
+        "error": "Coupon errors only: 'Enter a coupon code' / 'Invalid coupon code' (role=alert)."
+      },
+      "dataDependencies": [
+        "useCart(): lines, subtotalCents, remove (src/cart.tsx)",
+        "validateCoupon(code) in src/api/catalog.ts (300ms delay; coupons SAVE10=0.1, WELCOME20=0.2)",
+        "formatPrice"
+      ],
+      "preconditions": [
+        "Cart must have at least one item (added on /) to see the checkout content; otherwise the empty state is shown.",
+        "Navigate client-side (NavLink 'Checkout') after adding items. A direct URL load or reload empties the cart."
+      ],
+      "responsiveBehavior": [
+        "No page-specific media queries. .checkout has max-width 560px; each order line is a grid of 1fr auto auto.",
+        "Global header behaviour at max-width 320px applies (menu toggle)."
+      ],
+      "businessRules": [
+        "Line text is '{name} × {quantity}' and the line price is quantity*priceCents formatted (e.g. 'Ceramic Mug × 2' and '$36.00').",
+        "subtotalCents = sum(quantity*priceCents) (src/cart.tsx). Summary row 'Subtotal' has data-testid=subtotal.",
+        "discountCents = Math.round(subtotalCents * rate) when a coupon is applied, otherwise 0. The Discount row (data-testid=discount, text '−$X.XX' using the U+2212 minus sign) renders only if discountCents > 0 (src/pages/CheckoutPage.tsx:28,88).",
+        "SUSPICIOUS: totalCents = subtotalCents (src/pages/CheckoutPage.tsx:29). The discount is never subtracted, so Total (data-testid=total) always equals Subtotal even when a coupon is applied.",
+        "'Place order' has no onClick or form, so it performs no action and no confirmation is shown (src/pages/CheckoutPage.tsx:99).",
+        "'Remove' deletes the product line entirely (all quantity). There is no quantity decrement.",
+        "Coupon state is local to the page component. If the last line is removed, the empty state shows. The state is kept while the component stays mounted, so it may persist if items are added again without leaving /checkout. It is lost on navigating away.",
+        "An applied coupon is not re-validated when the cart changes; the discount is recalculated from the current subtotal."
+      ]
+    },
+    {
+      "route": "/login",
+      "name": "Sign in",
+      "purpose": "Email/password form backed by a simulated login API. Success replaces the form with a welcome heading.",
+      "files": [
+        "src/main.tsx",
+        "src/components/Layout.tsx",
+        "src/components/Button.tsx",
+        "src/pages/LoginPage.tsx",
+        "src/api/catalog.ts",
+        "src/styles.css"
+      ],
+      "headings": [
+        "h1 'Sign in'",
+        "After success: h1 'Welcome back, Demo User'"
+      ],
+      "interactiveElements": [
+        "form 'Sign in' (aria-label)",
+        "textbox 'Email' (input#email, type=email)",
+        "textbox 'Password' (input#password, type=password; not a textbox role, use getByLabel)",
+        "button 'Sign in' (primary, type=submit; becomes 'Signing in…' and disabled while loading)",
+        "Header nav links (Home, Shop all products, Checkout N items in cart, Sign in to your account)"
+      ],
+      "forms": [
+        {
+          "name": "Sign in (form aria-label='Sign in', noValidate)",
+          "fields": [
+            {
+              "label": "Email",
+              "type": "email",
+              "validation": [
+                "Must match /^\\S+@\\S+\\.\\S+$/ (no trim) else 'Enter a valid email address' (p#email-error, class error, no role=alert); input gets aria-invalid=true and aria-describedby=email-error"
+              ]
+            },
+            {
+              "label": "Password",
+              "type": "password",
+              "validation": [
+                "Length must be >= 8 else 'Password must be at least 8 characters' (p#password-error, class error, no role=alert); aria-invalid=true and aria-describedby=password-error"
+              ]
+            }
+          ],
+          "submitLabel": "Sign in",
+          "successBehavior": "After a 500ms simulated delay with valid credentials (demo@shop.test / password123; email compared case-insensitively, password case-sensitive), the form is replaced by section with h1 'Welcome back, Demo User'. There is no redirect, no token or storage, and the header does not change.",
+          "errorBehavior": "Client-side validation errors are shown inline and both are shown at once; the API is not called. Wrong credentials (well-formed input) => p[role=alert].error 'Invalid email or password'. The button re-enables after the call."
+        }
+      ],
+      "states": {
+        "loading": "Button text 'Signing in…' and disabled for 500ms.",
+        "empty": null,
+        "error": "Field errors (see the form) and the form-level alert 'Invalid email or password'."
+      },
+      "dataDependencies": [
+        "login(email, password) in src/api/catalog.ts (500ms delay)"
+      ],
+      "preconditions": [
+        "None. Public page."
+      ],
+      "responsiveBehavior": [
+        ".auth max-width 400px; no page-specific media queries.",
+        "Global header at max-width 320px: menu toggle shown, nav collapsed."
+      ],
+      "businessRules": [
+        "Only credential pair accepted: demo@shop.test / password123 (src/api/catalog.ts:26). The display name is 'Demo User'.",
+        "Login state is local to LoginPage (useState). It is not shared and not persisted; navigating away and back shows the sign-in form again. No route is protected.",
+        "The link label in the nav is 'Sign in to your account' while the page h1 is 'Sign in'.",
+        "Field-level errors and the form-level error are mutually exclusive in a single submit (setErrors replaces the whole object)."
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "name": "Add products and view checkout",
+      "feature": "cart",
+      "steps": [
+        "Open /",
+        "Click 'Add Ceramic Mug to cart' twice and 'Add Canvas Tote to cart' once",
+        "Header badge shows 3 (accessible name 'Checkout 3 items in cart')",
+        "Click nav link 'Checkout' (client-side)",
+        "See 'Ceramic Mug × 2' $36.00 and 'Canvas Tote × 1' $24.00; Subtotal $60.00 and Total $60.00"
+      ],
+      "routes": [
+        "/",
+        "/checkout"
+      ]
+    },
+    {
+      "name": "Apply coupon",
+      "feature": "checkout",
+      "steps": [
+        "Add Ceramic Mug on /, then go to /checkout via the nav link",
+        "Type 'save10' in 'Coupon code' and click 'Apply'",
+        "Button shows 'Applying…' for about 300ms",
+        "Status 'Coupon SAVE10 applied: 10% off' appears; Discount row shows −$1.80; Subtotal $18.00",
+        "Total still shows $18.00 (the discount is not subtracted in the code)"
+      ],
+      "routes": [
+        "/checkout"
+      ]
+    },
+    {
+      "name": "Coupon errors",
+      "feature": "checkout",
+      "steps": [
+        "With items in the cart on /checkout, click 'Apply' with an empty field => alert 'Enter a coupon code'",
+        "Enter 'BOGUS' and click Apply => alert 'Invalid coupon code'"
+      ],
+      "routes": [
+        "/checkout"
+      ]
+    },
+    {
+      "name": "Remove item / empty cart",
+      "feature": "cart",
+      "steps": [
+        "Add one product, go to /checkout",
+        "Click 'Remove <product name>'",
+        "The empty state appears: h1 'Your cart is empty' and link 'Browse products'",
+        "Click 'Browse products' to return to /"
+      ],
+      "routes": [
+        "/",
+        "/checkout"
+      ]
+    },
+    {
+      "name": "Empty checkout on direct load",
+      "feature": "checkout",
+      "steps": [
+        "Load /checkout directly",
+        "See 'Your cart is empty'"
+      ],
+      "routes": [
+        "/checkout"
+      ]
+    },
+    {
+      "name": "Login success",
+      "feature": "auth",
+      "steps": [
+        "Open /login (or click 'Sign in to your account')",
+        "Fill 'Email' with demo@shop.test and 'Password' with password123",
+        "Click 'Sign in' (button reads 'Signing in…' for about 500ms)",
+        "See h1 'Welcome back, Demo User'; the form is gone"
+      ],
+      "routes": [
+        "/login"
+      ]
+    },
+    {
+      "name": "Login validation and failure",
+      "feature": "auth",
+      "steps": [
+        "Submit the empty form => 'Enter a valid email address' and 'Password must be at least 8 characters'",
+        "Enter a well-formed email and a wrong 8+ char password => alert 'Invalid email or password'"
+      ],
+      "routes": [
+        "/login"
+      ]
+    },
+    {
+      "name": "Mobile menu",
+      "feature": "navigation",
+      "steps": [
+        "Set the viewport width to 320px or less",
+        "'Open menu' button is visible and the nav is hidden",
+        "Click it => nav opens as a vertical dropdown; aria-expanded=true"
+      ],
+      "routes": [
+        "/"
+      ]
+    }
+  ],
+  "auth": "Simulated only. The only valid credentials are demo@shop.test / password123 (src/api/catalog.ts login). There is no session, token, storage or route guard; a successful login only swaps LoginPage's local view to 'Welcome back, Demo User'. All routes are public.",
+  "stateManagement": "React Context CartProvider (src/cart.tsx) wraps RouterProvider in src/main.tsx. It holds quantities as Record<productId, number> in useState and exposes lines, count, subtotalCents, add(id) and remove(id). It is memory-only: a full page load resets it. Local useState is used for the coupon (CheckoutPage), the login form and user (LoginPage), and menuOpen (Layout). There is no persistence and no server calls; the async APIs are setTimeout stubs.",
+  "testData": [
+    "Login: demo@shop.test / password123 (name shown: 'Demo User'); the email is case-insensitive",
+    "Invalid login example: any well-formed email with an 8+ character password other than the above, e.g. wrong@shop.test / wrongpass1",
+    "Coupon SAVE10 => 10% off (case-insensitive, trimmed)",
+    "Coupon WELCOME20 => 20% off",
+    "Invalid coupon: any other string, e.g. BOGUS",
+    "Products: Ceramic Mug $18.00 (id mug), Canvas Tote $24.00 (id tote), Dot Notebook $12.00 (id notebook)",
+    "Example: 1 mug + 1 tote + 1 notebook => subtotal $54.00; with SAVE10 discount −$5.40; with WELCOME20 discount −$10.80",
+    "Discount rounding: Math.round(subtotalCents*rate); e.g. Dot Notebook only with WELCOME20 => −$2.40"
+  ],
+  "styling": {
+    "approach": "Single global plain stylesheet src/styles.css imported in src/main.tsx. It uses CSS custom properties on :root, BEM-ish utility classes (.btn, .btn-primary, .btn-secondary, .card, .container, etc.) and no CSS modules or CSS-in-JS. The Button component adds the classes btn btn-{variant}.",
+    "tokens": {
+      "--color-primary": "#7c3aed",
+      "--color-primary-hover": "#6d28d9",
+      "--color-text": "#0f172a",
+      "--color-muted": "#475569",
+      "--color-surface": "#ffffff",
+      "--color-background": "#f8fafc",
+      "--color-border": "#e2e8f0",
+      "--color-success": "#16a34a",
+      "--color-danger": "#dc2626",
+      "--radius-sm": "4px",
+      "--radius-md": "8px",
+      "--radius-lg": "12px",
+      "--space-1": "4px",
+      "--space-2": "8px",
+      "--space-3": "12px",
+      "--space-4": "16px",
+      "--space-6": "24px",
+      "--space-8": "32px",
+      "--space-12": "48px",
+      "font-family": "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif",
+      "body": "font-size 16px; line-height 24px",
+      "h1": "40px/48px, weight 700",
+      "h2": "24px/32px, weight 600",
+      "h3": "18px/28px, weight 600",
+      "container": "max-width 1120px; padding 32px 24px",
+      "site-header": "height 64px; padding 0 24px",
+      ".btn": "height 44px; padding 0 20px; weight 600; border-radius 2px (hardcoded, not a token; .btn-secondary overrides it with var(--radius-md) = 8px)",
+      "input": "height 44px; padding 0 12px; border-radius 8px",
+      ".cart-badge": "background var(--color-text); white text; 12px; radius 999px",
+      "breakpoints": "@media (max-width: 768px) product grid 1 column; @media (max-width: 320px) hamburger menu"
+    }
+  },
+  "unknowns": [
+    "index.html, vite config, tsconfig and package.json were not read; the page <title>, meta tags and exact dependency versions are unknown.",
+    "The react-router-dom version is unknown. It was not read; the code uses createBrowserRouter.",
+    "Whether the dev server serves SPA fallback for direct loads of /checkout and /login is not verified from code (Vite dev does by default).",
+    "'Place order' has no handler, so the intended post-order behaviour is unknown.",
+    "The intended behaviour for the Total with a coupon is unknown; the code sets total = subtotal, ignoring the discount.",
+    "Whether the 320px mobile-menu breakpoint is intended is unknown; the code only collapses the nav at max-width 320px.",
+    "No loading, error or empty states exist on the Home page (static data).",
+    "Focus management and keyboard behaviour beyond native elements were not verified in a browser; this analysis is from source only."
+  ],
+  "analyzedAt": "2026-09-24T00:16:20.914Z",
+  "pageHashes": {
+    "/": "a7990ae3984c8683869cae3768fb4e1ae90d56f8f3bf995388552f7bb5763c98",
+    "/checkout": "30db97093d8cd704ec528fd2804b71619733bcfce231a306a95597c9a8691a9a",
+    "/login": "d034baa38f226d011f1362041189308e90a7ea96ffbd38c583980e0def1c9fdc"
+  }
+}
