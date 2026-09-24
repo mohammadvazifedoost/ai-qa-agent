@@ -7,3 +7,5 @@ coverage/
 # generated QA runtime artifacts in fixtures (kept out of git; see fixtures/*/.qa/.gitignore)
 # browser-check scratch output from Playwright MCP
 .playwright-mcp/
+# agent worktrees
+.claude/worktrees/
