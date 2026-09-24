@@ -54,7 +54,7 @@ await qa.expectNoHorizontalOverflow()
   Fails if the document scrolls horizontally and reports which elements stick out.
 `;
 
-function specPath(ctx: QaContext, route: string): string {
+export function specPath(ctx: QaContext, route: string): string {
   return path.join(ctx.paths.testsDir, `${pageSlug(route)}.spec.ts`);
 }
 
@@ -108,7 +108,11 @@ const GeneratedSchema = z.object({
 });
 
 /** Compile/list the spec with Playwright; returns problems (empty = OK). */
-async function validateSpec(ctx: QaContext, file: string, scenarios: Scenario[]): Promise<string[]> {
+export async function validateSpec(
+  ctx: QaContext,
+  file: string,
+  scenarios: ReadonlyArray<Pick<Scenario, 'id'>>,
+): Promise<string[]> {
   const args = [
     playwrightCli(),
     'test',
@@ -137,6 +141,15 @@ async function validateSpec(ctx: QaContext, file: string, scenarios: Scenario[])
   return problems;
 }
 
+/** Cache key of a spec in `state.generatedSpecs`: the approved scenarios it implements + page model + design. */
+export function specHash(ctx: QaContext, page: PageModel, approved: Scenario[]): string {
+  return sha256(JSON.stringify({ scenarios: approved, page, design: designSummary(ctx, page.route) }));
+}
+
+export function specKey(ctx: QaContext, file: string): string {
+  return rel(ctx.paths.qaDir, file);
+}
+
 export interface GenerateScope {
   page?: string;
   /** Limit to these routes (used by `run --changed`). */
@@ -159,8 +172,8 @@ export async function generateTests(ctx: QaContext, scope: GenerateScope = {}): 
         readJson(scenarioFilePath(ctx, page.route), ScenarioFileSchema)?.scenarios ?? []
       ).filter((s) => s.approved);
       const file = specPath(ctx, page.route);
-      const hash = sha256(JSON.stringify({ scenarios, page, design: designSummary(ctx, page.route) }));
-      const key = rel(ctx.paths.qaDir, file);
+      const hash = specHash(ctx, page, scenarios);
+      const key = specKey(ctx, file);
       const fresh = fs.existsSync(file) && ctx.state.data.generatedSpecs[key] === hash;
       return { page, scenarios, file, hash, key, fresh };
     })

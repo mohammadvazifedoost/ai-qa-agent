@@ -7,7 +7,13 @@ import { listFiles, readJson, sha256, slugify, writeJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import type { DesignSystemFile } from '../design/schema.js';
 import type { QaContext } from '../pipeline/context.js';
-import { ScenarioFileSchema, ScenarioSchema, type Scenario, type ScenarioFile } from './schema.js';
+import {
+  ScenarioFileSchema,
+  ScenarioSchema,
+  type RemovedScenario,
+  type Scenario,
+  type ScenarioFile,
+} from './schema.js';
 
 const log = logger('scenarios');
 
@@ -96,6 +102,7 @@ export async function generateScenarios(ctx: QaContext, scope: ScenarioScope = {
       generatedAt: new Date().toISOString(),
       inputHash,
       scenarios,
+      removed: existing?.removed ?? [],
     } satisfies ScenarioFile);
     log.info(`Wrote ${scenarios.length} scenarios for ${page.route}`);
   }
@@ -131,6 +138,31 @@ export function selectPages<T extends Pick<PageModel, 'route' | 'name'>>(pages: 
   return hits;
 }
 
+/** Prompt section listing scenarios a person deleted, so the AI does not recreate them. */
+export function removedSection(removed: readonly RemovedScenario[]): string {
+  if (removed.length === 0) return '';
+  const list = removed
+    .map((r) => `- ${r.id}: ${r.title}${r.reason ? ` (reason: ${r.reason})` : ''}`)
+    .join('\n');
+  return `## Removed scenarios — DO NOT recreate
+A person deleted these as unnecessary or unusable. Do not return them again, do not return scenarios that test the same thing under another title, and do not reuse their ids for new scenarios.
+${list}
+`;
+}
+
+const normalizeTitle = (t: string): string => t.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** Guard against the AI ignoring the instruction: drop anything matching a removed id or title. */
+export function dropRemoved(scenarios: Scenario[], removed: readonly RemovedScenario[]): Scenario[] {
+  const ids = new Set(removed.map((r) => r.id));
+  const titles = new Set(removed.map((r) => normalizeTitle(r.title)));
+  return scenarios.filter((s) => {
+    const hit = ids.has(s.id) || titles.has(normalizeTitle(s.title));
+    if (hit) log.warn(`Dropping ${s.id} "${s.title}": it was removed by a person`);
+    return !hit;
+  });
+}
+
 async function generateForPage(
   ctx: QaContext,
   app: AppModelFile,
@@ -162,7 +194,7 @@ ${JSON.stringify(designForPage(design, page.route), null, 2)}
 ## Viewports available
 ${JSON.stringify(ctx.config.viewports)}
 
-${existing ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(existing.scenarios, null, 2)}\n` : ''}
+${existing ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(existing.scenarios, null, 2)}\n` : ''}${removedSection(existing?.removed ?? [])}
 ## Instructions
 - Produce at most ${max} high-value scenarios for this page across categories: functional, visual, responsive. Quality over quantity: no trivial duplicates.
 - functional: happy paths, validation, empty/error/loading states, navigation, and business rules (calculations!).
@@ -177,7 +209,7 @@ ${existing ? `## Existing scenarios (keep ids stable for scenarios that still ap
     tools: ['Read', 'Glob', 'Grep'],
   });
   const viewports = Object.keys(ctx.config.viewports);
-  return res.output.scenarios.map((s) => {
+  return dropRemoved(res.output.scenarios, existing?.removed ?? []).map((s) => {
     if (!viewports.includes(s.viewport)) {
       log.warn(`Scenario ${s.id} uses unknown viewport "${s.viewport}", using "${viewports[0]}"`);
       return { ...s, viewport: viewports[0]! };
