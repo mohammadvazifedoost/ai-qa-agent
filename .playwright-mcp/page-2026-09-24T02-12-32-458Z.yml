@@ -1,7 +1,0 @@
-- generic [ref=f1e2]:
-  - banner [ref=f1e3]:
-    - heading "ai-qa" [level=1] [ref=f1e4]
-    - generic [ref=f1e5]:
-      - text: Run
-      - combobox "Run" [ref=f1e6]
-  - paragraph [ref=f1e8]: Loading…
