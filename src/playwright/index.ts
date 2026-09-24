@@ -151,10 +151,17 @@ export class QaHelpers {
       return result;
     }
     await this.page.evaluate(() => document.fonts.ready);
+    const expectedPng = PNG.sync.read(fs.readFileSync(refFile));
+    // A design frame covers a region of the page starting at the top-left, so compare exactly that
+    // region: otherwise a taller viewport would count every pixel below the design as different.
     const shot = target
       ? await target.screenshot({ animations: 'disabled', caret: 'hide' })
-      : await this.page.screenshot({ fullPage: true, animations: 'disabled', caret: 'hide' });
-    const expectedPng = PNG.sync.read(fs.readFileSync(refFile));
+      : await this.page.screenshot({
+          fullPage: true,
+          animations: 'disabled',
+          caret: 'hide',
+          clip: { x: 0, y: 0, width: expectedPng.width, height: expectedPng.height },
+        });
     const actualPng = PNG.sync.read(shot);
     const { diff, diffPixels, diffRatio } = diffImages(expectedPng, actualPng, settings.pixelThreshold);
     const status: VisualResult['status'] =

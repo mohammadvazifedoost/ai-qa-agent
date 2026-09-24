@@ -22,6 +22,8 @@ import { triageRun } from './triage/triage.js';
 import { TriageResultSchema } from './triage/schema.js';
 import { writeReport } from './report/report.js';
 import { FilingSummarySchema } from './bugs/file.js';
+import { ClickUpClient } from './integrations/clickup.js';
+import { chromium } from '@playwright/test';
 
 interface Scope {
   page?: string;
@@ -82,12 +84,39 @@ program
   .description('check that Claude Code, Playwright and integrations are usable')
   .action(async () => {
     const ctx = await createContext(root());
+    let failed = false;
+    const line = (ok: boolean | null, text: string): void => {
+      const mark = ok === null ? pc.cyan('•') : ok ? pc.green('✔') : pc.red('✘');
+      if (ok === false) failed = true;
+      console.log(`${mark} ${text}`);
+    };
     const claude = await checkClaude(ctx.config.ai.claudePath);
-    console.log(`${claude.ok ? pc.green('✔') : pc.red('✘')} Claude Code CLI: ${claude.detail}`);
-    for (const name of Object.keys(ctx.config.ai.mcpServers)) {
-      console.log(`${pc.cyan('•')} MCP server configured for AI tasks: ${name}`);
-    }
-    if (!claude.ok) process.exitCode = 1;
+    line(claude.ok, `Claude Code CLI: ${claude.detail}`);
+
+    const browserPath = chromium.executablePath();
+    line(fs.existsSync(browserPath), `Playwright chromium: ${fs.existsSync(browserPath) ? browserPath : 'not installed — run: npx playwright install chromium'}`);
+
+    const reachable = await fetch(ctx.config.app.baseUrl, { signal: AbortSignal.timeout(3000) }).then((r) => r.status < 500).catch(() => false);
+    line(null, `App at ${ctx.config.app.baseUrl}: ${reachable ? 'reachable' : `not running${ctx.config.app.startCommand ? ` (will be started with "${ctx.config.app.startCommand}")` : ' and no startCommand configured'}`}`);
+
+    for (const name of Object.keys(ctx.config.ai.mcpServers)) line(null, `MCP server for AI tasks: ${name}`);
+    if (ctx.config.figma) {
+      line(!!ctx.config.ai.mcpServers.figma, `Figma: ${ctx.config.figma.fileUrl}${ctx.config.ai.mcpServers.figma ? '' : ' — ai.mcpServers.figma is missing'}`);
+    } else line(null, 'Figma: not configured (visual tests will rely on code only)');
+
+    if (ctx.config.clickup) {
+      const token = process.env[ctx.config.clickup.tokenEnv];
+      if (!token) line(false, `ClickUp: environment variable ${ctx.config.clickup.tokenEnv} is not set`);
+      else {
+        try {
+          const list = await new ClickUpClient(token).getList(ctx.config.clickup.listId);
+          line(true, `ClickUp: token valid, bugs go to list "${list.name}" (${list.id})`);
+        } catch (err) {
+          line(false, `ClickUp: ${(err as Error).message}`);
+        }
+      }
+    } else line(null, 'ClickUp: not configured (bugs will only be written to the local report)');
+    if (failed) process.exitCode = 1;
   });
 
 program

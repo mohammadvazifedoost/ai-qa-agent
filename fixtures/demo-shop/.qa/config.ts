@@ -18,6 +18,10 @@ export default defineConfig({
     // Frames used as visual references. Filled in by `ai-qa design`; edit to pin specific frames.
     frames: [],
   },
+  clickup: {
+    listId: "901523571090",
+    tokenEnv: "CLICKUP_API_TOKEN",
+  },
   ai: {
     model: 'sonnet',
     mcpServers: {

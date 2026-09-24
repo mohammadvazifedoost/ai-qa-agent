@@ -85,6 +85,8 @@ artifacts/
 reports/
 state.json
 test-results/
+# regenerated from config.ts on every run
+playwright.config.ts
 `;
 
 export function initProject(opts: InitOptions): { info: ProjectInfo; created: string[] } {
