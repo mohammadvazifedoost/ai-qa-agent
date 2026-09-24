@@ -42,6 +42,8 @@ const FiledBugSchema = z.object({
   classification: z.string().optional(),
   category: z.string().optional(),
   files: z.array(z.string()).default([]),
+  /** Tracker the item lives in; records from before Jira support are ClickUp tasks. */
+  tracker: z.enum(['clickup', 'jira']).default('clickup'),
 });
 export type FiledBug = z.infer<typeof FiledBugSchema>;
 

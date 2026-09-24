@@ -135,6 +135,8 @@ async function triageOne(ctx: QaContext, o: TestOutcome, cost: { usd: number }):
     prompt: buildPrompt(ctx, o),
     schema: AiVerdictSchema,
     tools: ['Read', 'Glob', 'Grep'],
+    // Providers that cannot open images with a read tool get the final screenshot attached.
+    images: o.artifacts.screenshots.slice(0, 1).map((s) => path.join(ctx.root, s)),
   });
   cost.usd += res.costUsd;
   const v = res.output;

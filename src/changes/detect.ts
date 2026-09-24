@@ -124,7 +124,7 @@ export async function detectDesignChanges(ctx: QaContext, design: DesignSystemFi
     cwd: ctx.root,
     system: BASE_SYSTEM,
     prompt: `List the pages and top-level frames of Figma file ${fileKey}.
-Call mcp__figma__get_metadata once WITHOUT nodeId to list pages, then once per page id. Do not call any other tool.
+Call ${ctx.ai.toolRef('figma', 'get_metadata')} once WITHOUT nodeId to list pages, then once per page id. Do not call any other tool.
 Return every page with its top-level frames (direct children of the canvas that are frames/sections/components): nodeId, name, width, height.`,
     schema: FrameList,
     tools: [],

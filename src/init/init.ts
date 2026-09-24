@@ -12,7 +12,13 @@ export interface InitOptions {
   force?: boolean;
   figmaUrl?: string;
   clickupListId?: string;
+  jiraUrl?: string;
+  jiraProject?: string;
+  jiraEmail?: string;
   baseUrl?: string;
+  /** AI provider: claude-code (default), codex or opencode. */
+  ai?: 'claude-code' | 'codex' | 'opencode';
+  model?: string;
 }
 
 /** The official remote Figma MCP server (authenticated through Claude Code's OAuth flow). */
@@ -42,7 +48,7 @@ export function renderConfig(info: ProjectInfo, opts: InitOptions): string {
     lines.push(`  figma: {`);
     lines.push(`    fileUrl: ${JSON.stringify(opts.figmaUrl)},`);
     lines.push(
-      `    // Frames used as visual references. Filled in by \`ai-qa-agent design\`; edit to pin specific frames.`,
+      `    // Optional: pin frames { name, nodeId, route, viewport }. Otherwise screens are discovered by \`ai-qa-agent analyze\`.`,
     );
     lines.push(`    frames: [],`);
     lines.push(`  },`);
@@ -54,8 +60,26 @@ export function renderConfig(info: ProjectInfo, opts: InitOptions): string {
     lines.push(`    tokenEnv: 'CLICKUP_API_TOKEN',`);
     lines.push(`  },`);
   }
+  if (opts.jiraUrl && opts.jiraProject) {
+    lines.push(`  jira: {`);
+    lines.push(`    baseUrl: ${JSON.stringify(opts.jiraUrl)},`);
+    lines.push(`    projectKey: ${JSON.stringify(opts.jiraProject)},`);
+    if (opts.jiraEmail) lines.push(`    email: ${JSON.stringify(opts.jiraEmail)},`);
+    else lines.push(`    // Account email is read from JIRA_EMAIL unless you set email here.`);
+    lines.push(`    // API token is read from this env var (never commit it).`);
+    lines.push(`    tokenEnv: 'JIRA_API_TOKEN',`);
+    lines.push(`  },`);
+  }
+  if (opts.clickupListId && opts.jiraUrl && opts.jiraProject) lines.push(`  tracker: 'jira',`);
+  const provider = opts.ai ?? 'claude-code';
   lines.push(`  ai: {`);
-  lines.push(`    model: 'sonnet',`);
+  if (provider !== 'claude-code') lines.push(`    provider: ${JSON.stringify(provider)},`);
+  if (opts.model) lines.push(`    model: ${JSON.stringify(opts.model)},`);
+  else if (provider === 'claude-code') lines.push(`    model: 'sonnet',`);
+  else
+    lines.push(
+      `    // model: omitted = the ${provider} default. Codex e.g. 'gpt-5-codex'; OpenCode 'provider/model'.`,
+    );
   lines.push(`    mcpServers: {`);
   if (opts.figmaUrl) lines.push(`      figma: ${JSON.stringify(FIGMA_MCP)},`);
   lines.push(`      playwright: ${JSON.stringify(PLAYWRIGHT_MCP)},`);

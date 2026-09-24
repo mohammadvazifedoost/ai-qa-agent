@@ -51,8 +51,9 @@ describe('previouslyFiled', () => {
       classification: 'DESIGN_MISMATCH',
       category: 'visual',
       files: ['src/styles.css'],
+      tracker: 'clickup',
     };
-    return { state } as QaContext;
+    return { state, config: { clickup: { listId: '1' } } } as unknown as QaContext;
   };
 
   it('matches the same defect found by different tests through root-cause files', () => {

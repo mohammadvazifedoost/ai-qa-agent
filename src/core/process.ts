@@ -1,4 +1,6 @@
 import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 export interface RunResult {
   code: number | null;
@@ -36,6 +38,46 @@ export function run(
     if (opts.input !== undefined) child.stdin?.end(opts.input);
     else child.stdin?.end();
   });
+}
+
+/**
+ * Resolve a command so it can be spawned without a shell. On Windows, globally installed npm CLIs
+ * are `.cmd` shims that `spawn` cannot execute directly; we read the shim to find the real target
+ * (`.exe` → run it, `.js` → run it with this Node). Returns the command unchanged elsewhere or
+ * when nothing better is found.
+ */
+export function resolveCommand(
+  command: string,
+  opts: { platform?: NodeJS.Platform; pathEnv?: string; readFile?: (p: string) => string | undefined } = {},
+): { command: string; prefixArgs: string[] } {
+  const platform = opts.platform ?? process.platform;
+  if (platform !== 'win32' || /[\\/]/.test(command) || /\.(exe|com)$/i.test(command)) {
+    return { command, prefixArgs: [] };
+  }
+  const readFile =
+    opts.readFile ??
+    ((p: string): string | undefined => {
+      try {
+        return fs.readFileSync(p, 'utf8');
+      } catch {
+        return undefined;
+      }
+    });
+  const exists = (p: string): boolean => readFile(p) !== undefined || fs.existsSync(p);
+  const dirs = (opts.pathEnv ?? process.env.PATH ?? '').split(';').filter(Boolean);
+  for (const dir of dirs) {
+    const exe = path.join(dir, `${command}.exe`);
+    if (fs.existsSync(exe)) return { command: exe, prefixArgs: [] };
+    const shim = readFile(path.join(dir, `${command}.cmd`));
+    if (shim === undefined) continue;
+    const target = shim.match(/"%dp0%\\([^"]+\.(exe|js|cjs|mjs))"/i);
+    if (target) {
+      const abs = path.join(dir, target[1]!);
+      if (target[2]!.toLowerCase() === 'exe') return { command: abs, prefixArgs: [] };
+      if (exists(abs)) return { command: process.execPath, prefixArgs: [abs] };
+    }
+  }
+  return { command, prefixArgs: [] };
 }
 
 /** Kill a process and all of its children (dev servers spawn grandchildren). */

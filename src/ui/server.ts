@@ -9,7 +9,7 @@ import {
   recordFiling,
   type FilingResult,
 } from '../bugs/file.js';
-import { ClickUpClient } from '../integrations/clickup.js';
+import { createTracker, trackerInfo, type IssueTracker } from '../integrations/tracker.js';
 import { readJson, sha256, slugify } from '../core/fs.js';
 import type { TestOutcome } from '../runner/results.js';
 import type { BugDraft, Issue } from '../triage/schema.js';
@@ -25,7 +25,15 @@ const log = logger('ui');
 
 export interface Overview {
   project: { name: string; baseUrl: string };
-  clickup: { configured: boolean; tokenPresent: boolean; listId: string | null };
+  /** The configured bug tracker (ClickUp or Jira), without secrets. */
+  tracker: {
+    kind: 'clickup' | 'jira' | null;
+    name: string;
+    noun: 'task' | 'issue';
+    configured: boolean;
+    tokenPresent: boolean;
+    target: string | null;
+  };
   runs: Array<{ id: string; startedAt: string; status: string; stats: TestRunResult['stats'] | null }>;
   run: {
     id: string;
@@ -34,9 +42,9 @@ export interface Overview {
     failures: TriageResult['failures'];
     issues: TriageResult['issues'];
     filing: FilingResult[];
-    /** Per failed outcome key: the ClickUp task known for its defect, verified against ClickUp. */
+    /** Per failed outcome key: the tracker item known for its defect, verified against the tracker. */
     tasks: Record<string, TaskLink>;
-    /** True when /api/tasks should be called to verify tasks (ClickUp configured and token present). */
+    /** True when /api/tasks should be called to verify items (tracker configured and credentials present). */
     tasksPending: boolean;
   } | null;
   scenarios: ReturnType<typeof loadAllScenarios>;
@@ -45,30 +53,30 @@ export interface Overview {
 export interface TaskLink {
   taskId: string;
   url?: string;
-  /** True when ClickUp confirmed the task exists; false when it was deleted or never verified. */
+  /** True when the tracker confirmed the item exists; false when it was deleted or never verified. */
   exists: boolean;
   verified: boolean;
   status?: string;
 }
 
-/** Existence checks are cached briefly so the dashboard does not hit ClickUp on every reload. */
+/** Existence checks are cached briefly so the dashboard does not hit the tracker on every reload. */
 const taskCache = new Map<string, { at: number; value: Omit<TaskLink, 'taskId'> }>();
 const TASK_CACHE_MS = 60_000;
 
 async function verifyTask(
-  client: ClickUpClient | undefined,
+  tracker: IssueTracker | undefined,
   taskId: string,
 ): Promise<Omit<TaskLink, 'taskId'>> {
-  if (!client) return { exists: false, verified: false };
-  const hit = taskCache.get(taskId);
+  if (!tracker) return { exists: false, verified: false };
+  const hit = taskCache.get(`${tracker.kind}:${taskId}`);
   if (hit && Date.now() - hit.at < TASK_CACHE_MS) return hit.value;
   try {
-    const r = await client.taskExists(taskId);
+    const r = await tracker.exists(taskId);
     const value = { exists: r.exists, verified: true, url: r.url, status: r.status };
-    taskCache.set(taskId, { at: Date.now(), value });
+    taskCache.set(`${tracker.kind}:${taskId}`, { at: Date.now(), value });
     return value;
   } catch (err) {
-    log.warn(`Could not verify task ${taskId} in ClickUp: ${(err as Error).message}`);
+    log.warn(`Could not verify ${taskId} in ${tracker.name}: ${(err as Error).message}`);
     return { exists: false, verified: false };
   }
 }
@@ -99,22 +107,25 @@ function knownTasks(
   return candidates;
 }
 
-/** Resolve and verify the ClickUp task for every failed/flaky outcome of a run. */
+/** Resolve and verify the tracker item for every failed/flaky outcome of a run. */
 async function taskLinks(
   ctx: QaContext,
   test: TestRunResult,
   triage: TriageResult | undefined,
   filing: FilingResult[],
 ): Promise<Record<string, TaskLink>> {
-  const cfg = ctx.config.clickup;
-  const token = cfg && process.env[cfg.tokenEnv];
-  const client = token ? new ClickUpClient(token) : undefined;
+  let tracker: IssueTracker | undefined;
+  try {
+    tracker = createTracker(ctx.config);
+  } catch {
+    tracker = undefined; // not configured or no credentials: nothing can be verified
+  }
   const failed = test.outcomes.filter((o) => o.status === 'failed' || o.status === 'flaky');
   const entries = await Promise.all(
     failed.map(async (o) => {
       let last: TaskLink | null = null;
       for (const known of knownTasks(ctx, test, triage, filing, o.key)) {
-        const v = await verifyTask(client, known.taskId);
+        const v = await verifyTask(tracker, known.taskId);
         last = {
           taskId: known.taskId,
           url: v.url ?? known.url,
@@ -122,7 +133,7 @@ async function taskLinks(
           verified: v.verified,
           status: v.status,
         };
-        if (v.exists) break; // the first task that still exists in ClickUp wins
+        if (v.exists) break; // the first item that still exists in the tracker wins
       }
       return last ? ([o.key, last] as const) : null;
     }),
@@ -158,18 +169,21 @@ export async function buildOverview(ctx: QaContext, runId?: string): Promise<Ove
       failures: triage?.failures ?? [],
       issues: triage?.issues ?? [],
       filing,
-      // Filled in by a second request (/api/tasks) so the page never waits for ClickUp.
+      // Filled in by a second request (/api/tasks) so the page never waits for the tracker.
       tasks: {},
-      tasksPending: !!(ctx.config.clickup && process.env[ctx.config.clickup.tokenEnv]),
+      tasksPending: trackerInfo(ctx.config).credentialsPresent,
     };
   }
-  const cfg = ctx.config.clickup;
+  const info = trackerInfo(ctx.config);
   return {
     project: { name: ctx.config.project.name, baseUrl: ctx.config.app.baseUrl },
-    clickup: {
-      configured: !!cfg,
-      tokenPresent: !!cfg && !!process.env[cfg.tokenEnv],
-      listId: cfg?.listId ?? null,
+    tracker: {
+      kind: info.kind,
+      name: info.name,
+      noun: info.noun,
+      configured: info.kind !== null,
+      tokenPresent: info.credentialsPresent,
+      target: info.target,
     },
     runs,
     run,
@@ -287,7 +301,7 @@ async function handleFile(ctx: QaContext, body: string): Promise<{ status: numbe
       force: true,
     });
     recordFiling(test, [result!], 'filed', 'Filed from the dashboard');
-    if (result!.taskId) taskCache.delete(result!.taskId);
+    if (result!.taskId) taskCache.delete(`${trackerInfo(ctx.config).kind}:${result!.taskId}`);
     return { status: result!.action === 'failed' ? 502 : 200, payload: result };
   } catch (err) {
     if (err instanceof FilingUnavailable)

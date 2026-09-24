@@ -17,7 +17,8 @@ describe('QaConfigSchema', () => {
     const c = QaConfigSchema.parse(minimal);
     expect(c.browsers).toEqual(['chromium']);
     expect(Object.keys(c.viewports)).toEqual(['desktop', 'tablet', 'mobile']);
-    expect(c.ai.model).toBe('sonnet');
+    expect(c.ai.provider).toBe('claude-code');
+    expect(c.ai.model).toBeUndefined(); // provider default applies (Claude Code: sonnet)
     expect(c.clickup).toBeUndefined();
     expect(c.visual.acceptableDiffRatio).toBe(0.02);
   });
@@ -76,5 +77,44 @@ describe('init', () => {
     expect(fs.readFileSync(path.join(root, '.qa', '.gitignore'), 'utf8')).toContain('artifacts/');
     expect(() => initProject({ root })).toThrow(/already exists/);
     expect(() => initProject({ root, force: true })).not.toThrow();
+  });
+});
+
+describe('init with other AI providers and Jira', () => {
+  it('renders provider, model and a jira section that validate', () => {
+    const root = makeProject({
+      'package.json': { name: 'shop', scripts: { dev: 'vite' }, devDependencies: { vite: '6' } },
+      'src/main.tsx': '',
+    });
+    const src = renderConfig(detectProject(root), {
+      root,
+      ai: 'opencode',
+      model: 'openai/gpt-5.5',
+      jiraUrl: 'https://acme.atlassian.net',
+      jiraProject: 'SHOP',
+      clickupListId: '1',
+    });
+    const body = src.replace(/^import .*$/m, '').replace('export default defineConfig(', 'return (');
+    const parsed = QaConfigSchema.parse(new Function(body)());
+    expect(parsed.ai.provider).toBe('opencode');
+    expect(parsed.ai.model).toBe('openai/gpt-5.5');
+    expect(parsed.jira).toMatchObject({
+      projectKey: 'SHOP',
+      tokenEnv: 'JIRA_API_TOKEN',
+      emailEnv: 'JIRA_EMAIL',
+      issueType: 'Bug',
+    });
+    expect(parsed.tracker).toBe('jira');
+    expect(src).not.toMatch(/token\s*:/i);
+  });
+
+  it('leaves the model to the provider default for codex', () => {
+    const root = makeProject({ 'package.json': { name: 'shop', devDependencies: { vite: '6' } } });
+    const src = renderConfig(detectProject(root), { root, ai: 'codex' });
+    const parsed = QaConfigSchema.parse(
+      new Function(src.replace(/^import .*$/m, '').replace('export default defineConfig(', 'return ('))(),
+    );
+    expect(parsed.ai.provider).toBe('codex');
+    expect(parsed.ai.model).toBeUndefined();
   });
 });

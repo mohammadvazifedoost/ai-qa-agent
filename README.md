@@ -8,8 +8,10 @@ command `ai-qa-agent`. Install it into any web application and it will:
 3. turn approved scenarios into maintainable **Playwright tests**,
 4. run them with **video, screenshots, traces, console and network logs**,
 5. **triage every failure** (product bug? test bug? environment? design mismatch?),
-6. file **confirmed** defects in **ClickUp** with evidence attached,
+6. file **confirmed** defects in **ClickUp** or **Jira** with evidence attached (on your click),
 7. write a **QA report**.
+
+The AI engine is your choice: **Claude Code**, **OpenAI Codex CLI** or **OpenCode**.
 
 The engine lives in this package. A target project only holds its configuration and generated
 artifacts in `.qa/`.
@@ -21,16 +23,31 @@ Figma + source code → analysis → scenarios → Playwright tests → executio
 
 ## How the AI works (and how it authenticates)
 
-All reasoning runs through the **Claude Code CLI** that is already installed and logged in on the
-machine (`claude -p`, headless mode with structured JSON output). That means:
+All reasoning runs through an agent CLI that is already installed and logged in on the machine.
+Pick one with `ai.provider` (or `ai-qa-agent init --ai <provider>`):
 
-- **No API key is stored or required by this tool.** It uses whatever authentication Claude Code
-  has: a Claude subscription login, an `ANTHROPIC_API_KEY` in the environment, or Bedrock/Vertex.
-- Every AI task is sandboxed: only read-only tools (`Read`, `Glob`, `Grep`) plus the MCP tools the
-  task needs, with an explicit allow-list, a spend cap, and no access to your personal Claude Code
-  settings, plugins or hooks. **The agent can never edit application code.**
-- Each task returns data validated against a schema; the engine writes all files itself.
-- Every AI transcript is kept in `.qa/artifacts/logs/ai/` for auditing.
+| `ai.provider` | Runs | Authentication | `ai.model` examples |
+|---|---|---|---|
+| `claude-code` (default) | `claude -p` (headless, native JSON-schema output) | Claude subscription login, `ANTHROPIC_API_KEY`, Bedrock/Vertex | `sonnet` (default), `opus` |
+| `codex` | `codex exec --json --sandbox read-only` | `codex login` (ChatGPT account) or an OpenAI API key | omit for Codex's default, `gpt-5-codex` |
+| `opencode` | `opencode run --format json` with an injected read-only agent | `opencode auth login` (any provider OpenCode supports) | `openai/gpt-5.5`, `anthropic/claude-sonnet-4-5` |
+
+For every provider:
+
+- **No API key is stored or required by this tool.** It uses whatever authentication the CLI has.
+- Every AI task is read-only: only file read/search tools plus the MCP tools the task needs, with
+  an explicit allow-list. Claude Code runs with `--permission-mode dontAsk` and isolated settings;
+  Codex runs in its `read-only` sandbox with approvals disabled; OpenCode runs a dedicated agent
+  (passed through `OPENCODE_CONFIG_CONTENT`) whose permissions deny everything else, and
+  `opencode run` auto-rejects anything not allowed. **The agent can never edit application code.**
+- Each task returns data validated against a schema. Claude Code enforces the schema natively; for
+  Codex and OpenCode the schema is part of the prompt, the final message is parsed and validated,
+  and one correction round is requested if it does not match.
+- The engine writes all files itself. Every AI transcript is kept in `.qa/artifacts/logs/ai/`.
+- Cost: Claude Code reports dollars and honours `ai.maxBudgetUsdPerTask`; OpenCode reports what its
+  provider reports; Codex reports tokens only (shown in the log) and has no per-task cap.
+- Figma through MCP: the remote Figma server needs OAuth *in the CLI you use* — Claude Code via
+  `claude mcp add`, Codex via `codex mcp login figma`, OpenCode via `opencode mcp auth figma`.
 
 Deterministic checks decide pass/fail; the AI decides *what* to check and *why* something failed.
 Visual verdicts come from computed-CSS comparison against Figma tokens and pixel comparison
@@ -39,9 +56,11 @@ against Figma frames, never from a model saying "looks right".
 ## Requirements
 
 - Node.js ≥ 22.12
-- [Claude Code](https://code.claude.com) installed and authenticated (`claude --version` works)
+- One AI CLI installed and authenticated: [Claude Code](https://code.claude.com) (`claude`),
+  [Codex CLI](https://github.com/openai/codex) (`npm i -g @openai/codex`, then `codex login`) or
+  [OpenCode](https://opencode.ai) (`npm i -g opencode-ai`, then `opencode auth login`)
 - `@playwright/test` in the target project with a browser installed (`npx playwright install chromium`)
-- Optional: Figma access (for design analysis) and a ClickUp personal API token (for bug filing)
+- Optional: Figma access (for design analysis) and a ClickUp or Jira account (for bug filing)
 
 ## Installation
 
@@ -146,8 +165,9 @@ export default defineConfig({
   tests: { timeoutMs: 30_000, workers: 2, verifyRetries: 1 },
   visual: { pixelThreshold: 0.1, acceptableDiffRatio: 0.02 },
   ai: {
-    model: 'sonnet',                 // any Claude Code model alias/id
-    claudePath: 'claude',
+    provider: 'claude-code',         // claude-code | codex | opencode
+    model: 'sonnet',                 // provider-specific; omit for the provider's default
+    command: 'claude',               // optional: path to the CLI executable
     maxBudgetUsdPerTask: 3,
     minConfidenceToFile: 0.7,
     mcpServers: {
@@ -218,10 +238,36 @@ keeps the partial result, and fetches missing reference screenshots on the next 
    category, page, steps, expected/actual, root cause, environment, test ids) and the screenshot,
    video, trace and design-diff images attached. Priority maps from severity.
 
+## Jira setup (Jira Cloud)
+
+1. Create an API token at id.atlassian.com → Security → API tokens and export it together with the
+   account email: `export JIRA_API_TOKEN=...` and `export JIRA_EMAIL=you@company.com` (or put
+   `email` in the config — it is not a secret; the token is).
+2. Add the section (or run `ai-qa-agent init --jira-url https://yourco.atlassian.net --jira-project SHOP`):
+
+   ```ts
+   jira: {
+     baseUrl: 'https://yourco.atlassian.net',
+     projectKey: 'SHOP',
+     issueType: 'Bug',                 // default
+     tokenEnv: 'JIRA_API_TOKEN',       // default
+     emailEnv: 'JIRA_EMAIL',           // default
+     labels: ['ai-qa-agent'],          // default
+     priorities: { critical: 'Highest', high: 'High', medium: 'Medium', low: 'Low' }, // default
+   },
+   ```
+3. `ai-qa-agent doctor` verifies the credentials and shows the project name.
+4. Defects become issues through the official REST API v3: the bug report is converted to Atlassian
+   Document Format, labels are added, priority is mapped from severity (and dropped automatically if
+   the project does not use that field), and screenshot, video, trace and design diffs are attached.
+
+If both `clickup` and `jira` are configured, set `tracker: 'jira'` or `tracker: 'clickup'`.
+
 **Nothing is ever filed automatically — there is no flag or setting for it.** After a run,
-confirmed defects wait in the report and in the dashboard (`ai-qa-agent ui`); a task is created only when
-a person clicks *Create task* on a failed test. Symptoms of one underlying defect are grouped into
-one bug report, so one click covers all the tests it affects.
+confirmed defects wait in the report and in the dashboard (`ai-qa-agent ui`); a task/issue is
+created only when a person clicks *Create task* (ClickUp) or *Create issue* (Jira) on a failed
+test. Symptoms of one underlying defect are grouped into one bug report, so one click covers all
+the tests it affects.
 
 ## Dashboard (`ai-qa-agent ui`)
 
@@ -234,16 +280,16 @@ pipeline writes — no database, no external service.
   Clicking a row opens a modal with what happened (analysis, root cause, expected vs actual), the
   evidence (screenshot, video, trace, console/network log, page snapshot) and, collapsed, the test
   error and the scenario's steps.
-- Every failed row has either an *Open task* link or a *Create task* button. The dashboard checks
-  ClickUp for the task recorded for that defect (from this run or an earlier run of the same
-  defect, cached for a minute); if it still exists you get the link, otherwise — never created, or
-  deleted in ClickUp — the button. A click creates the task from the bug report (consolidated for
-  confirmed defects; for failures the analyzer did not confirm it is built from the scenario and
-  the error and tagged `needs-verification`). Filters: All / Failures / Passing, type (functional,
-  visual, responsive) and page.
-- The token must be in the environment of the shell that started the UI
-  (`CLICKUP_API_TOKEN=pk_... npx ai-qa-agent ui`). Filing results are written back to the run so the
-  report and the dashboard stay consistent.
+- Every failed row has either an *Open* link or a *Create task* / *Create issue* button. The
+  dashboard checks the tracker (ClickUp or Jira) for the item recorded for that defect (from this
+  run or an earlier run of the same defect, cached for a minute); if it still exists you get the
+  link, otherwise — never created, or deleted there — the button. A click creates it from the bug
+  report (consolidated for confirmed defects; for failures the analyzer did not confirm it is built
+  from the scenario and the error and labelled `needs-verification`). Filters: All / Failures /
+  Passing, type (functional, visual, responsive), search, and page.
+- The tracker credentials must be in the environment of the shell that started the UI
+  (`CLICKUP_API_TOKEN=... npx ai-qa-agent ui`, or `JIRA_API_TOKEN` + `JIRA_EMAIL`). Filing results
+  are written back to the run so the report and the dashboard stay consistent.
 
 ## Playwright setup
 

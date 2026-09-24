@@ -2,72 +2,27 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
-import type { McpServer } from '../config/schema.js';
-import { ensureDir } from '../core/fs.js';
+import {
+  AiError,
+  transcriptPath,
+  type AiEngine,
+  type AiResult,
+  type AiTask,
+  type ToolCallRecord,
+} from './engine.js';
 import { logger } from '../core/logger.js';
 import { run } from '../core/process.js';
 
 const log = logger('ai');
 
-/**
- * Built-in Claude Code tools an AI task may use. Anything that can execute code or
- * modify files (Bash, Edit, Write, ...) is deliberately excluded: the QA agent reads the
- * target project and returns structured data; the engine itself writes files. This is how
- * we guarantee the agent never edits application code.
- */
-export type ReadOnlyTool = 'Read' | 'Glob' | 'Grep';
-
-export interface AiTask<T extends z.ZodType> {
-  /** Short identifier used for transcript file names and logs. */
-  name: string;
-  prompt: string;
-  /** Extra system instructions appended to Claude Code's default system prompt. */
-  system?: string;
-  schema: T;
-  cwd: string;
-  tools?: ReadOnlyTool[];
-  /** MCP servers to expose; keys become the `mcp__<key>__` prefix. */
-  mcpServers?: Record<string, McpServer>;
-  /** Specific MCP tool names (e.g. `mcp__figma__get_screenshot`) or `mcp__<server>__*` wildcards. */
-  mcpTools?: string[];
-  /** Additional directories the agent may read outside `cwd`. */
-  addDirs?: string[];
-}
+export type { AiResult, AiTask, ReadOnlyTool, ToolCallRecord } from './engine.js';
+export { AiError } from './engine.js';
 
 export interface AiSettings {
   claudePath: string;
   model: string;
   maxBudgetUsdPerTask: number;
   transcriptDir: string;
-}
-
-/** One tool call the agent made, with what the tool returned (captured from the event stream). */
-export interface ToolCallRecord {
-  name: string;
-  input: unknown;
-  /** Concatenated text content of the tool result. */
-  text: string;
-  images: Array<{ mediaType: string; base64: string }>;
-  isError: boolean;
-}
-
-export interface AiResult<T> {
-  output: T;
-  costUsd: number;
-  durationMs: number;
-  numTurns: number;
-  transcript: string;
-  /** Every tool call and its result, e.g. to pick up Figma screenshot URLs deterministically. */
-  toolCalls: ToolCallRecord[];
-}
-
-export class AiError extends Error {
-  constructor(
-    message: string,
-    readonly transcript?: string,
-  ) {
-    super(message);
-  }
 }
 
 const ContentBlock = z.looseObject({ type: z.string() });
@@ -93,16 +48,20 @@ const ResultEvent = z.looseObject({
  * headless mode (`claude -p`). Authentication is whatever the user configured for Claude Code
  * (e.g. a Claude Max subscription login); this tool never reads or stores credentials.
  */
-export class ClaudeRunner {
+export class ClaudeRunner implements AiEngine {
+  readonly provider = 'claude-code' as const;
+
   /** Total spend of all tasks run through this instance (USD, as reported by Claude Code). */
   totalCostUsd = 0;
 
   constructor(private readonly settings: AiSettings) {}
 
+  toolRef(server: string, tool: string): string {
+    return `mcp__${server}__${tool}`;
+  }
+
   async run<T extends z.ZodType>(task: AiTask<T>): Promise<AiResult<z.output<T>>> {
-    ensureDir(this.settings.transcriptDir);
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const transcript = path.join(this.settings.transcriptDir, `${stamp}_${task.name}.jsonl`);
+    const transcript = transcriptPath(this.settings.transcriptDir, task.name);
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-qa-'));
     const mcpConfigFile = path.join(tmp, 'mcp.json');
     fs.writeFileSync(mcpConfigFile, JSON.stringify({ mcpServers: task.mcpServers ?? {} }));

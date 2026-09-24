@@ -51,9 +51,15 @@ src/
   index.ts                public API: defineConfig + types
   config/                 Zod schema (+ defaults) and jiti-based loader for .qa/config.ts
   core/                   paths, logger (console + file), fs/hash helpers, process spawning
-  ai/claude.ts            ClaudeRunner: spawns `claude -p --output-format stream-json`, streams
-                          the event log to a transcript, captures every tool call/result, validates
-                          structured output, tracks cost
+  ai/engine.ts            AiEngine contract (AiTask/AiResult/ToolCallRecord), canonical MCP tool names,
+                          prompt-based structured output + JSON extraction + correction round
+  ai/index.ts             provider factory (ai.provider) and the doctor check for each CLI
+  ai/claude.ts            ClaudeRunner: spawns `claude -p --output-format stream-json` with a native
+                          JSON schema, isolated settings, allow-listed tools, spend cap
+  ai/codex.ts             CodexRunner: `codex exec --json --sandbox read-only`, MCP servers via -c
+                          overrides with enabled_tools allow-lists, token usage
+  ai/opencode.ts          OpenCodeRunner: `opencode run --format json` with a read-only agent and MCP
+                          servers injected via OPENCODE_CONFIG_CONTENT; corrections reuse the session
   ai/context.ts           shared system prompt, project rules, Figma URL parsing
   discovery/detect.ts     deterministic framework/route/test detection
   analyze/app.ts          AppModel schema; full analysis and per-route incremental analysis + merge
@@ -78,14 +84,17 @@ src/
   triage/triage.ts        AI verdict per failure (3 in parallel), consolidation into issues
   bugs/report.ts          bug markdown, environment, evidence selection
   bugs/file.ts            ClickUp filing with dedupe via state fingerprints
+  integrations/tracker.ts IssueTracker interface + selection (tracker / clickup / jira sections)
   integrations/clickup.ts minimal ClickUp REST v2 client (validated responses)
+  integrations/jira.ts    minimal Jira Cloud REST v3 client (basic auth, ADF, attachments, priority fallback)
+  integrations/adf.ts     Markdown → Atlassian Document Format for bug descriptions
   report/report.ts        markdown + HTML report
   state/state.ts          .qa/state.json store (stage hashes, runs, filed bugs)
   pipeline/context.ts     loads config/state/runner once per invocation
   pipeline/run.ts         stage orchestration with checkpoints and resume
 ```
 
-## Claude Code integration details
+## AI engine integration details (Claude Code shown; see ai/codex.ts and ai/opencode.ts for the others)
 
 `ClaudeRunner.run(task)` builds this command:
 

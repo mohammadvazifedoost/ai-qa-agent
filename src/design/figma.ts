@@ -216,7 +216,7 @@ async function fetchMissingReferences(
     name: 'design-refs',
     cwd: ctx.root,
     system: BASE_SYSTEM,
-    prompt: `For each node below, call mcp__figma__get_screenshot exactly once with fileKey "${fileKey}", the nodeId, and maxDimension set to the given value. Use the default response (no base64). Do not call any other tool. Report which node ids returned an image.
+    prompt: `For each node below, call ${ctx.ai.toolRef('figma', 'get_screenshot')} exactly once with fileKey "${fileKey}", the nodeId, and maxDimension set to the given value. Use the default response (no base64). Do not call any other tool. Report which node ids returned an image.
 
 ${missing.map((s) => `- nodeId ${s.nodeId} ("${s.name}"), maxDimension ${Math.max(s.width, s.height)}`).join('\n')}`,
     schema: z.object({

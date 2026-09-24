@@ -1,7 +1,8 @@
 /**
  * The dashboard is a single static page served by `ai-qa-agent ui`. Styling is Tailwind, compiled at
  * package build time into dist/ui/styles.css (see src/ui/tailwind.css). The page reads
- * /api/overview, links evidence under /files/, and creates ClickUp tasks through POST /api/file.
+ * /api/overview, links evidence under /files/, and creates ClickUp tasks / Jira issues through
+ * POST /api/file.
  */
 export const PAGE_HTML = String.raw`<!doctype html>
 <html lang="en">
@@ -28,7 +29,7 @@ export const PAGE_HTML = String.raw`<!doctype html>
     <nav class="border-t border-rail-line px-3 py-3" aria-label="Pages">
       <ul class="m-0 list-none p-0" id="nav"></ul>
     </nav>
-    <div class="border-t border-rail-line px-5 py-4 text-[13px] text-rail-muted" id="clickup"></div>
+    <div class="border-t border-rail-line px-5 py-4 text-[13px] text-rail-muted" id="tracker"></div>
   </aside>
 
   <main class="max-w-[1160px] px-4 pb-20 pt-5 md:px-8 md:pt-7">
@@ -47,7 +48,7 @@ async function load(runId) {
   const res = await fetch('/api/overview' + (runId ? '?run=' + encodeURIComponent(runId) : ''));
   data = await res.json();
   render();
-  // ClickUp verification happens after the first paint so the page never waits for it.
+  // Tracker verification happens after the first paint so the page never waits for it.
   if (data.run?.tasksPending) {
     const runId = data.run.id;
     try {
@@ -57,7 +58,7 @@ async function load(runId) {
   }
 }
 
-/** Re-render only the action cells (and the open modal's footer) once ClickUp answered. */
+/** Re-render only the action cells (and the open modal's footer) once the tracker answered. */
 function refreshActions() {
   for (const cell of document.querySelectorAll('[data-action-for]')) {
     const sc = data.scenarios.find((x) => x.id === cell.dataset.actionFor);
@@ -101,11 +102,12 @@ function render() {
   const runInfo = data.runs.find((r) => data.run && r.id === data.run.id);
   $('#runmeta').textContent = runInfo ? (runInfo.stats.passed + runInfo.stats.failed + runInfo.stats.flaky) + ' tests · ' + runInfo.status : '';
 
-  const cu = $('#clickup');
-  const head = '<b class="block text-[11.5px] font-bold uppercase tracking-[0.12em] text-rail-muted">ClickUp</b>';
-  if (!data.clickup.configured) cu.innerHTML = head + '<span class="mt-1 block">Not configured — bugs stay in the report.</span>';
-  else if (!data.clickup.tokenPresent) cu.innerHTML = head + '<span class="mt-1 block text-flaky">Token missing in the shell that started ai-qa-agent ui.</span>';
-  else cu.innerHTML = head + '<span class="mt-1 block"><span class="text-pass">Ready</span> · list ' + esc(data.clickup.listId) + '</span>';
+  const tr = data.tracker;
+  const cu = $('#tracker');
+  const head = '<b class="block text-[11.5px] font-bold uppercase tracking-[0.12em] text-rail-muted">' + esc(tr.configured ? tr.name : 'Bug tracker') + '</b>';
+  if (!tr.configured) cu.innerHTML = head + '<span class="mt-1 block">Not configured — bugs stay in the report.</span>';
+  else if (!tr.tokenPresent) cu.innerHTML = head + '<span class="mt-1 block text-flaky">Credentials missing in the shell that started ai-qa-agent ui.</span>';
+  else cu.innerHTML = head + '<span class="mt-1 block"><span class="text-pass">Ready</span> · ' + esc(tr.target) + '</span>';
 
   const main = $('#main');
   const empty = (msg) => '<div class="rounded-2xl border border-dashed border-line-strong px-6 py-14 text-center text-muted">' + msg + '</div>';
@@ -210,18 +212,19 @@ function row(sc, status) {
 
 function action(sc, status) {
   if (status !== 'failed' && status !== 'flaky') return '';
-  if (!data.clickup.configured) return '';
+  const tr = data.tracker;
+  if (!tr.configured) return '';
   const o = failingOutcome(sc);
   if (!o) return '';
-  if (data.run.tasksPending) return '<span class="text-xs text-muted" aria-live="polite">checking ClickUp…</span>';
+  if (data.run.tasksPending) return '<span class="text-xs text-muted" aria-live="polite">checking ' + esc(tr.name) + '…</span>';
   const task = data.run.tasks[o.key];
   if (task && task.exists) {
-    return '<a class="btn btn-ghost" href="' + esc(task.url || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="' + esc(task.status ? 'Status in ClickUp: ' + task.status : '') + '">Open task ' + esc(task.taskId) + '</a>';
+    return '<a class="btn btn-ghost" href="' + esc(task.url || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="' + esc(task.status ? 'Status in ' + tr.name + ': ' + task.status : '') + '">' + (tr.noun === 'issue' ? 'Open ' + esc(task.taskId) : 'Open task ' + esc(task.taskId)) + '</a>';
   }
   const issue = issueFor(o.key);
   const body = issue ? { issueId: issue.id } : { failureKey: o.key };
-  const disabled = data.clickup.tokenPresent ? '' : 'disabled title="ClickUp token missing in the shell that started ai-qa-agent ui"';
-  return '<button class="btn" ' + disabled + ' onclick="event.stopPropagation(); fileBug(this, ' + esc(JSON.stringify(body)) + ')">Create task</button>';
+  const disabled = tr.tokenPresent ? '' : 'disabled title="' + esc(tr.name) + ' credentials missing in the shell that started ai-qa-agent ui"';
+  return '<button class="btn" ' + disabled + ' onclick="event.stopPropagation(); fileBug(this, ' + esc(JSON.stringify(body)) + ')">Create ' + tr.noun + '</button>';
 }
 
 async function fileBug(btn, body) {
@@ -229,7 +232,7 @@ async function fileBug(btn, body) {
   btn.disabled = true; btn.textContent = 'Creating…';
   const res = await fetch('/api/file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: data.run.id, ...body }) });
   const out = await res.json();
-  if (!res.ok) { btn.disabled = false; btn.textContent = label; alert('Could not create the task: ' + (out.error || out.reason || res.status)); return; }
+  if (!res.ok) { btn.disabled = false; btn.textContent = label; alert('Could not create the ' + data.tracker.noun + ': ' + (out.error || out.reason || res.status)); return; }
   const open = $('#modal').open ? $('#modal').dataset.id : null;
   await load(data.run.id);
   if (open) openModal(open);
@@ -277,7 +280,7 @@ function openModal(id) {
   if (status === 'failed' || status === 'flaky') {
     foot = action(sc, status);
     const o = failingOutcome(sc);
-    if (foot && o && !issueFor(o.key)) foot += '<span class="text-[13px] text-muted">Not confirmed as a product bug by the analyzer — the task will be tagged needs-verification.</span>';
+    if (foot && o && !issueFor(o.key)) foot += '<span class="text-[13px] text-muted">Not confirmed as a product bug by the analyzer — the ' + data.tracker.noun + ' will be labelled needs-verification.</span>';
   }
   modal.innerHTML = '<div class="flex items-start gap-4 border-b border-line px-5 pb-4 pt-5 md:px-6 md:pt-[22px]"><div class="min-w-0">' +
     '<span class="pill pill-' + status + '">' + (status === 'none' ? 'not run' : status) + '</span> ' + typeChip(sc) +

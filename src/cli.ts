@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import pc from 'picocolors';
-import { checkClaude } from './ai/claude.js';
+import { checkProvider } from './ai/index.js';
 import { logger, setLogLevel } from './core/logger.js';
 import { rel } from './core/paths.js';
-import { initProject } from './init/init.js';
+import { initProject, type InitOptions } from './init/init.js';
 import { createContext } from './pipeline/context.js';
 import { extractDesign } from './design/figma.js';
 import { analyzeApp } from './analyze/app.js';
@@ -30,7 +30,7 @@ import { triageRun } from './triage/triage.js';
 import { TriageResultSchema } from './triage/schema.js';
 import { writeReport } from './report/report.js';
 import { FilingSummarySchema } from './bugs/file.js';
-import { ClickUpClient } from './integrations/clickup.js';
+import { createTracker, trackerInfo } from './integrations/tracker.js';
 import { chromium } from '@playwright/test';
 
 interface Scope {
@@ -55,7 +55,7 @@ const program = new Command();
 program
   .name('ai-qa-agent')
   .description(
-    'AI QA Agent: design + code analysis, Playwright test generation, failure triage, ClickUp bugs',
+    'AI QA Agent: design + code analysis, Playwright test generation, failure triage, ClickUp / Jira bugs',
   )
   .version('0.1.0')
   .option('-C, --cwd <dir>', 'target project root', process.cwd())
@@ -66,19 +66,45 @@ program
 
 const root = (): string => program.opts<{ cwd: string }>().cwd;
 
+interface InitFlags {
+  figma?: string;
+  clickupList?: string;
+  jiraUrl?: string;
+  jiraProject?: string;
+  jiraEmail?: string;
+  ai?: string;
+  model?: string;
+  baseUrl?: string;
+  force?: boolean;
+}
+
 program
   .command('init')
   .description('detect the project and create .qa/config.ts')
   .option('--figma <url>', 'Figma file URL holding the designs')
   .option('--clickup-list <id>', 'ClickUp list id where bugs are created')
+  .option('--jira-url <url>', 'Jira Cloud site, e.g. https://yourco.atlassian.net')
+  .option('--jira-project <key>', 'Jira project key where bugs are created')
+  .option('--jira-email <email>', 'Atlassian account email (or set JIRA_EMAIL)')
+  .option('--ai <provider>', 'AI engine: claude-code (default), codex or opencode')
+  .option('--model <model>', 'model for the AI engine (provider-specific)')
   .option('--base-url <url>', 'URL the app is served at (default: detected dev port)')
   .option('--force', 'overwrite an existing .qa/config.ts')
-  .action((o: { figma?: string; clickupList?: string; baseUrl?: string; force?: boolean }) => {
+  .action((o: InitFlags) => {
+    if (o.ai && !['claude-code', 'codex', 'opencode'].includes(o.ai)) {
+      throw new Error(`--ai must be claude-code, codex or opencode (got "${o.ai}")`);
+    }
+    if (!!o.jiraUrl !== !!o.jiraProject) throw new Error('--jira-url and --jira-project go together');
     const { created } = initProject({
       root: root(),
       force: o.force,
       figmaUrl: o.figma,
       clickupListId: o.clickupList,
+      jiraUrl: o.jiraUrl,
+      jiraProject: o.jiraProject,
+      jiraEmail: o.jiraEmail,
+      ai: o.ai as InitOptions['ai'],
+      model: o.model,
       baseUrl: o.baseUrl,
     });
     for (const f of created) console.log(`  ${pc.green('created')} ${rel(root(), f)}`);
@@ -98,8 +124,8 @@ program
       if (ok === false) failed = true;
       console.log(`${mark} ${text}`);
     };
-    const claude = await checkClaude(ctx.config.ai.claudePath);
-    line(claude.ok, `Claude Code CLI: ${claude.detail}`);
+    const claude = await checkProvider(ctx.config);
+    line(claude.ok, `AI engine: ${claude.detail}`);
 
     const browserPath = chromium.executablePath();
     line(
@@ -123,18 +149,16 @@ program
       );
     } else line(null, 'Figma: not configured (visual tests will rely on code only)');
 
-    if (ctx.config.clickup) {
-      const token = process.env[ctx.config.clickup.tokenEnv];
-      if (!token) line(false, `ClickUp: environment variable ${ctx.config.clickup.tokenEnv} is not set`);
-      else {
-        try {
-          const list = await new ClickUpClient(token).getList(ctx.config.clickup.listId);
-          line(true, `ClickUp: token valid, bugs go to list "${list.name}" (${list.id})`);
-        } catch (err) {
-          line(false, `ClickUp: ${(err as Error).message}`);
-        }
+    const info = trackerInfo(ctx.config);
+    if (!info.kind) line(null, 'Bug tracker: not configured (bugs will only be written to the local report)');
+    else {
+      try {
+        const tracker = createTracker(ctx.config);
+        line(true, `${tracker.name}: credentials valid, bugs go to ${await tracker.describeTarget()}`);
+      } catch (err) {
+        line(false, `${info.name}: ${(err as Error).message}`);
       }
-    } else line(null, 'ClickUp: not configured (bugs will only be written to the local report)');
+    }
     if (failed) process.exitCode = 1;
   });
 
@@ -243,7 +267,7 @@ program
   .option('--refresh', 'ignore caches and re-analyze code and design')
   .action(async (o: Scope & { changed?: boolean; design?: boolean; resume?: boolean; refresh?: boolean }) => {
     const ctx = await createContext(root());
-    // Bugs are never filed here: the dashboard's "Log in ClickUp" button is the only way.
+    // Bugs are never filed here: the dashboard's Create task / Create issue button is the only way.
     const res = await runPipeline(ctx, {
       page: o.page,
       filter: scopeToFilter(o),
@@ -284,7 +308,7 @@ program
 program
   .command('ui')
   .description(
-    'open a local dashboard with all scenarios, results, evidence and a button to log bugs in ClickUp',
+    'open a local dashboard with all scenarios, results, evidence and a button to log bugs in ClickUp or Jira',
   )
   .option('--port <port>', 'port to listen on', (v) => Number(v), 4310)
   .option('--host <host>', 'interface to bind', '127.0.0.1')
@@ -295,9 +319,12 @@ program
     const url =
       typeof addr === 'object' && addr ? `http://${o.host}:${addr.port}/` : `http://${o.host}:${o.port}/`;
     console.log(`AI QA Agent dashboard: ${pc.bold(url)}  (Ctrl+C to stop)`);
-    if (ctx.config.clickup && !process.env[ctx.config.clickup.tokenEnv]) {
+    const info = trackerInfo(ctx.config);
+    if (info.kind && !info.credentialsPresent) {
       console.log(
-        pc.yellow(`ClickUp filing is disabled: ${ctx.config.clickup.tokenEnv} is not set in this shell.`),
+        pc.yellow(
+          `${info.name} filing is disabled: its credentials are not set in this shell (see ai-qa-agent doctor).`,
+        ),
       );
     }
     await new Promise(() => undefined);
