@@ -30,7 +30,10 @@ function gitCommit(root: string): string | null {
   try {
     const head = fs.readFileSync(path.join(root, '.git', 'HEAD'), 'utf8').trim();
     if (!head.startsWith('ref: ')) return head.slice(0, 12);
-    return fs.readFileSync(path.join(root, '.git', head.slice(5)), 'utf8').trim().slice(0, 12);
+    return fs
+      .readFileSync(path.join(root, '.git', head.slice(5)), 'utf8')
+      .trim()
+      .slice(0, 12);
   } catch {
     return null;
   }

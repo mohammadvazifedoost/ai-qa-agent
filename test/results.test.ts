@@ -71,7 +71,13 @@ describe('collectOutcomes', () => {
                   status: 'unexpected',
                   annotations: [{ type: 'qa-visual', description: '{"status":"mismatch"}' }],
                   results: [
-                    { status: 'failed', duration: 5, retry: 0, errors: [{ message: 'first' }], attachments: [] },
+                    {
+                      status: 'failed',
+                      duration: 5,
+                      retry: 0,
+                      errors: [{ message: 'first' }],
+                      attachments: [],
+                    },
                     {
                       status: 'failed',
                       duration: 7,
@@ -81,7 +87,11 @@ describe('collectOutcomes', () => {
                         { name: 'video', contentType: 'video/webm', path: path.join(root, 'video.webm') },
                         { name: 'trace', contentType: 'application/zip', path: path.join(root, 'trace.zip') },
                         { name: 'screenshot', contentType: 'image/png', path: path.join(root, 'shot.png') },
-                        { name: 'design-diff-home.png', contentType: 'image/png', path: path.join(root, 'shot.png') },
+                        {
+                          name: 'design-diff-home.png',
+                          contentType: 'image/png',
+                          path: path.join(root, 'shot.png'),
+                        },
                         {
                           name: 'qa-logs.json',
                           contentType: 'application/json',

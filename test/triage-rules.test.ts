@@ -27,20 +27,25 @@ describe('classifyByRules', () => {
   });
 
   it('classifies unreachable app as ENVIRONMENT_FAILURE', () => {
-    const v = classifyByRules(outcome({ message: 'page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:5173/' }));
+    const v = classifyByRules(
+      outcome({ message: 'page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:5173/' }),
+    );
     expect(v?.classification).toBe('ENVIRONMENT_FAILURE');
     expect(v?.confidence).toBeGreaterThan(0.9);
   });
 
   it('classifies browser crashes as INFRASTRUCTURE_FAILURE', () => {
-    expect(classifyByRules(outcome({ message: "browserType.launch: Executable doesn't exist" }))?.classification).toBe(
-      'INFRASTRUCTURE_FAILURE',
-    );
+    expect(
+      classifyByRules(outcome({ message: "browserType.launch: Executable doesn't exist" }))?.classification,
+    ).toBe('INFRASTRUCTURE_FAILURE');
   });
 
   it('classifies programming errors inside the spec as TEST_BUG', () => {
     const v = classifyByRules(
-      outcome({ message: 'TypeError: foo is not a function', stack: 'TypeError: foo is not a function\n at .qa/tests/x.spec.ts:12' }),
+      outcome({
+        message: 'TypeError: foo is not a function',
+        stack: 'TypeError: foo is not a function\n at .qa/tests/x.spec.ts:12',
+      }),
     );
     expect(v?.classification).toBe('TEST_BUG');
   });

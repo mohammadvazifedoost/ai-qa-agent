@@ -94,14 +94,25 @@ program
     line(claude.ok, `Claude Code CLI: ${claude.detail}`);
 
     const browserPath = chromium.executablePath();
-    line(fs.existsSync(browserPath), `Playwright chromium: ${fs.existsSync(browserPath) ? browserPath : 'not installed — run: npx playwright install chromium'}`);
+    line(
+      fs.existsSync(browserPath),
+      `Playwright chromium: ${fs.existsSync(browserPath) ? browserPath : 'not installed — run: npx playwright install chromium'}`,
+    );
 
-    const reachable = await fetch(ctx.config.app.baseUrl, { signal: AbortSignal.timeout(3000) }).then((r) => r.status < 500).catch(() => false);
-    line(null, `App at ${ctx.config.app.baseUrl}: ${reachable ? 'reachable' : `not running${ctx.config.app.startCommand ? ` (will be started with "${ctx.config.app.startCommand}")` : ' and no startCommand configured'}`}`);
+    const reachable = await fetch(ctx.config.app.baseUrl, { signal: AbortSignal.timeout(3000) })
+      .then((r) => r.status < 500)
+      .catch(() => false);
+    line(
+      null,
+      `App at ${ctx.config.app.baseUrl}: ${reachable ? 'reachable' : `not running${ctx.config.app.startCommand ? ` (will be started with "${ctx.config.app.startCommand}")` : ' and no startCommand configured'}`}`,
+    );
 
     for (const name of Object.keys(ctx.config.ai.mcpServers)) line(null, `MCP server for AI tasks: ${name}`);
     if (ctx.config.figma) {
-      line(!!ctx.config.ai.mcpServers.figma, `Figma: ${ctx.config.figma.fileUrl}${ctx.config.ai.mcpServers.figma ? '' : ' — ai.mcpServers.figma is missing'}`);
+      line(
+        !!ctx.config.ai.mcpServers.figma,
+        `Figma: ${ctx.config.figma.fileUrl}${ctx.config.ai.mcpServers.figma ? '' : ' — ai.mcpServers.figma is missing'}`,
+      );
     } else line(null, 'Figma: not configured (visual tests will rely on code only)');
 
     if (ctx.config.clickup) {
