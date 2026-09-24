@@ -1,0 +1,443 @@
+{
+  "source": {
+    "fileKey": "RPpqNkGynHaWPphAXkpFFH",
+    "fileUrl": "https://www.figma.com/design/RPpqNkGynHaWPphAXkpFFH/ai-qa-demo-shop-design"
+  },
+  "colors": [
+    {
+      "name": "color/primary",
+      "value": "#2563EB",
+      "certainty": "observed",
+      "evidence": "variable color/primary (get_variable_defs on 2:2, 2:39, 3:8, 3:53, 1:38); Primary button fill"
+    },
+    {
+      "name": "color/on-primary",
+      "value": "#FFFFFF",
+      "certainty": "observed",
+      "evidence": "variable color/on-primary; Primary button label colour (design context node 1:35)"
+    },
+    {
+      "name": "color/background",
+      "value": "#F8FAFC",
+      "certainty": "observed",
+      "evidence": "variable color/background used in all 4 screens; which node uses it as fill is unknown"
+    },
+    {
+      "name": "color/surface",
+      "value": "#FFFFFF",
+      "certainty": "observed",
+      "evidence": "variable color/surface; Secondary button fill (node 1:36)"
+    },
+    {
+      "name": "color/text",
+      "value": "#0F172A",
+      "certainty": "observed",
+      "evidence": "variable color/text; Secondary button label colour (node 1:37)"
+    },
+    {
+      "name": "color/muted",
+      "value": "#475569",
+      "certainty": "observed",
+      "evidence": "variable color/muted used in all 4 screens; which text nodes use it was not read"
+    },
+    {
+      "name": "color/border",
+      "value": "#E2E8F0",
+      "certainty": "observed",
+      "evidence": "variable color/border; Secondary button 1px border (node 1:36)"
+    },
+    {
+      "name": "color/success",
+      "value": "#16A34A",
+      "certainty": "observed",
+      "evidence": "variable color/success only present on Checkout / Desktop (3:8); the node using it is unknown (likely coupon Success message 3:40, not verified)"
+    }
+  ],
+  "typography": [
+    {
+      "name": "Heading/H1",
+      "fontFamily": "Inter",
+      "fontWeight": 700,
+      "fontSize": "40px",
+      "lineHeight": "48px",
+      "letterSpacing": "0",
+      "certainty": "observed",
+      "evidence": "variable Heading/H1 (Home, Checkout, Login screens)"
+    },
+    {
+      "name": "Heading/H2",
+      "fontFamily": "Inter",
+      "fontWeight": 600,
+      "fontSize": "24px",
+      "lineHeight": "32px",
+      "letterSpacing": "0",
+      "certainty": "observed",
+      "evidence": "variable Heading/H2 (Home desktop and mobile only; 'Products' heading node 2:19 is 32px high)"
+    },
+    {
+      "name": "Heading/H3",
+      "fontFamily": "Inter",
+      "fontWeight": 600,
+      "fontSize": "18px",
+      "lineHeight": "28px",
+      "letterSpacing": "0",
+      "certainty": "observed",
+      "evidence": "variable Heading/H3 (Home screens only; product name / price nodes are 28px high)"
+    },
+    {
+      "name": "Body/Regular",
+      "fontFamily": "Inter",
+      "fontWeight": 400,
+      "fontSize": "16px",
+      "lineHeight": "24px",
+      "letterSpacing": "0",
+      "certainty": "observed",
+      "evidence": "variable Body/Regular (all screens)"
+    },
+    {
+      "name": "Body/Medium",
+      "fontFamily": "Inter",
+      "fontWeight": 500,
+      "fontSize": "16px",
+      "lineHeight": "24px",
+      "letterSpacing": "0",
+      "certainty": "observed",
+      "evidence": "variable Body/Medium (Home desktop, Checkout, Login; not on Home mobile)"
+    },
+    {
+      "name": "Body/Semibold",
+      "fontFamily": "Inter",
+      "fontWeight": 600,
+      "fontSize": "16px",
+      "lineHeight": "24px",
+      "letterSpacing": "0",
+      "certainty": "observed",
+      "evidence": "variable Body/Semibold; Button label style (nodes 1:35, 1:37)"
+    }
+  ],
+  "spacing": [
+    {
+      "name": "size/control-height",
+      "value": "44px",
+      "certainty": "observed",
+      "evidence": "variable size/control-height; Button 1:34/1:36 height 44, Input nodes 3:36/3:70/3:74 height 44"
+    },
+    {
+      "name": "button-padding-x",
+      "value": "20px",
+      "certainty": "observed",
+      "evidence": "design context of Button 1:38: px-[20px]"
+    },
+    {
+      "name": "header-height",
+      "value": "64px",
+      "certainty": "observed",
+      "evidence": "Header frames 2:3, 2:40, 3:9, 3:54 height 64"
+    },
+    {
+      "name": "page-gutter",
+      "value": "24px",
+      "certainty": "observed",
+      "evidence": "Logo x=24 in header; Hero/Products/Checkout/Sign in form at x=24 inside Container; nav ends at x=1416 (1440-24)"
+    },
+    {
+      "name": "container-max-width",
+      "value": "1120px",
+      "certainty": "inferred",
+      "evidence": "Container frames 2:14, 3:20, 3:65 width 1120 at x=160 on 1440 screens (centred); inner content 1072px wide"
+    },
+    {
+      "name": "page-top-padding",
+      "value": "32px",
+      "certainty": "observed",
+      "evidence": "first block (Hero 2:15, Checkout 3:21, Sign in form 3:66) at y=32 inside Main"
+    },
+    {
+      "name": "product-grid-gap",
+      "value": "24px",
+      "certainty": "observed",
+      "evidence": "Product cards x=0, 365.33, 730.67 with width 341.33 (desktop); y=0,222,444 with height 198 (mobile)"
+    },
+    {
+      "name": "product-card-inner-offset",
+      "value": "25px",
+      "certainty": "observed",
+      "evidence": "card children at x=25,y=25; likely 24px padding + 1px border (padding vs border not confirmed)"
+    },
+    {
+      "name": "product-card-inner-gap",
+      "value": "8px",
+      "certainty": "inferred",
+      "evidence": "Name y=25 h=28 → Description y=61 (gap 8); Description h=24 → Price y=93 (gap 8); Price h=28 → Button y=129 (gap 8)"
+    },
+    {
+      "name": "section-heading-gap",
+      "value": "16px",
+      "certainty": "inferred",
+      "evidence": "Products heading 2:19 h=32 at y=0, Product grid at y=48"
+    },
+    {
+      "name": "input-text-offset-x",
+      "value": "13px",
+      "certainty": "observed",
+      "evidence": "Value text x=13 inside Input (3:37, 3:71, 3:75); likely 12px padding + 1px border (inferred)"
+    },
+    {
+      "name": "form-field-gap",
+      "value": "8px",
+      "certainty": "inferred",
+      "evidence": "Login Field / Email y=56 h=72, Field / Password y=136 (gap 8); Label h=24, Input at y=28 (gap 4)"
+    },
+    {
+      "name": "checkout-column-width",
+      "value": "560px",
+      "certainty": "observed",
+      "evidence": "Checkout frame 3:21 width 560"
+    },
+    {
+      "name": "login-form-width",
+      "value": "400px",
+      "certainty": "observed",
+      "evidence": "Sign in form 3:66 width 400"
+    },
+    {
+      "name": "order-line-height",
+      "value": "48px",
+      "certainty": "observed",
+      "evidence": "Order line 3:24 / 3:28 height 48 inside 1px-bordered Order items (x=1)"
+    }
+  ],
+  "radius": [
+    {
+      "name": "radius/md",
+      "value": "8px",
+      "certainty": "observed",
+      "evidence": "variable radius/md; Button radius (design context rounded-[var(--radius/md,8px)]); description of component 1:38"
+    },
+    {
+      "name": "radius/lg",
+      "value": "12px",
+      "certainty": "observed",
+      "evidence": "variable radius/lg present on Home desktop/mobile and Checkout; which node uses it (probably cards / order list) was not read"
+    }
+  ],
+  "shadows": [],
+  "breakpoints": [
+    {
+      "name": "mobile",
+      "value": "390px",
+      "certainty": "inferred",
+      "evidence": "Home / Mobile frame 2:39 width 390 (matches configured viewport mobile 390x844)"
+    },
+    {
+      "name": "desktop",
+      "value": "1440px",
+      "certainty": "inferred",
+      "evidence": "Home / Desktop 2:2, Checkout / Desktop 3:8, Login / Desktop 3:53 width 1440 (matches configured viewport desktop 1440x900)"
+    }
+  ],
+  "components": [
+    {
+      "name": "Button",
+      "nodeId": "1:38",
+      "description": "Figma description: 'Primary and secondary action buttons. Height 44, radius radius/md (8px), label Body/Semibold.' In get_metadata the wrapper 1:38 is a plain frame containing two variant symbols; design context exposes props variant: Primary|Secondary and label (default 'Button'). Instances on screens are 120x44, except full-width 560x44 (Checkout submit 3:51) and 400x44 (Login submit 3:76).",
+      "variants": [
+        "Variant=Primary",
+        "Variant=Secondary"
+      ],
+      "specs": [
+        {
+          "variant": "Variant=Primary (1:34)",
+          "properties": {
+            "backgroundColor": "#2563EB",
+            "color": "#FFFFFF",
+            "borderRadius": "8px",
+            "height": "44px",
+            "width": "120px",
+            "paddingLeft": "20px",
+            "paddingRight": "20px",
+            "fontFamily": "Inter",
+            "fontSize": "16px",
+            "fontWeight": "600",
+            "lineHeight": "24px",
+            "border": "none",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "center"
+          },
+          "certainty": "observed"
+        },
+        {
+          "variant": "Variant=Secondary (1:36)",
+          "properties": {
+            "backgroundColor": "#FFFFFF",
+            "color": "#0F172A",
+            "borderColor": "#E2E8F0",
+            "borderWidth": "1px",
+            "borderStyle": "solid",
+            "borderRadius": "8px",
+            "height": "44px",
+            "width": "120px",
+            "paddingLeft": "20px",
+            "paddingRight": "20px",
+            "fontFamily": "Inter",
+            "fontSize": "16px",
+            "fontWeight": "600",
+            "lineHeight": "24px",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "center"
+          },
+          "certainty": "observed"
+        }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "name": "Home / Desktop",
+      "nodeId": "2:2",
+      "width": 1440,
+      "height": 542,
+      "route": "/",
+      "routeCertainty": "inferred",
+      "viewport": "desktop",
+      "keyElements": [
+        "Header 64px: Logo (left), Main nav right-aligned: 'Home', 'Shop all products', 'Checkout' link with Cart badge (text '0'), 'Sign in to your account'",
+        "Hero: Title (H1, 1072x48) and Subtitle",
+        "'Products' heading",
+        "Product grid: 3 Product cards (3 columns, 341.33px wide each) each with Name, Description, Price and Button instance (120x44)"
+      ]
+    },
+    {
+      "name": "Home / Mobile",
+      "nodeId": "2:39",
+      "width": 390,
+      "height": 1058,
+      "route": "/",
+      "routeCertainty": "inferred",
+      "viewport": "mobile",
+      "keyElements": [
+        "Header 64px: Logo and 40x40 Menu button (icon glyph text) at x=326 replacing the desktop nav",
+        "Hero: Title wraps to 2 lines (96px high), Subtitle 2 lines (48px)",
+        "'Products' heading",
+        "Product grid: 3 Product cards stacked in 1 column (342px wide, 24px gap), each with Name, Description, Price, Button (120x44)"
+      ]
+    },
+    {
+      "name": "Checkout / Desktop",
+      "nodeId": "3:8",
+      "width": 1440,
+      "height": 639,
+      "route": "/checkout",
+      "routeCertainty": "inferred",
+      "viewport": "desktop",
+      "keyElements": [
+        "Same header as Home; Cart badge text '2'",
+        "Checkout title (H1)",
+        "Order items list with 2 Order lines: 'Ceramic Mug × 1' $18.00 and 'Canvas Tote × 1' $24.00, each with a 'Remove' text action",
+        "Coupon: Label, Coupon input (432x44) + Button (120x44), Success message text",
+        "Summary rows: Subtotal, Discount, Total (Total row is larger, 28px text)",
+        "Full-width Button (560x44) at bottom"
+      ]
+    },
+    {
+      "name": "Login / Desktop",
+      "nodeId": "3:53",
+      "width": 1440,
+      "height": 388,
+      "route": "/login",
+      "routeCertainty": "inferred",
+      "viewport": "desktop",
+      "keyElements": [
+        "Same header as Home; Cart badge text '2'",
+        "Sign in form (400px wide, left-aligned in container): Title (H1), 'Field / Email' label + 44px input, 'Field / Password' label + 44px input (Value text nodes have width 0, i.e. empty, no placeholder text), full-width Button (400x44)"
+      ]
+    }
+  ],
+  "layoutRules": [
+    {
+      "rule": "Page shell: full-width Header 64px tall, then Main; content Container is 1120px wide, horizontally centred (x=160 at 1440), with 24px inner gutter (content width 1072px).",
+      "certainty": "inferred",
+      "evidence": "Container 2:14 / 3:20 / 3:65 x=160 w=1120; Hero 2:15 x=24 w=1072"
+    },
+    {
+      "rule": "Desktop header: Logo at x=24; nav right-aligned ending at x=1416 (24px right gutter), items 'Home', 'Shop all products', 'Checkout' (+ cart badge 20x20), 'Sign in to your account' with 24px gaps.",
+      "certainty": "observed",
+      "evidence": "Main nav 2:5 x=890 w=526; children x=0,70,228,350 (gaps 24)"
+    },
+    {
+      "rule": "Mobile header replaces the nav with a 40x40 menu button at the right (x=326, 24px right gutter); nav links are not shown in the mobile frame.",
+      "certainty": "observed",
+      "evidence": "Menu button 2:42 x=326 w=40 in a 390 frame; no Main nav in 2:40"
+    },
+    {
+      "rule": "Mobile main content is full-width (Container 390px wide, x=0) with 24px side gutters (content 342px).",
+      "certainty": "observed",
+      "evidence": "Container 2:45 w=390; Hero 2:46 x=24 w=342"
+    },
+    {
+      "rule": "Product grid: 3 equal columns with 24px gap at desktop (341.33px each); collapses to 1 column (342px, 24px row gap) at mobile.",
+      "certainty": "observed",
+      "evidence": "Product cards in 2:20 and 2:51"
+    },
+    {
+      "rule": "Product card content is stacked vertically: Name, Description, Price, Button (120x44, not stretched); cards are 198px tall in both viewports.",
+      "certainty": "observed",
+      "evidence": "Product card children positions in 2:21 and 2:52"
+    },
+    {
+      "rule": "Hero title/subtitle wrap on mobile (Title 96px = 2 lines at 48px line height; Subtitle 48px = 2 lines) vs single line on desktop.",
+      "certainty": "observed",
+      "evidence": "2:16/2:17 vs 2:47/2:48 heights"
+    },
+    {
+      "rule": "Checkout and Login content are single narrow columns left-aligned inside the container (Checkout 560px, Sign in form 400px); no side panel is shown.",
+      "certainty": "observed",
+      "evidence": "3:21 w=560; 3:66 w=400"
+    },
+    {
+      "rule": "Order lines are rows: item text left, price and 'Remove' action right; Summary rows have label left and value right-aligned to the 560px edge.",
+      "certainty": "observed",
+      "evidence": "3:24–3:31 and 3:42–3:50 child x positions"
+    },
+    {
+      "rule": "Coupon row: input (432px) + 8px gap + Button (120px) = 560px; Success message under the row.",
+      "certainty": "observed",
+      "evidence": "3:34 children x=0/w=432 and x=440/w=120; 3:40 at y=84"
+    },
+    {
+      "rule": "Interactive controls (Buttons, Inputs) are 44px high (size/control-height); Buttons in full-width contexts stretch to container width (560 / 400).",
+      "certainty": "observed",
+      "evidence": "Variable size/control-height=44; instances 3:51, 3:76"
+    },
+    {
+      "rule": "The design only has a mobile (390) and a desktop (1440) variant of Home; Checkout and Login exist only at desktop 1440.",
+      "certainty": "observed",
+      "evidence": "Screens page frames list"
+    }
+  ],
+  "unknowns": [
+    "Screenshots: only Home / Desktop (2:2) was rendered at 1x (1440x542). get_screenshot for Home / Mobile (2:39), Checkout / Desktop (3:8) and Login / Desktop (3:53) failed with the Figma MCP Starter-plan tool call limit, so those screens were not rendered and their key elements come from get_metadata node names only.",
+    "The Figma MCP call limit was also hit before I could call get_design_context on individual screen nodes, so fills, borders, radii and text styles of Header, Cart badge, Product card, Order items, Inputs, Menu button and text colours were NOT read. Only the Button component styles are observed.",
+    "Which nodes use color/background, color/muted, color/success, radius/lg and Heading/H2/H3 is unknown (only variable presence per screen is known).",
+    "Header background/border, Cart badge colours and shape (20x20, radius unknown), Input border colour/radius/background, Product card border/background/radius: unknown.",
+    "Component variants for Input/Field, Product card, Cart badge: none exist as component definitions; only Button is a component (Components page has only frame 1:38).",
+    "No shadows/effects were observed (none read); shadows list is empty because none were verified.",
+    "Tablet (834x1112) viewport has no design frame; tablet behaviour is unknown.",
+    "Route mapping is inferred from frame names matching the app routes /, /checkout, /login; no prototype links or route metadata exist in the file (not checked).",
+    "Hover/focus/disabled/error states for Button and inputs are not designed (only Primary and Secondary variants exist). Mobile menu open state and Checkout empty/error states are not in the file.",
+    "Login Email and Password input Value texts are empty (width 0); placeholder text is unknown.",
+    "Home / Mobile 'Icon' glyph in the Menu button is a text node (19x24); the actual character is unknown."
+  ],
+  "extractedAt": "2026-09-24T00:11:33.780Z",
+  "references": [
+    {
+      "screen": "Home / Desktop",
+      "nodeId": "2:2",
+      "file": "design/refs/home-desktop.png",
+      "width": 1440,
+      "height": 542
+    }
+  ]
+}

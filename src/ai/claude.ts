@@ -41,11 +41,14 @@ export interface AiSettings {
   transcriptDir: string;
 }
 
-export interface CapturedToolImage {
-  toolName: string;
-  toolInput: unknown;
-  mediaType: string;
-  base64: string;
+/** One tool call the agent made, with what the tool returned (captured from the event stream). */
+export interface ToolCallRecord {
+  name: string;
+  input: unknown;
+  /** Concatenated text content of the tool result. */
+  text: string;
+  images: Array<{ mediaType: string; base64: string }>;
+  isError: boolean;
 }
 
 export interface AiResult<T> {
@@ -54,8 +57,8 @@ export interface AiResult<T> {
   durationMs: number;
   numTurns: number;
   transcript: string;
-  /** Images returned by tool calls (e.g. Figma screenshots), captured from the event stream. */
-  toolImages: CapturedToolImage[];
+  /** Every tool call and its result, e.g. to pick up Figma screenshot URLs deterministically. */
+  toolCalls: ToolCallRecord[];
 }
 
 export class AiError extends Error {
@@ -140,7 +143,7 @@ export class ClaudeRunner {
     );
     const started = Date.now();
     const out = fs.createWriteStream(transcript);
-    const toolImages: CapturedToolImage[] = [];
+    const toolCalls: ToolCallRecord[] = [];
     const toolUses = new Map<string, { name: string; input: unknown }>();
     let result: z.infer<typeof ResultEvent> | undefined;
 
@@ -166,19 +169,25 @@ export class ClaudeRunner {
           toolUses.set(id, { name: String(block.name), input: block.input });
           log.debug(`tool → ${String(block.name)}`, block.input);
         }
-        if (event.type === 'user' && block.type === 'tool_result' && Array.isArray(block.content)) {
+        if (event.type === 'user' && block.type === 'tool_result') {
           const use = toolUses.get(String(block.tool_use_id));
-          for (const inner of block.content as Array<Record<string, unknown>>) {
-            const source = inner.source as { type?: string; media_type?: string; data?: string } | undefined;
-            if (inner.type === 'image' && source?.type === 'base64' && source.data) {
-              toolImages.push({
-                toolName: use?.name ?? 'unknown',
-                toolInput: use?.input,
-                mediaType: source.media_type ?? 'image/png',
-                base64: source.data,
-              });
+          const record: ToolCallRecord = {
+            name: use?.name ?? 'unknown',
+            input: use?.input,
+            text: '',
+            images: [],
+            isError: block.is_error === true,
+          };
+          const inner =
+            typeof block.content === 'string' ? [{ type: 'text', text: block.content }] : block.content;
+          for (const part of Array.isArray(inner) ? (inner as Array<Record<string, unknown>>) : []) {
+            const source = part.source as { type?: string; media_type?: string; data?: string } | undefined;
+            if (part.type === 'text' && typeof part.text === 'string') record.text += part.text + '\n';
+            if (part.type === 'image' && source?.type === 'base64' && source.data) {
+              record.images.push({ mediaType: source.media_type ?? 'image/png', base64: source.data });
             }
           }
+          toolCalls.push(record);
         }
       }
     };
@@ -227,7 +236,7 @@ export class ClaudeRunner {
         durationMs,
         numTurns: result.num_turns ?? 0,
         transcript,
-        toolImages,
+        toolCalls,
       };
     } finally {
       out.end();

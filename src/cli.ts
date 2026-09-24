@@ -6,6 +6,7 @@ import { logger, setLogLevel } from './core/logger.js';
 import { rel } from './core/paths.js';
 import { initProject } from './init/init.js';
 import { createContext } from './pipeline/context.js';
+import { extractDesign } from './design/figma.js';
 
 const log = logger('cli');
 const program = new Command();
@@ -56,6 +57,15 @@ program
       console.log(`${pc.cyan('•')} MCP server configured for AI tasks: ${name}`);
     }
     if (!claude.ok) process.exitCode = 1;
+  });
+
+program
+  .command('analyze')
+  .description('analyze the Figma design (and, later stages, the application source)')
+  .option('--refresh', 'ignore cached results and re-analyze')
+  .action(async (o: { refresh?: boolean }) => {
+    const ctx = await createContext(root());
+    await extractDesign(ctx, { force: o.refresh });
   });
 
 program.parseAsync().catch((err: unknown) => {

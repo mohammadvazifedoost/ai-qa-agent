@@ -13,9 +13,15 @@ export default defineConfig({
   source: {
     include: ["src"],
   },
+  figma: {
+    fileUrl: "https://www.figma.com/design/RPpqNkGynHaWPphAXkpFFH/ai-qa-demo-shop-design",
+    // Frames used as visual references. Filled in by `ai-qa design`; edit to pin specific frames.
+    frames: [],
+  },
   ai: {
     model: 'sonnet',
     mcpServers: {
+      figma: {"type":"http","url":"https://mcp.figma.com/mcp"},
       playwright: {"command":"npx","args":["-y","@playwright/mcp@latest","--headless","--isolated"]},
     },
   },
