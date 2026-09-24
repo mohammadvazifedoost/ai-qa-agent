@@ -101,7 +101,7 @@ select,.toggle{font:inherit;padding:7px 10px;border:1px solid var(--line-strong)
 .chip.pass{background:var(--pass-soft);color:var(--pass)}
 .chip.flaky{background:var(--flaky-soft);color:var(--flaky)}
 .act{display:flex;align-items:center;gap:10px;white-space:nowrap}
-.btn{border:0;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer;background:var(--accent);color:var(--accent-ink)}
+.btn{display:inline-block;border:0;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer;background:var(--accent);color:var(--accent-ink);text-decoration:none;line-height:1.4}
 .btn:disabled{opacity:.55;cursor:default}
 .btn.ghost{background:var(--accent-soft);color:var(--accent)}
 .logged{color:var(--pass);font-weight:600;font-size:13px}
@@ -283,12 +283,16 @@ function action(sc, status) {
   if (status !== 'failed' && status !== 'flaky') return '';
   const cu = clickupFor(sc);
   if (!cu) return '';
-  if (cu.filed) return '<span class="logged">Logged<a href="' + esc(cu.filed.url || '#') + '" target="_blank" rel="noopener">' + esc(cu.filed.taskId) + '</a></span>';
   const can = data.clickup.configured && data.clickup.tokenPresent;
   const body = cu.issue ? { issueId: cu.issue.id } : { failureKey: cu.outcome.key };
-  const confirmed = !!cu.issue;
-  return '<button class="btn' + (confirmed ? '' : ' ghost') + '" ' + (can ? '' : 'disabled title="ClickUp token missing"') +
-    ' onclick="event.stopPropagation(); fileBug(this, ' + esc(JSON.stringify(body)) + ')">Log in ClickUp</button>';
+  const disabled = can ? '' : 'disabled title="ClickUp token missing in the shell that started ai-qa ui"';
+  const call = ' onclick="event.stopPropagation(); fileBug(this, ' + esc(JSON.stringify(body)) + ')"';
+  if (cu.filed) {
+    // Already in ClickUp: open it, or push the latest run's details to it as a comment.
+    return '<a class="btn ghost" href="' + esc(cu.filed.url || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open task ' + esc(cu.filed.taskId) + '</a>' +
+      '<button class="btn ghost" ' + disabled + call + ' title="Add a comment with this run\'s result to the existing task">Update</button>';
+  }
+  return '<button class="btn" ' + disabled + call + '>Log in ClickUp</button>';
 }
 
 async function fileBug(btn, body) {
