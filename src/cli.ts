@@ -231,7 +231,9 @@ program
 
 program
   .command('run')
-  .description('full pipeline: analyze → scenarios → generate → test → triage → file bugs → report')
+  .description(
+    'full pipeline: analyze → scenarios → generate → test → triage → report (bugs are logged from the dashboard)',
+  )
   .option('--page <route>', 'only this page (route or name)')
   .option('--category <category>', 'only run tests of this category: functional | visual | responsive')
   .option('--feature <feature>', 'only run tests of this feature tag, e.g. auth')
@@ -239,36 +241,28 @@ program
   .option('--design', 'with --changed: also inspect Figma for new/changed frames (uses Figma MCP calls)')
   .option('--resume', 'continue the last unfinished run')
   .option('--refresh', 'ignore caches and re-analyze code and design')
-  .option(
-    '--file',
-    'create ClickUp tasks for confirmed defects (default: off; or clickup.autoFile in config)',
-  )
-  .action(
-    async (
-      o: Scope & { changed?: boolean; design?: boolean; resume?: boolean; refresh?: boolean; file?: boolean },
-    ) => {
-      const ctx = await createContext(root());
-      const res = await runPipeline(ctx, {
-        page: o.page,
-        filter: scopeToFilter(o),
-        changed: o.changed,
-        design: o.design,
-        resume: o.resume,
-        refresh: o.refresh,
-        file: o.file ?? ctx.config.clickup?.autoFile ?? false,
-      });
-      if (res.nothingChanged || !res.test || !res.triage || !res.filing || !res.report) {
-        console.log('Nothing changed since the last analysis; no tests were run.');
-        return;
-      }
-      const s = res.test.stats;
-      console.log(
-        `\n${pc.bold('Result')}: ${s.passed} passed, ${s.failed} failed · ${res.triage.issues.length} defect(s) · ${res.filing.message}\n` +
-          `Report: ${rel(ctx.root, res.report.markdown)} — browse with ${pc.bold('npx ai-qa ui')}`,
-      );
-      if (res.triage.issues.length) process.exitCode = 1;
-    },
-  );
+  .action(async (o: Scope & { changed?: boolean; design?: boolean; resume?: boolean; refresh?: boolean }) => {
+    const ctx = await createContext(root());
+    // Bugs are never filed here: the dashboard's "Log in ClickUp" button is the only way.
+    const res = await runPipeline(ctx, {
+      page: o.page,
+      filter: scopeToFilter(o),
+      changed: o.changed,
+      design: o.design,
+      resume: o.resume,
+      refresh: o.refresh,
+    });
+    if (res.nothingChanged || !res.test || !res.triage || !res.filing || !res.report) {
+      console.log('Nothing changed since the last analysis; no tests were run.');
+      return;
+    }
+    const s = res.test.stats;
+    console.log(
+      `\n${pc.bold('Result')}: ${s.passed} passed, ${s.failed} failed · ${res.triage.issues.length} defect(s) · ${res.filing.message}\n` +
+        `Report: ${rel(ctx.root, res.report.markdown)} — browse with ${pc.bold('npx ai-qa ui')}`,
+    );
+    if (res.triage.issues.length) process.exitCode = 1;
+  });
 
 program
   .command('changes')

@@ -38,7 +38,8 @@ init ──► analyze ──► design ──► scenarios ──► generate �
 | generate | `generate/playwright.ts` | approved scenarios, page model, Playwright MCP (to confirm locators on the live app) | `tests/<page>.spec.ts`, validated with `playwright test --list`; up to 3 fix rounds | per spec: scenarios + model |
 | test | `runner/*` | specs, generated `playwright.config.ts` | `artifacts/runs/<id>/` evidence + `results.json` | — |
 | triage | `triage/*` | outcomes + evidence + scenario + source + design | `triage.json` (per-failure verdicts, consolidated issues) | — |
-| file | `bugs/*`, `integrations/clickup.ts` | fileable issues; off unless `--file` / `clickup.autoFile` | ClickUp tasks + attachments, `filing.json`, `state.bugs` | fingerprint of scenario ids |
+| file | `bugs/file.ts` | confirmed issues | `filing.json` marking them *pending* — the pipeline never creates tasks | — |
+| (dashboard button) | `bugs/file.ts` `fileIssues`, `integrations/clickup.ts` | one issue or one failure, on a person's click | ClickUp task + attachments (or a comment on the task filed earlier), `filing.json`, `state.bugs` | fingerprint of scenario ids, root-cause files |
 | ui | `ui/server.ts`, `ui/page.ts` | scenarios, run results, triage, filing | local dashboard (`/api/overview`, `/files/*`, `POST /api/file` to log one issue) | — |
 | report | `report/report.ts` | everything above | `reports/<id>/report.md|html`, `bugs/*.md` | — |
 

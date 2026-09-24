@@ -69,8 +69,6 @@ export const QaConfigSchema = z.object({
       tags: z.array(z.string()).default(['ai-qa']),
       /** Status new tasks are created in, e.g. "to do". Omit to use the list's default status. */
       status: z.string().optional(),
-      /** Create tasks automatically at the end of `ai-qa run`. Default: no — file from the UI or with `run --file`. */
-      autoFile: z.boolean().default(false),
       attachEvidence: z.boolean().default(true),
     })
     .optional(),

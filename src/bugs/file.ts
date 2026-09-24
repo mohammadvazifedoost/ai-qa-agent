@@ -25,7 +25,7 @@ export const FilingResultSchema = z.object({
 export type FilingResult = z.infer<typeof FilingResultSchema>;
 
 export const FilingSummarySchema = z.object({
-  status: z.enum(['filed', 'not-configured', 'missing-token', 'disabled', 'nothing-to-file']),
+  status: z.enum(['filed', 'pending', 'nothing-to-file', 'not-configured', 'missing-token', 'disabled']),
   message: z.string(),
   results: z.array(FilingResultSchema),
 });
@@ -120,7 +120,7 @@ function clickupClient(
 
 /**
  * File the given issues in ClickUp (create task + attach evidence, or comment on the task filed
- * in an earlier run). Used by the pipeline (`run --file`) and by the UI's "Log in ClickUp" button.
+ * in an earlier run). Only called from the dashboard's "Log in ClickUp" button.
  */
 export async function fileIssues(
   ctx: QaContext,
@@ -223,41 +223,23 @@ export async function fileIssues(
   return results;
 }
 
-/** Pipeline stage: files all fileable issues when enabled, otherwise records why nothing was filed. */
-export async function fileBugs(
-  ctx: QaContext,
-  run: TestRunResult,
-  triage: TriageResult,
-  opts: { enabled: boolean; fetchImpl?: Fetch },
-): Promise<FilingSummary> {
+/**
+ * Pipeline stage: never files anything. It records the confirmed defects as pending so the report
+ * and the dashboard can show them; a person creates the ClickUp task with the dashboard button.
+ */
+export async function recordPendingBugs(run: TestRunResult, triage: TriageResult): Promise<FilingSummary> {
   const fileable = triage.issues.filter((i) => i.fileable);
-  const skippedAll = (reason: string): FilingResult[] =>
-    fileable.map((i) => ({ issueId: i.id, action: 'skipped', reason, attachments: [] }));
-  const done = (status: FilingSummary['status'], message: string, results: FilingResult[]): FilingSummary => {
-    const summary = recordFiling(run, results, status, message);
-    log.info(message);
-    return summary;
-  };
-  if (fileable.length === 0) return done('nothing-to-file', 'No confirmed defects to file', []);
-  if (!opts.enabled) {
-    return done(
-      'disabled',
-      `${fileable.length} confirmed defect(s) ready to file — review them in \`ai-qa ui\` or rerun with \`--file\``,
-      skippedAll('automatic filing is off'),
-    );
-  }
-  try {
-    const results = await fileIssues(ctx, run, fileable, opts);
-    const created = results.filter((r) => r.action === 'created').length;
-    return done('filed', `ClickUp: ${created} created, ${results.length - created} other`, results);
-  } catch (err) {
-    if (err instanceof FilingUnavailable) {
-      return done(
-        err.status,
-        `${fileable.length} confirmed defect(s) not filed: ${err.message}`,
-        skippedAll(err.message),
-      );
-    }
-    throw err;
-  }
+  const results: FilingResult[] = fileable.map((i) => ({
+    issueId: i.id,
+    action: 'skipped',
+    reason: 'waiting for a person to log it from the dashboard',
+    attachments: [],
+  }));
+  const message =
+    fileable.length === 0
+      ? 'No confirmed defects'
+      : `${fileable.length} confirmed defect(s) — open \`ai-qa ui\` and use "Log in ClickUp" on the ones you want tracked`;
+  const summary = recordFiling(run, results, fileable.length === 0 ? 'nothing-to-file' : 'pending', message);
+  log.info(message);
+  return summary;
 }

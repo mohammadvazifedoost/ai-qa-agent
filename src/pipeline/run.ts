@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { analyzeApp } from '../analyze/app.js';
-import { fileBugs, FilingSummarySchema, type FilingSummary } from '../bugs/file.js';
+import { FilingSummarySchema, recordPendingBugs, type FilingSummary } from '../bugs/file.js';
 import {
   describeChanges,
   detectCodeChanges,
@@ -32,8 +32,6 @@ export interface RunOptions {
   changed?: boolean;
   /** Inspect Figma for changes as part of `changed` (costs Figma MCP calls). */
   design?: boolean;
-  /** Create ClickUp tasks for confirmed defects. */
-  file: boolean;
 }
 
 export interface PipelineResult {
@@ -47,7 +45,8 @@ export interface PipelineResult {
 }
 
 /**
- * The full pipeline: analyze → design → scenarios → generate → test → triage → file → report.
+ * The full pipeline: analyze → design → scenarios → generate → test → triage → report.
+ * Confirmed defects are recorded as pending; ClickUp tasks are only ever created from the dashboard.
  * Analysis/scenario/test generation are incremental (skipped when inputs are unchanged).
  * Every stage of a run is checkpointed in .qa/state.json; `--resume` continues an unfinished run.
  */
@@ -123,7 +122,7 @@ export async function runPipeline(ctx: QaContext, opts: RunOptions): Promise<Pip
     );
     const filing = await stage(
       'file',
-      () => fileBugs(ctx, test, triage, { enabled: opts.file }),
+      () => recordPendingBugs(test, triage),
       () => readJson(path.join(dir, 'filing.json'), FilingSummarySchema),
     );
     const report = await stage('report', async () =>

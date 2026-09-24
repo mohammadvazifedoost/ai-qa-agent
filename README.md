@@ -81,7 +81,6 @@ ai-qa run --changed --design       # also re-extract the design when Figma frame
 ai-qa run --page checkout          # one page (route or name)
 ai-qa run --category visual        # functional | visual | responsive
 ai-qa run --feature auth           # by feature tag
-ai-qa run --file                   # create ClickUp tasks (default: off)
 ai-qa run --resume                 # continue an interrupted run
 ai-qa run --refresh                # ignore caches; re-read code and Figma
 ai-qa test --grep CHECKOUT-002     # specific scenario ids
@@ -135,7 +134,6 @@ export default defineConfig({
     tokenEnv: 'CLICKUP_API_TOKEN',   // the token is read from this env var, never from config
     tags: ['ai-qa'],
     status: 'to do',                 // optional; default is the list's first status
-    autoFile: false,                 // true = file confirmed defects at the end of `ai-qa run`
     attachEvidence: true,
   },
   browsers: ['chromium'],            // chromium | firefox | webkit
@@ -198,13 +196,11 @@ keeps the partial result, and fetches missing reference screenshots on the next 
    category, page, steps, expected/actual, root cause, environment, test ids) and the screenshot,
    video, trace and design-diff images attached. Priority maps from severity.
 
-**Nothing is filed automatically.** After a run, confirmed defects wait in the report and in the
-dashboard (`ai-qa ui`), where each one has a *Log bug in ClickUp* button. Automatic filing is
-available with `ai-qa run --file` or `clickup.autoFile: true`, and then only for failures the
-analyzer classified as `PRODUCT_BUG` or `DESIGN_MISMATCH`, that failed on every retry, and whose
-confidence is at least `ai.minConfidenceToFile`. Symptoms of one underlying defect are grouped into
-one task. A defect that was already filed in an earlier run (same scenarios) gets a comment instead
-of a duplicate task.
+**Nothing is ever filed automatically — there is no flag or setting for it.** After a run,
+confirmed defects wait in the report and in the dashboard (`ai-qa ui`); a task is created only when
+a person clicks *Log in ClickUp* on a failed test. Symptoms of one underlying defect are grouped
+into one bug report, and a defect that was already filed in an earlier run gets a comment on the
+existing task instead of a duplicate.
 
 ## Dashboard (`ai-qa ui`)
 
