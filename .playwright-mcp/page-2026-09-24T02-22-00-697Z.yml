@@ -1,0 +1,133 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - paragraph [ref=e4]:
+      - text: demo-shop
+      - generic [ref=e5]: http://127.0.0.1:5173
+    - list [ref=e6]:
+      - listitem [ref=e7]:
+        - button "All pages 6 4" [ref=e8] [cursor=pointer]:
+          - generic [ref=e9]: All pages
+          - generic [ref=e10]:
+            - generic [ref=e11]: "6"
+            - generic [ref=e12]: "4"
+      - listitem [ref=e13]:
+        - button / [ref=e14] [cursor=pointer]
+      - listitem [ref=e16]:
+        - button "/checkout" [ref=e17] [cursor=pointer]
+      - listitem [ref=e19]:
+        - button "/contact 6 4" [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]: /contact
+          - generic [ref=e22]:
+            - generic [ref=e23]: "6"
+            - generic [ref=e24]: "4"
+      - listitem [ref=e25]:
+        - button "/login" [ref=e26] [cursor=pointer]
+    - generic [ref=e28]:
+      - generic [ref=e29]: ClickUp
+      - text: ready · list 901523571090
+  - main [ref=e30]:
+    - generic [ref=e31]:
+      - heading "Test results" [level=1] [ref=e32]
+      - generic [ref=e33]:
+        - text: Run
+        - combobox "Run" [ref=e34]:
+          - option "2026-09-24 02:05:06" [selected]
+          - option "2026-09-24 01:11:53"
+          - option "2026-09-24 01:10:51"
+          - option "2026-09-24 01:05:31"
+          - option "2026-09-24 00:57:53"
+          - option "2026-09-24 00:53:44"
+          - option "2026-09-24 00:42:27"
+          - option "2026-09-24 00:37:11"
+    - generic [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - generic [ref=e38]: 6/10
+          - generic [ref=e39]: tests passed in this run
+          - generic [ref=e40]: 3distinct defects
+        - img "6 passed, 4 failed, 0 flaky" [ref=e41]
+        - generic [ref=e44]:
+          - generic [ref=e45]: 6 passed
+          - generic [ref=e47]: 4 failed
+          - generic [ref=e49]: 30 not in this run
+      - generic [ref=e51]:
+        - group "Show" [ref=e52]:
+          - button "All" [pressed] [ref=e53] [cursor=pointer]
+          - button "Failures" [ref=e54] [cursor=pointer]
+          - button "Passing" [ref=e55] [cursor=pointer]
+        - generic [ref=e56]:
+          - checkbox "show scenarios not in this run" [ref=e57]
+          - text: show scenarios not in this run
+        - generic [ref=e58]: 10 shown
+      - generic [ref=e59]:
+        - heading "/contact" [level=2] [ref=e60]
+        - generic [ref=e61]: 10 · 4 failing
+      - list [ref=e62]:
+        - listitem [ref=e63]:
+          - button "passed CONTACT-001 Send a contact message with valid data shows confirmation" [ref=e64] [cursor=pointer]:
+            - generic "passed" [ref=e65]
+            - generic [ref=e66]: CONTACT-001
+            - generic [ref=e67]: Send a contact message with valid data shows confirmation
+        - listitem [ref=e68]:
+          - button "passed CONTACT-002 Submitting an empty form shows both required-field errors and sends nothing" [ref=e69] [cursor=pointer]:
+            - generic "passed" [ref=e70]
+            - generic [ref=e71]: CONTACT-002
+            - generic [ref=e72]: Submitting an empty form shows both required-field errors and sends nothing
+        - listitem [ref=e73]:
+          - button "passed CONTACT-003 Whitespace-only name is rejected" [ref=e74] [cursor=pointer]:
+            - generic "passed" [ref=e75]
+            - generic [ref=e76]: CONTACT-003
+            - generic [ref=e77]: Whitespace-only name is rejected
+        - listitem [ref=e78]:
+          - button "passed CONTACT-004 Malformed email addresses are rejected, minimal valid address accepted" [ref=e79] [cursor=pointer]:
+            - generic "passed" [ref=e80]
+            - generic [ref=e81]: CONTACT-004
+            - generic [ref=e82]: Malformed email addresses are rejected, minimal valid address accepted
+        - listitem [ref=e83]:
+          - button "passed CONTACT-005 Message is optional and the confirmation greets the trimmed name" [ref=e84] [cursor=pointer]:
+            - generic "passed" [ref=e85]
+            - generic [ref=e86]: CONTACT-005
+            - generic [ref=e87]: Message is optional and the confirmation greets the trimmed name
+        - listitem [ref=e88]:
+          - button "passed CONTACT-006 Sending state disables the button and prevents double submit" [ref=e89] [cursor=pointer]:
+            - generic "passed" [ref=e90]
+            - generic [ref=e91]: CONTACT-006
+            - generic [ref=e92]: Sending state disables the button and prevents double submit
+        - listitem [ref=e93]:
+          - button "failed CONTACT-007 Form is accessible by keyboard and errors are correctable and announced product bug" [ref=e94] [cursor=pointer]:
+            - generic "failed" [ref=e95]
+            - generic [ref=e96]: CONTACT-007
+            - generic [ref=e97]:
+              - text: Form is accessible by keyboard and errors are correctable and announced
+              - generic [ref=e98]: product bug
+          - generic [ref=e100]:
+            - text: Logged
+            - link "123ztrcx1n2" [ref=e101] [cursor=pointer]:
+              - /url: https://app.clickup.com/t/123ztrcx1n2
+        - listitem [ref=e102]:
+          - button "failed CONTACT-008 'Send message' button and inputs match Figma Button/Input specs design mismatch" [ref=e103] [cursor=pointer]:
+            - generic "failed" [ref=e104]
+            - generic [ref=e105]: CONTACT-008
+            - generic [ref=e106]:
+              - text: "'Send message' button and inputs match Figma Button/Input specs"
+              - generic [ref=e107]: design mismatch
+          - generic [ref=e109]:
+            - text: Logged
+            - link "123ztrcx1mj" [ref=e110] [cursor=pointer]:
+              - /url: https://app.clickup.com/t/123ztrcx1mj
+        - listitem [ref=e111]:
+          - button "failed CONTACT-009 Contact form is usable at mobile width without horizontal overflow product bug" [ref=e112] [cursor=pointer]:
+            - generic "failed" [ref=e113]
+            - generic [ref=e114]: CONTACT-009
+            - generic [ref=e115]:
+              - text: Contact form is usable at mobile width without horizontal overflow
+              - generic [ref=e116]: product bug
+          - button "Log in ClickUp" [ref=e118] [cursor=pointer]
+        - listitem [ref=e119]:
+          - button "failed CONTACT-010 Header navigation collapses to a menu button on mobile product bug" [ref=e120] [cursor=pointer]:
+            - generic "failed" [ref=e121]
+            - generic [ref=e122]: CONTACT-010
+            - generic [ref=e123]:
+              - text: Header navigation collapses to a menu button on mobile
+              - generic [ref=e124]: product bug
+          - button "Log in ClickUp" [ref=e126] [cursor=pointer]

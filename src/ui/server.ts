@@ -2,7 +2,9 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileIssues, FilingUnavailable, loadFiling, recordFiling, type FilingResult } from '../bugs/file.js';
-import { readJson } from '../core/fs.js';
+import { readJson, sha256, slugify } from '../core/fs.js';
+import type { TestOutcome } from '../runner/results.js';
+import type { BugDraft, Issue } from '../triage/schema.js';
 import { logger } from '../core/logger.js';
 import { runDir } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
@@ -109,16 +111,76 @@ function serveFile(ctx: QaContext, urlPath: string, res: http.ServerResponse): v
   fs.createReadStream(abs).pipe(res);
 }
 
+/** Id used in filing.json for a failure that was filed without a consolidated issue. */
+export function adhocIssueId(outcome: Pick<TestOutcome, 'scenarioId' | 'title'>): string {
+  return `FAIL-${outcome.scenarioId ?? slugify(outcome.title)}`;
+}
+
+/**
+ * A bug report for one failed test that the analyzer did not turn into a confirmed issue
+ * (test bug, unknown, not triaged). A human chose to file it, so it is built from the scenario,
+ * the error and whatever analysis exists, and tagged for verification.
+ */
+export function adhocIssue(
+  ctx: QaContext,
+  test: TestRunResult,
+  triage: TriageResult | undefined,
+  key: string,
+): Issue | undefined {
+  const outcome = test.outcomes.find((o) => o.key === key);
+  if (!outcome) return undefined;
+  const failure = triage?.failures.find((f) => f.key === key);
+  const scenario = loadAllScenarios(ctx).find((s) => s.id === outcome.scenarioId);
+  const category =
+    scenario?.category === 'visual' || scenario?.category === 'responsive' ? scenario.category : 'functional';
+  const bug: BugDraft = failure?.bug ?? {
+    title: scenario?.title ?? outcome.title,
+    severity: 'medium',
+    category,
+    affectedPage: scenario?.page ?? '/',
+    stepsToReproduce: scenario?.steps.length
+      ? scenario.steps
+      : [`Run test "${outcome.title}" (${outcome.project})`],
+    expectedResult: scenario?.expectedResults.join(' ') ?? 'The test passes.',
+    actualResult: outcome.error?.message.split('\n\n')[0] ?? 'The test failed.',
+    suspectedRootCause: failure?.reasoning ?? 'unknown (not analyzed)',
+  };
+  const scenarioIds = [outcome.scenarioId ?? outcome.title];
+  return {
+    id: adhocIssueId(outcome),
+    fingerprint: sha256(scenarioIds.join('|')).slice(0, 16),
+    classification: failure?.classification === 'DESIGN_MISMATCH' ? 'DESIGN_MISMATCH' : 'PRODUCT_BUG',
+    bug,
+    failureKeys: [key],
+    scenarioIds,
+    confidence: failure?.confidence ?? 0,
+    fileable: false,
+    notFiledReason: failure ? `analyzer classified it as ${failure.classification}` : 'not analyzed',
+  };
+}
+
 async function handleFile(ctx: QaContext, body: string): Promise<{ status: number; payload: unknown }> {
-  const { runId, issueId } = JSON.parse(body || '{}') as { runId?: string; issueId?: string };
-  if (!runId || !issueId) return { status: 400, payload: { error: 'runId and issueId are required' } };
+  const { runId, issueId, failureKey } = JSON.parse(body || '{}') as {
+    runId?: string;
+    issueId?: string;
+    failureKey?: string;
+  };
+  if (!runId || (!issueId && !failureKey)) {
+    return { status: 400, payload: { error: 'runId and issueId or failureKey are required' } };
+  }
   const test = loadRun(ctx, runId);
-  const triage = test && readJson(path.join(test.runDir, 'triage.json'), TriageResultSchema);
-  const issue = triage?.issues.find((i) => i.id === issueId);
-  if (!test || !issue)
-    return { status: 404, payload: { error: `Issue ${issueId} not found in run ${runId}` } };
+  if (!test) return { status: 404, payload: { error: `Run ${runId} not found` } };
+  const triage = readJson(path.join(test.runDir, 'triage.json'), TriageResultSchema);
+  const issue = issueId
+    ? triage?.issues.find((i) => i.id === issueId)
+    : adhocIssue(ctx, test, triage, failureKey!);
+  if (!issue)
+    return { status: 404, payload: { error: `${issueId ?? failureKey} not found in run ${runId}` } };
+  const confirmed = issueId !== undefined && triage?.issues.some((i) => i.id === issueId && i.fileable);
   try {
-    const [result] = await fileIssues(ctx, test, [issue]);
+    const [result] = await fileIssues(ctx, test, [issue], {
+      extraTags: confirmed ? [] : ['needs-verification'],
+    });
     recordFiling(test, [result!], 'filed', 'Filed from the dashboard');
     return { status: result!.action === 'failed' ? 502 : 200, payload: result };
   } catch (err) {

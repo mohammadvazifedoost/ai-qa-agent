@@ -209,12 +209,21 @@ of a duplicate task.
 ## Dashboard (`ai-qa ui`)
 
 `npx ai-qa ui` serves a local page (default `http://127.0.0.1:4310`) built from the files the
-pipeline writes — no database, no external service. It lists every scenario grouped by page with
-its result in the selected run, the failure classification and linked defect, the final screenshot,
-the video, the trace and logs, and the AI's analysis with the suspected root cause. Confirmed
-defects have a *Log bug in ClickUp* button; the token must be in the environment of the shell that
-started the UI (`CLICKUP_API_TOKEN=pk_... npx ai-qa ui`). Filing results are written back to the run
-so the report and the dashboard stay consistent.
+pipeline writes — no database, no external service.
+
+- The sidebar lists pages with pass/fail counts; the verdict panel shows the run's pass ratio and
+  distinct defects. Scenarios that were not part of the selected run are hidden unless you ask.
+- Each scenario is one row: status, id, title, and for failures the analyzer's classification.
+  Clicking a row opens a modal with what happened (analysis, root cause, expected vs actual), the
+  evidence (screenshot, video, trace, console/network log, page snapshot) and, collapsed, the test
+  error and the scenario's steps.
+- Every failed row has a *Log in ClickUp* button. It files the consolidated bug report for a
+  confirmed defect, comments on the existing task when the defect was filed in an earlier run, and
+  for failures the analyzer did not confirm (test bug, not analyzed) it still files a task built
+  from the scenario and the error, tagged `needs-verification`. Once filed, the row shows the task link.
+- The token must be in the environment of the shell that started the UI
+  (`CLICKUP_API_TOKEN=pk_... npx ai-qa ui`). Filing results are written back to the run so the
+  report and the dashboard stay consistent.
 
 ## Playwright setup
 

@@ -126,7 +126,7 @@ export async function fileIssues(
   ctx: QaContext,
   run: TestRunResult,
   issues: Issue[],
-  opts: { fetchImpl?: Fetch } = {},
+  opts: { fetchImpl?: Fetch; extraTags?: string[] } = {},
 ): Promise<FilingResult[]> {
   const { client, cfg } = clickupClient(ctx, opts.fetchImpl);
   const list = await client.getList(cfg.listId);
@@ -165,6 +165,7 @@ export async function fileIssues(
           ...cfg.tags,
           issue.classification === 'DESIGN_MISMATCH' ? 'design-mismatch' : 'bug',
           issue.bug.category,
+          ...(opts.extraTags ?? []),
         ],
         priority: PRIORITY[issue.bug.severity],
         status: cfg.status,

@@ -1,6 +1,6 @@
 /**
  * The dashboard is a single static page (no build step, no framework) served by `ai-qa ui`.
- * It reads /api/overview and links evidence files under /files/.
+ * It reads /api/overview, links evidence under /files/, and files bugs through POST /api/file.
  */
 export const PAGE_HTML = String.raw`<!doctype html>
 <html lang="en">
@@ -9,100 +9,166 @@ export const PAGE_HTML = String.raw`<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ai-qa results</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#F3F5F6;--surface:#FFFFFF;--ink:#16202A;--muted:#66737F;--line:#D9DFE4;
-  --pass:#1B7F4C;--fail:#B3261E;--flaky:#B26A00;--skip:#8A96A0;--action:#1F4FD1;--action-ink:#fff;
-  --pass-soft:#E3F3EA;--fail-soft:#FBE7E5;--flaky-soft:#FFF1DC;
-  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --bg:#F2F5F4;--surface:#FFFFFF;--ink:#10231F;--muted:#5F6F6B;--line:#DCE3E0;--line-strong:#B9C4C0;
+  --accent:#0E6B5C;--accent-ink:#FFFFFF;--accent-soft:#E1F0EC;
+  --pass:#2F7D4F;--pass-soft:#E4F2E9;--fail:#C03A2B;--fail-soft:#FAE6E2;--flaky:#B7791F;--flaky-soft:#FBEFD9;--idle:#9AA7A3;
+  --shadow:0 20px 60px rgba(16,35,31,.18);
+  --font:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root{
-  --bg:#0F1418;--surface:#161C22;--ink:#E6EBEF;--muted:#94A0AB;--line:#26303A;
-  --pass:#4CC38A;--fail:#F0776E;--flaky:#E4A33B;--skip:#7D8994;--action:#7C9BFF;--action-ink:#0F1418;
-  --pass-soft:#12301F;--fail-soft:#3A1A17;--flaky-soft:#3A2A10;
+  --bg:#0F1614;--surface:#161F1C;--ink:#E8EEEC;--muted:#98A6A2;--line:#243230;--line-strong:#3A4A46;
+  --accent:#4FB8A2;--accent-ink:#0F1614;--accent-soft:#17302B;
+  --pass:#5CC58A;--pass-soft:#13301F;--fail:#F0806F;--fail-soft:#3B1C17;--flaky:#E3AA4C;--flaky-soft:#3A2B10;--idle:#6C7A76;
+  --shadow:0 20px 60px rgba(0,0,0,.5);
 }}
 *{box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font)}
-a{color:var(--action)}
-.wrap{max-width:1240px;margin:0 auto;padding:24px 16px 64px}
-header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 24px;margin-bottom:20px}
-header h1{font-size:22px;font-weight:600;margin:0}
-header .url{color:var(--muted)}
-header select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
-.spacer{flex:1}
-.status{color:var(--muted)}
-.status.ok{color:var(--pass)}.status.warn{color:var(--flaky)}
-.summary{display:flex;flex-wrap:wrap;gap:8px 28px;align-items:baseline;margin:0 0 8px}
-.summary .n{font-size:28px;font-weight:600;line-height:1}
-.summary .n.pass{color:var(--pass)}.summary .n.fail{color:var(--fail)}.summary .n.flaky{color:var(--flaky)}
-.summary .l{color:var(--muted);margin-left:6px}
-.strip{display:flex;gap:2px;height:28px;margin:8px 0 20px}
-.strip button{flex:1;min-width:6px;border:0;padding:0;cursor:pointer;border-radius:2px;background:var(--skip);opacity:.9}
-.strip button.passed{background:var(--pass)}.strip button.failed{background:var(--fail)}.strip button.flaky{background:var(--flaky)}
-.strip button:hover,.strip button:focus-visible{opacity:1;outline:2px solid var(--ink);outline-offset:1px}
-.filters{display:flex;flex-wrap:wrap;gap:8px 16px;margin-bottom:12px;align-items:center}
-.filters label{color:var(--muted)}
-.filters select,.filters input{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
-.page{margin-top:28px}
-.page h2{font-size:17px;font-weight:600;margin:0 0 8px}
-.page h2 small{color:var(--muted);font-weight:400;margin-left:10px}
-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
-th{text-align:left;font-weight:500;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px}
-td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-tr:last-child td{border-bottom:0}
-tr.row{cursor:pointer}
-tr.row:hover td{background:color-mix(in srgb,var(--line) 35%,transparent)}
-.id{font-family:var(--mono);font-size:13px;white-space:nowrap}
-.meta{color:var(--muted);font-size:13px}
-.result{display:inline-block;padding:2px 9px;border-radius:999px;font-size:13px;font-weight:500;white-space:nowrap}
-.result.passed{background:var(--pass-soft);color:var(--pass)}
-.result.failed{background:var(--fail-soft);color:var(--fail)}
-.result.flaky{background:var(--flaky-soft);color:var(--flaky)}
-.result.skipped,.result.none{background:transparent;color:var(--muted);border:1px solid var(--line)}
-.cls{font-size:13px}
-.cls.bug{color:var(--fail);font-weight:500}
-.cls.other{color:var(--muted)}
-tr.detail td{background:color-mix(in srgb,var(--line) 20%,transparent);padding:16px 12px 20px}
-.detail-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(280px,1.4fr);gap:20px}
-@media (max-width:860px){.detail-grid{grid-template-columns:1fr}}
-.detail h4{margin:0 0 6px;font-size:13px;font-weight:600;color:var(--muted)}
-.detail ol,.detail ul{margin:0 0 14px;padding-left:20px}
-.detail li{margin:2px 0}
-.error{white-space:pre-wrap;font-family:var(--mono);font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px;max-height:260px;overflow:auto;margin:0 0 14px}
-.evidence img{max-width:100%;border:1px solid var(--line);border-radius:6px;display:block;margin-bottom:10px}
-.evidence video{max-width:100%;border:1px solid var(--line);border-radius:6px;display:block;margin-bottom:10px;background:#000}
-.links{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px}
-.issue{border-left:3px solid var(--fail);padding:6px 12px;margin:8px 0 12px;background:var(--surface);border-radius:0 6px 6px 0}
-.issue b{display:block}
-.issue .rc{font-size:13px;color:var(--muted);margin-top:4px}
-button.file{font:inherit;font-weight:500;background:var(--action);color:var(--action-ink);border:0;border-radius:6px;padding:8px 14px;cursor:pointer}
-button.file:disabled{opacity:.55;cursor:default}
-button.file:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.filed{color:var(--pass);font-weight:500}
-.note{color:var(--muted);font-size:13px;margin-top:6px}
-.empty{padding:40px 0;color:var(--muted)}
+a{color:var(--accent)}
+button{font:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Frame */
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+aside{border-right:1px solid var(--line);padding:24px 18px;position:sticky;top:0;height:100vh;overflow:auto}
+main{padding:24px 32px 80px;max-width:1120px}
+@media (max-width:880px){
+  .app{grid-template-columns:1fr}
+  aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:16px}
+  main{padding:16px 16px 64px}
+}
+.brand{font-weight:800;font-size:18px;letter-spacing:-.01em;margin:0 0 2px}
+.brand small{display:block;font-weight:500;font-size:12px;color:var(--muted);word-break:break-all}
+.nav{list-style:none;margin:22px 0 0;padding:0}
+.nav li{margin:2px 0}
+.nav button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;background:none;border:0;border-radius:8px;padding:8px 10px;color:var(--ink);cursor:pointer;text-align:left}
+.nav button:hover{background:var(--accent-soft)}
+.nav button[aria-current="true"]{background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+.nav .counts{display:flex;gap:6px;font-size:12px;font-weight:600}
+.nav .counts span{min-width:22px;text-align:center;border-radius:6px;padding:1px 5px}
+.nav .p{background:var(--pass-soft);color:var(--pass)}.nav .f{background:var(--fail-soft);color:var(--fail)}
+.side-status{margin-top:26px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+.side-status b{display:block;color:var(--ink);font-weight:600}
+.side-status .ok{color:var(--pass)}.side-status .warn{color:var(--flaky)}
+
+/* Header + verdict */
+.topbar{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;margin-bottom:22px}
+.topbar h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0}
+.topbar .spacer{flex:1}
+select,.toggle{font:inherit;padding:7px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink)}
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:22px}
+.verdict .big{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px}
+.verdict .ratio{font-size:44px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.verdict .ratio i{font-style:normal;color:var(--muted);font-weight:600;font-size:22px}
+.verdict .label{font-size:15px;color:var(--muted)}
+.verdict .defects{margin-left:auto;font-weight:600}
+.verdict .defects b{color:var(--fail);font-size:22px;margin-right:4px}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:16px 0 8px;background:var(--line)}
+.bar span{display:block;height:100%}
+.bar .passed{background:var(--pass)}.bar .failed{background:var(--fail)}.bar .flaky{background:var(--flaky)}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+/* Controls */
+.controls{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:14px}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:7px 12px;color:var(--muted);cursor:pointer;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.controls label.chk{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:14px}
+.controls .count{margin-left:auto;color:var(--muted);font-size:13px}
+
+/* List */
+.group{margin:24px 0 8px;display:flex;align-items:baseline;gap:10px}
+.group h2{margin:0;font-size:16px;font-weight:700}
+.group span{color:var(--muted);font-size:13px}
+.list{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:grid;grid-template-columns:14px 118px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .open{grid-column:1/4;display:grid;grid-template-columns:subgrid;align-items:center;gap:14px;background:none;border:0;padding:0;text-align:left;color:inherit;cursor:pointer;min-width:0}
+.row .open:hover .title{color:var(--accent)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--idle)}
+.dot.passed{background:var(--pass)}.dot.failed{background:var(--fail)}.dot.flaky{background:var(--flaky)}
+.id{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.title{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.title .chip{margin-left:8px}
+.chip{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;vertical-align:1px;white-space:nowrap}
+.chip.bug{background:var(--fail-soft);color:var(--fail)}
+.chip.other{background:var(--line);color:var(--muted)}
+.chip.pass{background:var(--pass-soft);color:var(--pass)}
+.chip.flaky{background:var(--flaky-soft);color:var(--flaky)}
+.act{display:flex;align-items:center;gap:10px;white-space:nowrap}
+.btn{border:0;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer;background:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.ghost{background:var(--accent-soft);color:var(--accent)}
+.logged{color:var(--pass);font-weight:600;font-size:13px}
+.logged a{margin-left:4px}
+@media (max-width:640px){
+  .row{grid-template-columns:14px minmax(0,1fr)}
+  .row .open{grid-column:1/3;grid-template-columns:14px minmax(0,1fr)}
+  .row .id{display:none}
+  .row .act{grid-column:2}
+}
+.empty{padding:48px 16px;color:var(--muted);text-align:center}
 .empty code{font-family:var(--mono);font-size:13px}
-@media (prefers-reduced-motion:no-preference){tr.detail{animation:reveal .18s ease-out}@keyframes reveal{from{opacity:0}to{opacity:1}}}
+
+/* Modal */
+dialog{border:0;border-radius:16px;padding:0;width:min(1040px,calc(100vw - 32px));max-height:calc(100vh - 32px);background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(16,35,31,.55);backdrop-filter:blur(2px)}
+.m-head{display:flex;gap:16px;align-items:flex-start;padding:22px 24px 16px;border-bottom:1px solid var(--line)}
+.m-head h2{margin:4px 0 4px;font-size:20px;font-weight:800;letter-spacing:-.01em}
+.m-head .meta{color:var(--muted);font-size:13px}
+.m-head .close{margin-left:auto;background:var(--line);border:0;border-radius:50%;width:34px;height:34px;cursor:pointer;color:var(--ink);font-size:18px;line-height:1}
+.pill{display:inline-block;font-weight:700;font-size:12px;padding:3px 10px;border-radius:999px}
+.pill.passed{background:var(--pass-soft);color:var(--pass)}.pill.failed{background:var(--fail-soft);color:var(--fail)}.pill.flaky{background:var(--flaky-soft);color:var(--flaky)}.pill.none{background:var(--line);color:var(--muted)}
+.m-body{padding:20px 24px;display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1.25fr);gap:24px;overflow:auto;max-height:calc(100vh - 210px)}
+@media (max-width:760px){.m-body{grid-template-columns:1fr}}
+.m-body h3{margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--muted)}
+.m-body section{margin-bottom:22px}
+.lead{font-size:16px;font-weight:600;margin:0 0 8px}
+.cause{font-size:14px;color:var(--muted);margin:0}
+.cause code{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+details summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;list-style:none}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:"▸ ";color:var(--muted)}
+details[open] summary::before{content:"▾ "}
+pre.err{white-space:pre-wrap;font-family:var(--mono);font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;max-height:240px;overflow:auto;margin:10px 0 0}
+ol.steps,ul.exp{margin:8px 0 0;padding-left:20px;font-size:14px}
+ol.steps li,ul.exp li{margin:3px 0}
+.shot{display:block;border:1px solid var(--line);border-radius:10px;max-width:100%}
+video{display:block;width:100%;border-radius:10px;background:#000;margin-top:12px}
+.links{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:12px;font-size:14px}
+.m-foot{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 24px;border-top:1px solid var(--line);background:var(--bg);border-radius:0 0 16px 16px}
+.m-foot .note{color:var(--muted);font-size:13px}
+@media (prefers-reduced-motion:no-preference){dialog[open]{animation:pop .16s ease-out}@keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1 id="project">ai-qa</h1>
-    <span class="url" id="url"></span>
-    <span class="spacer"></span>
-    <label>Run <select id="run"></select></label>
-    <span class="status" id="clickup"></span>
-  </header>
-  <div id="main"><p class="empty">Loading…</p></div>
+<div class="app">
+  <aside>
+    <p class="brand" id="project">ai-qa<small id="url"></small></p>
+    <ul class="nav" id="nav"></ul>
+    <div class="side-status" id="clickup"></div>
+  </aside>
+  <main>
+    <div class="topbar">
+      <h1>Test results</h1>
+      <span class="spacer"></span>
+      <label>Run <select id="run" aria-label="Run"></select></label>
+    </div>
+    <div id="main"><p class="empty">Loading…</p></div>
+  </main>
 </div>
+<dialog id="modal" aria-labelledby="m-title"></dialog>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const file = (p) => '/files/' + p.split('/').map(encodeURIComponent).join('/');
-let data, filters = { page: '', category: '', status: '' };
+let data;
+let view = { page: '', only: 'all', includeNotRun: false };
 
 async function load(runId) {
   const res = await fetch('/api/overview' + (runId ? '?run=' + encodeURIComponent(runId) : ''));
@@ -110,156 +176,185 @@ async function load(runId) {
   render();
 }
 
-function outcomesFor(id) {
-  return data.run ? data.run.outcomes.filter((o) => o.scenarioId === id) : [];
+/* ---------- joins ---------- */
+const outcomesFor = (id) => data.run ? data.run.outcomes.filter((o) => o.scenarioId === id) : [];
+const failureFor = (key) => data.run?.failures.find((f) => f.key === key);
+const issueFor = (key) => data.run?.issues.find((i) => i.failureKeys.includes(key));
+const filingFor = (issueId) => data.run?.filing.find((f) => f.issueId === issueId && (f.action === 'created' || f.action === 'commented'));
+function statusOf(id) {
+  const s = outcomesFor(id).map((o) => o.status);
+  if (!s.length) return 'none';
+  if (s.includes('failed')) return 'failed';
+  if (s.includes('flaky')) return 'flaky';
+  return s.every((x) => x === 'skipped') ? 'none' : 'passed';
 }
-function failureFor(key) { return data.run?.failures.find((f) => f.key === key); }
-function issueFor(key) { return data.run?.issues.find((i) => i.failureKeys.includes(key)); }
-function filingFor(issueId) { return data.run?.filing.find((f) => f.issueId === issueId); }
-
-function overallStatus(id) {
-  const os = outcomesFor(id).map((o) => o.status);
-  if (!os.length) return 'none';
-  if (os.includes('failed')) return 'failed';
-  if (os.includes('flaky')) return 'flaky';
-  if (os.every((s) => s === 'skipped')) return 'skipped';
-  return 'passed';
+/** The ClickUp record for a scenario: its consolidated issue, or the ad-hoc filing of its failure. */
+function clickupFor(sc) {
+  const outs = outcomesFor(sc.id).filter((o) => o.status === 'failed' || o.status === 'flaky');
+  for (const o of outs) {
+    const issue = issueFor(o.key);
+    const filed = issue ? filingFor(issue.id) : filingFor('FAIL-' + sc.id);
+    if (filed) return { filed, issue, outcome: o };
+    if (issue) return { issue, outcome: o };
+  }
+  return outs[0] ? { outcome: outs[0] } : null;
 }
+function classificationOf(sc) {
+  const f = outcomesFor(sc.id).map((o) => failureFor(o.key)).find(Boolean);
+  return f ? f.classification : null;
+}
+const isBug = (c) => c === 'PRODUCT_BUG' || c === 'DESIGN_MISMATCH';
+const human = (c) => c ? c.replace('_', ' ').toLowerCase() : '';
 
+/* ---------- render ---------- */
 function render() {
-  $('#project').textContent = data.project.name;
+  $('#project').firstChild.textContent = data.project.name;
   $('#url').textContent = data.project.baseUrl;
   const sel = $('#run');
   sel.innerHTML = data.runs.map((r) => '<option value="' + esc(r.id) + '"' + (data.run && r.id === data.run.id ? ' selected' : '') + '>' +
-    esc(r.id.replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2')) + ' — ' + r.stats.passed + ' passed, ' + r.stats.failed + ' failed</option>').join('');
+    esc(r.id.replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2')) + '</option>').join('');
   sel.onchange = () => load(sel.value);
+
   const cu = $('#clickup');
-  if (!data.clickup.configured) { cu.textContent = 'ClickUp not configured'; cu.className = 'status'; }
-  else if (!data.clickup.tokenPresent) { cu.textContent = 'ClickUp token missing — start ai-qa ui with the token in the environment'; cu.className = 'status warn'; }
-  else { cu.textContent = 'ClickUp ready · list ' + data.clickup.listId; cu.className = 'status ok'; }
+  if (!data.clickup.configured) cu.innerHTML = '<b>ClickUp</b>not configured';
+  else if (!data.clickup.tokenPresent) cu.innerHTML = '<b>ClickUp</b><span class="warn">token missing in this shell</span>';
+  else cu.innerHTML = '<b>ClickUp</b><span class="ok">ready</span> · list ' + esc(data.clickup.listId);
 
   const main = $('#main');
-  if (!data.scenarios.length) { main.innerHTML = '<p class="empty">No scenarios yet. Run <code>ai-qa scenarios</code> first.</p>'; return; }
-  if (!data.run) { main.innerHTML = '<p class="empty">No test run yet. Run <code>ai-qa run</code> or <code>ai-qa test</code>.</p>'; return; }
+  if (!data.scenarios.length) { $('#nav').innerHTML = ''; main.innerHTML = '<p class="empty">No scenarios yet. Run <code>ai-qa scenarios</code> first.</p>'; return; }
+  if (!data.run) { $('#nav').innerHTML = ''; main.innerHTML = '<p class="empty">No test run yet. Run <code>ai-qa run</code> or <code>ai-qa test</code>.</p>'; return; }
+
+  const all = data.scenarios.map((sc) => ({ sc, status: statusOf(sc.id) }));
+  const inRun = all.filter((x) => x.status !== 'none');
+  const pages = [...new Set(all.map((x) => x.sc.page))].sort();
+
+  // Sidebar: pages with pass/fail counts for this run.
+  $('#nav').innerHTML = ['', ...pages].map((p) => {
+    const rows = (p ? all.filter((x) => x.sc.page === p) : all).filter((x) => x.status !== 'none');
+    const pass = rows.filter((x) => x.status === 'passed').length, fail = rows.filter((x) => x.status !== 'passed').length;
+    return '<li><button aria-current="' + (view.page === p) + '" onclick="setPage(\'' + esc(p) + '\')"><span>' + (p ? esc(p) : 'All pages') + '</span>' +
+      '<span class="counts">' + (pass ? '<span class="p">' + pass + '</span>' : '') + (fail ? '<span class="f">' + fail + '</span>' : '') + '</span></button></li>';
+  }).join('');
 
   const s = data.run.stats;
-  const pages = [...new Set(data.scenarios.map((x) => x.page))].sort();
-  const categories = [...new Set(data.scenarios.map((x) => x.category))].sort();
-  const withStatus = data.scenarios.map((sc) => ({ sc, status: overallStatus(sc.id) }));
-  const visible = withStatus.filter(({ sc, status }) =>
-    (!filters.page || sc.page === filters.page) && (!filters.category || sc.category === filters.category) && (!filters.status || status === filters.status));
+  const ran = s.passed + s.failed + s.flaky;
+  const pct = (n) => ran ? (100 * n / ran) + '%' : '0%';
+  const failingIssues = data.run.issues.length;
+  let html = '<div class="verdict"><div class="big"><span class="ratio">' + s.passed + '<i>/' + ran + '</i></span><span class="label">tests passed in this run</span>' +
+    '<span class="defects"><b>' + failingIssues + '</b>' + (failingIssues === 1 ? 'distinct defect' : 'distinct defects') + '</span></div>' +
+    '<div class="bar" role="img" aria-label="' + s.passed + ' passed, ' + s.failed + ' failed, ' + s.flaky + ' flaky">' +
+    '<span class="passed" style="width:' + pct(s.passed) + '"></span><span class="flaky" style="width:' + pct(s.flaky) + '"></span><span class="failed" style="width:' + pct(s.failed) + '"></span></div>' +
+    '<div class="legend"><span><i style="background:var(--pass)"></i>' + s.passed + ' passed</span><span><i style="background:var(--fail)"></i>' + s.failed + ' failed</span>' +
+    (s.flaky ? '<span><i style="background:var(--flaky)"></i>' + s.flaky + ' flaky</span>' : '') +
+    (all.length - inRun.length ? '<span><i style="background:var(--idle)"></i>' + (all.length - inRun.length) + ' not in this run</span>' : '') + '</div></div>';
 
-  let html = '<div class="summary">' +
-    '<span><span class="n pass">' + s.passed + '</span><span class="l">passed</span></span>' +
-    '<span><span class="n fail">' + s.failed + '</span><span class="l">failed</span></span>' +
-    (s.flaky ? '<span><span class="n flaky">' + s.flaky + '</span><span class="l">flaky</span></span>' : '') +
-    '<span><span class="n">' + data.run.issues.length + '</span><span class="l">distinct defects</span></span>' +
-    '<span class="l">' + data.scenarios.length + ' scenarios</span></div>';
-  html += '<div class="strip" aria-label="Each block is one scenario; click to jump to it">' +
-    withStatus.map(({ sc, status }) => '<button class="' + status + '" title="' + esc(sc.id + ' — ' + status) + '" onclick="jump(\'' + esc(sc.id) + '\')"></button>').join('') + '</div>';
-  html += '<div class="filters">' +
-    sel2('page', 'Page', pages) + sel2('category', 'Category', categories) +
-    sel2('status', 'Result', ['passed', 'failed', 'flaky', 'none'], { none: 'not run' }) +
-    '<span class="meta">' + visible.length + ' shown</span></div>';
+  const rows = all.filter((x) => (!view.page || x.sc.page === view.page) &&
+    (view.only === 'all' ? true : view.only === 'failed' ? x.status === 'failed' || x.status === 'flaky' : x.status === 'passed') &&
+    (view.includeNotRun || x.status !== 'none'));
+  html += '<div class="controls"><div class="seg" role="group" aria-label="Show">' +
+    ['all', 'failed', 'passed'].map((k) => '<button aria-pressed="' + (view.only === k) + '" onclick="setOnly(\'' + k + '\')">' + ({ all: 'All', failed: 'Failures', passed: 'Passing' })[k] + '</button>').join('') + '</div>' +
+    '<label class="chk"><input type="checkbox" ' + (view.includeNotRun ? 'checked' : '') + ' onchange="view.includeNotRun=this.checked;render()"> show scenarios not in this run</label>' +
+    '<span class="count">' + rows.length + ' shown</span></div>';
 
+  if (!rows.length) html += '<p class="empty">Nothing matches. ' + (view.only === 'failed' ? 'No failures here.' : '') + '</p>';
   for (const page of pages) {
-    const rows = visible.filter((v) => v.sc.page === page);
-    if (!rows.length) continue;
-    const fails = rows.filter((r) => r.status === 'failed').length;
-    html += '<section class="page"><h2>' + esc(page) + '<small>' + rows.length + ' scenarios' + (fails ? ', ' + fails + ' failing' : '') + '</small></h2>';
-    html += '<table><thead><tr><th>ID</th><th>Scenario</th><th>Type</th><th>Result</th><th>Analysis</th></tr></thead><tbody>';
-    for (const { sc, status } of rows) {
-      const outs = outcomesFor(sc.id);
-      const analysis = outs.map((o) => {
-        const f = failureFor(o.key); if (!f) return '';
-        const issue = issueFor(o.key);
-        const bug = f.classification === 'PRODUCT_BUG' || f.classification === 'DESIGN_MISMATCH';
-        return '<span class="cls ' + (bug ? 'bug' : 'other') + '">' + esc(f.classification.replace('_', ' ').toLowerCase()) + (issue ? ' · ' + esc(issue.id) : '') + '</span>';
-      }).filter(Boolean).join('<br>');
-      html += '<tr class="row" id="row-' + esc(sc.id) + '" onclick="toggle(\'' + esc(sc.id) + '\')">' +
-        '<td class="id">' + esc(sc.id) + '</td>' +
-        '<td>' + esc(sc.title) + '<div class="meta">' + esc(sc.feature) + ' · ' + esc(sc.priority) + ' priority</div></td>' +
-        '<td class="meta">' + esc(sc.category) + '<br>' + esc(sc.viewport) + '</td>' +
-        '<td><span class="result ' + status + '">' + (status === 'none' ? 'not run' : status) + '</span>' +
-        (outs.length > 1 ? '<div class="meta">' + outs.map((o) => esc(o.project.replace('chromium-', '')) + ' ' + o.status).join(', ') + '</div>' : '') + '</td>' +
-        '<td>' + (analysis || '<span class="meta">—</span>') + '</td></tr>';
-      html += '<tr class="detail" id="detail-' + esc(sc.id) + '" hidden><td colspan="5">' + detail(sc, outs) + '</td></tr>';
-    }
-    html += '</tbody></table></section>';
+    const group = rows.filter((x) => x.sc.page === page);
+    if (!group.length) continue;
+    const fails = group.filter((x) => x.status === 'failed' || x.status === 'flaky').length;
+    html += '<div class="group"><h2>' + esc(page) + '</h2><span>' + group.length + (fails ? ' · ' + fails + ' failing' : '') + '</span></div><ul class="list">';
+    for (const { sc, status } of group) html += row(sc, status);
+    html += '</ul>';
   }
   main.innerHTML = html;
-  for (const k of Object.keys(filters)) { const el = $('#f-' + k); if (el) el.onchange = () => { filters[k] = el.value; render(); }; }
 }
 
-function sel2(key, label, options, names = {}) {
-  return '<label>' + label + ' <select id="f-' + key + '"><option value="">all</option>' +
-    options.map((o) => '<option value="' + esc(o) + '"' + (filters[key] === o ? ' selected' : '') + '>' + esc(names[o] || o) + '</option>').join('') + '</select></label>';
+function row(sc, status) {
+  const cls = classificationOf(sc);
+  const chip = status === 'failed' || status === 'flaky'
+    ? (cls ? '<span class="chip ' + (isBug(cls) ? 'bug' : 'other') + '">' + esc(human(cls)) + '</span>' : '<span class="chip other">not analyzed</span>')
+    : '';
+  return '<li class="row"><button class="open" onclick="openModal(\'' + esc(sc.id) + '\')" aria-haspopup="dialog">' +
+    '<span class="dot ' + status + '" aria-label="' + status + '"></span><span class="id">' + esc(sc.id) + '</span>' +
+    '<span class="title">' + esc(sc.title) + chip + '</span></button>' +
+    '<span class="act">' + action(sc, status) + '</span></li>';
 }
 
-function detail(sc, outs) {
-  let left = '<div class="detail"><h4>Steps</h4><ol>' + sc.steps.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>' +
-    '<h4>Expected</h4><ul>' + sc.expectedResults.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>';
-  if (sc.preconditions?.length) left += '<h4>Preconditions</h4><ul>' + sc.preconditions.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>';
-  left += '</div>';
-  let right = '<div class="detail evidence">';
-  if (!outs.length) right += '<p class="note">This scenario was not part of the selected run.</p>';
-  for (const o of outs) {
-    const a = o.artifacts;
-    if (outs.length > 1) right += '<h4>' + esc(o.project) + '</h4>';
-    if (o.error) right += '<h4>Error</h4><pre class="error">' + esc(o.error.message) + '</pre>';
-    const f = failureFor(o.key);
-    if (f) {
-      right += '<h4>Analysis · ' + esc(f.classification.replace('_', ' ')) + ' (' + Math.round(f.confidence * 100) + '% confidence)</h4><p>' + esc(f.summary) + '</p>';
-      if (f.testProblem) right += '<p class="note">Test problem: ' + esc(f.testProblem) + '</p>';
-      const issue = issueFor(o.key);
-      if (issue) right += issueBlock(issue);
-    }
-    if (a.screenshots[0]) right += '<h4>Screenshot</h4><a href="' + file(a.screenshots[0]) + '" target="_blank"><img loading="lazy" src="' + file(a.screenshots[0]) + '" alt="Final screenshot of ' + esc(o.key) + '"></a>';
-    if (a.video) right += '<h4>Video</h4><video controls preload="metadata" src="' + file(a.video) + '"></video>';
-    right += '<div class="links">' +
-      (a.trace ? '<a href="' + file(a.trace) + '">Download trace</a>' : '') +
-      (a.logs ? '<a href="' + file(a.logs) + '" target="_blank">Console & network log</a>' : '') +
-      (a.errorContext ? '<a href="' + file(a.errorContext) + '" target="_blank">Page snapshot at failure</a>' : '') +
-      a.design.map((d) => '<a href="' + file(d) + '" target="_blank">' + esc(d.split('_').pop()) + '</a>').join('') + '</div>';
-  }
-  right += '</div>';
-  return '<div class="detail-grid">' + left + right + '</div>';
+function action(sc, status) {
+  if (status !== 'failed' && status !== 'flaky') return '';
+  const cu = clickupFor(sc);
+  if (!cu) return '';
+  if (cu.filed) return '<span class="logged">Logged<a href="' + esc(cu.filed.url || '#') + '" target="_blank" rel="noopener">' + esc(cu.filed.taskId) + '</a></span>';
+  const can = data.clickup.configured && data.clickup.tokenPresent;
+  const body = cu.issue ? { issueId: cu.issue.id } : { failureKey: cu.outcome.key };
+  const confirmed = !!cu.issue;
+  return '<button class="btn' + (confirmed ? '' : ' ghost') + '" ' + (can ? '' : 'disabled title="ClickUp token missing"') +
+    ' onclick="event.stopPropagation(); fileBug(this, ' + esc(JSON.stringify(body)) + ')">Log in ClickUp</button>';
 }
 
-function issueBlock(issue) {
-  const filed = filingFor(issue.id);
-  let html = '<div class="issue" id="issue-' + esc(issue.id) + '"><b>' + esc(issue.id) + ': ' + esc(issue.bug.title) + '</b>' +
-    '<span class="meta">' + esc(issue.bug.severity) + ' · ' + esc(issue.bug.category) + ' · tests ' + esc(issue.scenarioIds.join(', ')) + '</span>' +
-    '<div class="rc">Root cause: ' + esc(issue.bug.suspectedRootCause) + '</div><div style="margin-top:10px">';
-  if (filed && (filed.action === 'created' || filed.action === 'commented')) {
-    html += '<span class="filed">Logged in ClickUp</span> · <a href="' + esc(filed.url || '#') + '" target="_blank">open task ' + esc(filed.taskId) + '</a>';
-  } else {
-    const can = data.clickup.configured && data.clickup.tokenPresent;
-    html += '<button class="file" ' + (can ? '' : 'disabled') + ' onclick="event.stopPropagation(); fileIssue(\'' + esc(issue.id) + '\', this)">Log bug in ClickUp</button>';
-    if (!issue.fileable) html += '<div class="note">Not filed automatically: ' + esc(issue.notFiledReason) + '. You can still log it.</div>';
-    if (filed && filed.action === 'failed') html += '<div class="note">Last attempt failed: ' + esc(filed.reason) + '</div>';
-  }
-  return html + '</div></div>';
-}
-
-async function fileIssue(issueId, btn) {
+async function fileBug(btn, body) {
+  const label = btn.textContent;
   btn.disabled = true; btn.textContent = 'Logging…';
-  const res = await fetch('/api/file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: data.run.id, issueId }) });
-  const body = await res.json();
-  if (!res.ok) { btn.disabled = false; btn.textContent = 'Log bug in ClickUp'; alert('Could not log the bug: ' + (body.error || body.reason || res.status)); return; }
+  const res = await fetch('/api/file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: data.run.id, ...body }) });
+  const out = await res.json();
+  if (!res.ok) { btn.disabled = false; btn.textContent = label; alert('Could not log the bug: ' + (out.error || out.reason || res.status)); return; }
+  const open = $('#modal').open ? $('#modal').dataset.id : null;
   await load(data.run.id);
-  for (const sc of data.scenarios) if (data.run.issues.find((i) => i.id === issueId)?.scenarioIds.includes(sc.id)) toggle(sc.id, true);
+  if (open) openModal(open);
 }
 
-function toggle(id, open) {
-  const d = document.getElementById('detail-' + id);
-  if (d) d.hidden = open === undefined ? !d.hidden : !open;
+/* ---------- modal ---------- */
+function openModal(id) {
+  const sc = data.scenarios.find((x) => x.id === id);
+  if (!sc) return;
+  const status = statusOf(id);
+  const outs = outcomesFor(id);
+  const modal = $('#modal');
+  modal.dataset.id = id;
+  const cu = clickupFor(sc);
+  let left = '', right = '';
+  if (outs.length === 0) left += '<section><p class="lead">This scenario was not part of the selected run.</p></section>';
+  for (const o of outs) {
+    const f = failureFor(o.key), issue = issueFor(o.key);
+    if (outs.length > 1) left += '<h3>' + esc(o.project) + '</h3>';
+    if (o.status === 'passed') left += '<section><p class="lead">Passed' + (o.attempts > 1 ? ' after ' + o.attempts + ' attempts' : '') + '.</p></section>';
+    if (f || issue) {
+      left += '<section><h3>What happened</h3><p class="lead">' + esc(issue ? issue.bug.title : f.summary) + '</p>' +
+        (f ? '<p class="cause">' + esc(human(f.classification)) + ' · ' + Math.round(f.confidence * 100) + '% confidence' + (issue ? ' · ' + esc(issue.bug.severity) + ' severity' : '') + '</p>' : '') +
+        (issue ? '<p class="cause" style="margin-top:8px">Root cause: <code>' + esc(issue.bug.suspectedRootCause) + '</code></p>' : (f?.testProblem ? '<p class="cause" style="margin-top:8px">Test problem: ' + esc(f.testProblem) + '</p>' : '')) + '</section>';
+      if (issue) left += '<section><h3>Expected vs actual</h3><p style="margin:0 0 6px"><b>Expected</b> ' + esc(issue.bug.expectedResult) + '</p><p style="margin:0"><b>Actual</b> ' + esc(issue.bug.actualResult) + '</p></section>';
+    } else if (o.status !== 'passed') {
+      left += '<section><p class="lead">Failed; not analyzed yet (run <code>ai-qa triage</code>).</p></section>';
+    }
+    if (o.error) left += '<section><details><summary>Test error</summary><pre class="err">' + esc(o.error.message) + '</pre></details></section>';
+    const a = o.artifacts;
+    if (a.screenshots[0] || a.video) {
+      right += '<section><h3>Evidence' + (outs.length > 1 ? ' · ' + esc(o.project) : '') + '</h3>' +
+        (a.screenshots[0] ? '<a href="' + file(a.screenshots[0]) + '" target="_blank" rel="noopener"><img class="shot" loading="lazy" src="' + file(a.screenshots[0]) + '" alt="Final screenshot of ' + esc(o.key) + '"></a>' : '') +
+        (a.video ? '<video controls preload="metadata" src="' + file(a.video) + '"></video>' : '') +
+        '<div class="links">' + (a.trace ? '<a href="' + file(a.trace) + '">Trace</a>' : '') + (a.logs ? '<a href="' + file(a.logs) + '" target="_blank" rel="noopener">Console & network</a>' : '') +
+        (a.errorContext ? '<a href="' + file(a.errorContext) + '" target="_blank" rel="noopener">Page snapshot</a>' : '') +
+        a.design.map((d) => '<a href="' + file(d) + '" target="_blank" rel="noopener">' + esc(d.split('_design-').pop().replace('.png', '').replace(/-/g, ' ')) + '</a>').join('') + '</div></section>';
+    }
+  }
+  left += '<section><details><summary>Scenario steps and expected results</summary><ol class="steps">' + sc.steps.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ol>' +
+    '<h3 style="margin-top:12px">Expected</h3><ul class="exp">' + sc.expectedResults.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></details></section>';
+
+  let foot = '';
+  if (status === 'failed' || status === 'flaky') {
+    foot = action(sc, status);
+    if (cu && !cu.filed && !cu.issue) foot += '<span class="note">Not confirmed as a product bug by the analyzer — the task will be tagged needs-verification.</span>';
+  }
+  modal.innerHTML = '<div class="m-head"><div><span class="pill ' + status + '">' + (status === 'none' ? 'not run' : status) + '</span>' +
+    '<h2 id="m-title">' + esc(sc.title) + '</h2><div class="meta"><span class="id">' + esc(sc.id) + '</span> · ' + esc(sc.page) + ' · ' + esc(sc.category) + ' · ' + esc(sc.viewport) + ' · ' + esc(sc.priority) + ' priority</div></div>' +
+    '<button class="close" onclick="document.getElementById(\'modal\').close()" aria-label="Close">×</button></div>' +
+    '<div class="m-body"><div>' + left + '</div><div>' + right + '</div></div>' +
+    (foot ? '<div class="m-foot">' + foot + '</div>' : '');
+  if (!modal.open) modal.showModal();
 }
-function jump(id) {
-  filters = { page: '', category: '', status: '' }; render();
-  toggle(id, true);
-  document.getElementById('row-' + id)?.scrollIntoView({ block: 'center' });
-}
+$('#modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
+function setPage(p) { view.page = p; render(); }
+function setOnly(k) { view.only = k; render(); }
 load();
 </script>
 </body>

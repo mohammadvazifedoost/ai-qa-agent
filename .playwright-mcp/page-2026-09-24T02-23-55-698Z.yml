@@ -1,0 +1,275 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - paragraph [ref=e4]:
+        - text: demo-shop
+        - generic [ref=e5]: http://127.0.0.1:5173
+      - list [ref=e6]:
+        - listitem [ref=e432]:
+          - button "All pages 17 13" [ref=e433] [cursor=pointer]:
+            - generic [ref=e434]: All pages
+            - generic [ref=e435]:
+              - generic [ref=e436]: "17"
+              - generic [ref=e437]: "13"
+        - listitem [ref=e438]:
+          - button "/ 4 6" [ref=e439] [cursor=pointer]:
+            - generic [ref=e440]: /
+            - generic [ref=e441]:
+              - generic [ref=e442]: "4"
+              - generic [ref=e443]: "6"
+        - listitem [ref=e444]:
+          - button "/checkout 5 5" [ref=e445] [cursor=pointer]:
+            - generic [ref=e446]: /checkout
+            - generic [ref=e447]:
+              - generic [ref=e448]: "5"
+              - generic [ref=e449]: "5"
+        - listitem [ref=e450]:
+          - button "/contact" [ref=e451] [cursor=pointer]
+        - listitem [ref=e453]:
+          - button "/login 8 2" [ref=e454] [cursor=pointer]:
+            - generic [ref=e455]: /login
+            - generic [ref=e456]:
+              - generic [ref=e457]: "8"
+              - generic [ref=e458]: "2"
+      - generic [ref=e28]:
+        - generic [ref=e459]: ClickUp
+        - text: ready · list 901523571090
+    - main [ref=e30]:
+      - generic [ref=e31]:
+        - heading "Test results" [level=1] [ref=e32]
+        - generic [ref=e33]:
+          - text: Run
+          - combobox "Run" [ref=e34]:
+            - option "2026-09-24 02:05:06"
+            - option "2026-09-24 01:11:53"
+            - option "2026-09-24 01:10:51"
+            - option "2026-09-24 01:05:31"
+            - option "2026-09-24 00:57:53"
+            - option "2026-09-24 00:53:44"
+            - option "2026-09-24 00:42:27"
+            - option "2026-09-24 00:37:11" [selected]
+      - generic [ref=e35]:
+        - generic [ref=e460]:
+          - generic [ref=e461]:
+            - generic [ref=e462]: 17/30
+            - generic [ref=e463]: tests passed in this run
+            - generic [ref=e464]: 0distinct defects
+          - img "17 passed, 13 failed, 0 flaky" [ref=e465]
+          - generic [ref=e468]:
+            - generic [ref=e469]: 17 passed
+            - generic [ref=e471]: 13 failed
+            - generic [ref=e473]: 10 not in this run
+        - generic [ref=e475]:
+          - group "Show" [ref=e476]:
+            - button "All" [pressed] [ref=e477] [cursor=pointer]
+            - button "Failures" [ref=e478] [cursor=pointer]
+            - button "Passing" [ref=e479] [cursor=pointer]
+          - generic [ref=e480]:
+            - checkbox "show scenarios not in this run" [ref=e481]
+            - text: show scenarios not in this run
+          - generic [ref=e482]: 30 shown
+        - generic [ref=e483]:
+          - heading / [level=2] [ref=e484]
+          - generic [ref=e485]: 10 · 6 failing
+        - list [ref=e486]:
+          - listitem [ref=e487]:
+            - button "passed HOME-001 Home page shows hero and all three products with correct names, descriptions and prices" [ref=e488] [cursor=pointer]:
+              - generic "passed" [ref=e489]
+              - generic [ref=e490]: HOME-001
+              - generic [ref=e491]: Home page shows hero and all three products with correct names, descriptions and prices
+          - listitem [ref=e492]:
+            - button "passed HOME-002 Adding products updates the header cart badge with the total quantity" [ref=e493] [cursor=pointer]:
+              - generic "passed" [ref=e494]
+              - generic [ref=e495]: HOME-002
+              - generic [ref=e496]: Adding products updates the header cart badge with the total quantity
+          - listitem [ref=e497]:
+            - button "failed HOME-003 Cart badge accessible name uses correct singular grammar for one item not analyzed" [ref=e498] [cursor=pointer]:
+              - generic "failed" [ref=e499]
+              - generic [ref=e500]: HOME-003
+              - generic [ref=e501]:
+                - text: Cart badge accessible name uses correct singular grammar for one item
+                - generic [ref=e502]: not analyzed
+            - button "Log in ClickUp" [ref=e504] [cursor=pointer]
+          - listitem [ref=e505]:
+            - button "passed HOME-004 Products added on Home carry to Checkout via client-side navigation, in catalog order" [ref=e506] [cursor=pointer]:
+              - generic "passed" [ref=e507]
+              - generic [ref=e508]: HOME-004
+              - generic [ref=e509]: Products added on Home carry to Checkout via client-side navigation, in catalog order
+          - listitem [ref=e510]:
+            - button "failed HOME-005 'Shop all products' header link scrolls to the product list without losing the cart not analyzed" [ref=e511] [cursor=pointer]:
+              - generic "failed" [ref=e512]
+              - generic [ref=e513]: HOME-005
+              - generic [ref=e514]:
+                - text: "'Shop all products' header link scrolls to the product list without losing the cart"
+                - generic [ref=e515]: not analyzed
+            - button "Log in ClickUp" [ref=e517] [cursor=pointer]
+          - listitem [ref=e518]:
+            - button "failed HOME-006 Primary 'Add to cart' buttons match the Figma Button/Primary spec not analyzed" [ref=e519] [cursor=pointer]:
+              - generic "failed" [ref=e520]
+              - generic [ref=e521]: HOME-006
+              - generic [ref=e522]:
+                - text: Primary 'Add to cart' buttons match the Figma Button/Primary spec
+                - generic [ref=e523]: not analyzed
+            - button "Log in ClickUp" [ref=e525] [cursor=pointer]
+          - listitem [ref=e526]:
+            - button "failed HOME-007 Headings and product grid spacing match Figma typography and layout not analyzed" [ref=e527] [cursor=pointer]:
+              - generic "failed" [ref=e528]
+              - generic [ref=e529]: HOME-007
+              - generic [ref=e530]:
+                - text: Headings and product grid spacing match Figma typography and layout
+                - generic [ref=e531]: not analyzed
+            - generic [ref=e533]:
+              - text: Logged
+              - link "123ztrcx1n3" [ref=e534] [cursor=pointer]:
+                - /url: https://app.clickup.com/t/123ztrcx1n3
+          - listitem [ref=e535]:
+            - button "failed HOME-008 On a 390px mobile viewport the nav collapses behind a menu button that opens and closes correctly not analyzed" [ref=e536] [cursor=pointer]:
+              - generic "failed" [ref=e537]
+              - generic [ref=e538]: HOME-008
+              - generic [ref=e539]:
+                - text: On a 390px mobile viewport the nav collapses behind a menu button that opens and closes correctly
+                - generic [ref=e540]: not analyzed
+            - button "Log in ClickUp" [ref=e542] [cursor=pointer]
+          - listitem [ref=e543]:
+            - button "failed HOME-009 Mobile layout stacks hero and product cards in one column without horizontal scroll not analyzed" [ref=e544] [cursor=pointer]:
+              - generic "failed" [ref=e545]
+              - generic [ref=e546]: HOME-009
+              - generic [ref=e547]:
+                - text: Mobile layout stacks hero and product cards in one column without horizontal scroll
+                - generic [ref=e548]: not analyzed
+            - button "Log in ClickUp" [ref=e550] [cursor=pointer]
+          - listitem [ref=e551]:
+            - button "passed HOME-010 Tablet viewport (834px) shows a usable header and product grid without overflow" [ref=e552] [cursor=pointer]:
+              - generic "passed" [ref=e553]
+              - generic [ref=e554]: HOME-010
+              - generic [ref=e555]: Tablet viewport (834px) shows a usable header and product grid without overflow
+        - generic [ref=e556]:
+          - heading "/checkout" [level=2] [ref=e557]
+          - generic [ref=e558]: 10 · 5 failing
+        - list [ref=e559]:
+          - listitem [ref=e560]:
+            - button "passed CHECKOUT-001 Checkout lists cart lines with correct line prices, subtotal and total" [ref=e561] [cursor=pointer]:
+              - generic "passed" [ref=e562]
+              - generic [ref=e563]: CHECKOUT-001
+              - generic [ref=e564]: Checkout lists cart lines with correct line prices, subtotal and total
+          - listitem [ref=e565]:
+            - button "failed CHECKOUT-002 Valid coupon SAVE10 is applied and the discount is subtracted from the Total not analyzed" [ref=e566] [cursor=pointer]:
+              - generic "failed" [ref=e567]
+              - generic [ref=e568]: CHECKOUT-002
+              - generic [ref=e569]:
+                - text: Valid coupon SAVE10 is applied and the discount is subtracted from the Total
+                - generic [ref=e570]: not analyzed
+            - button "Log in ClickUp" [ref=e572] [cursor=pointer]
+          - listitem [ref=e573]:
+            - button "failed CHECKOUT-003 WELCOME20 on a mixed cart and rounding on a single item give correct discount and Total not analyzed" [ref=e574] [cursor=pointer]:
+              - generic "failed" [ref=e575]
+              - generic [ref=e576]: CHECKOUT-003
+              - generic [ref=e577]:
+                - text: WELCOME20 on a mixed cart and rounding on a single item give correct discount and Total
+                - generic [ref=e578]: not analyzed
+            - button "Log in ClickUp" [ref=e580] [cursor=pointer]
+          - listitem [ref=e581]:
+            - 'button "passed CHECKOUT-004 Coupon validation errors: empty, whitespace-only and unknown codes" [ref=e582] [cursor=pointer]':
+              - generic "passed" [ref=e583]
+              - generic [ref=e584]: CHECKOUT-004
+              - generic [ref=e585]: "Coupon validation errors: empty, whitespace-only and unknown codes"
+          - listitem [ref=e586]:
+            - button "passed CHECKOUT-005 Apply button shows a loading state while the coupon is validated" [ref=e587] [cursor=pointer]:
+              - generic "passed" [ref=e588]
+              - generic [ref=e589]: CHECKOUT-005
+              - generic [ref=e590]: Apply button shows a loading state while the coupon is validated
+          - listitem [ref=e591]:
+            - button "passed CHECKOUT-006 Removing lines updates totals and leads to the empty state with a way back" [ref=e592] [cursor=pointer]:
+              - generic "passed" [ref=e593]
+              - generic [ref=e594]: CHECKOUT-006
+              - generic [ref=e595]: Removing lines updates totals and leads to the empty state with a way back
+          - listitem [ref=e596]:
+            - button "passed CHECKOUT-007 Direct load of /checkout shows the empty cart state" [ref=e597] [cursor=pointer]:
+              - generic "passed" [ref=e598]
+              - generic [ref=e599]: CHECKOUT-007
+              - generic [ref=e600]: Direct load of /checkout shows the empty cart state
+          - listitem [ref=e601]:
+            - button "failed CHECKOUT-008 'Place order' gives user feedback and completes the order not analyzed" [ref=e602] [cursor=pointer]:
+              - generic "failed" [ref=e603]
+              - generic [ref=e604]: CHECKOUT-008
+              - generic [ref=e605]:
+                - text: "'Place order' gives user feedback and completes the order"
+                - generic [ref=e606]: not analyzed
+            - button "Log in ClickUp" [ref=e608] [cursor=pointer]
+          - listitem [ref=e609]:
+            - button "failed CHECKOUT-009 Checkout heading, coupon controls and Place order button match Figma tokens not analyzed" [ref=e610] [cursor=pointer]:
+              - generic "failed" [ref=e611]
+              - generic [ref=e612]: CHECKOUT-009
+              - generic [ref=e613]:
+                - text: Checkout heading, coupon controls and Place order button match Figma tokens
+                - generic [ref=e614]: not analyzed
+            - button "Log in ClickUp" [ref=e616] [cursor=pointer]
+          - listitem [ref=e617]:
+            - button "failed CHECKOUT-010 Checkout fits a 390px mobile viewport without horizontal overflow not analyzed" [ref=e618] [cursor=pointer]:
+              - generic "failed" [ref=e619]
+              - generic [ref=e620]: CHECKOUT-010
+              - generic [ref=e621]:
+                - text: Checkout fits a 390px mobile viewport without horizontal overflow
+                - generic [ref=e622]: not analyzed
+            - button "Log in ClickUp" [ref=e624] [cursor=pointer]
+        - generic [ref=e625]:
+          - heading "/login" [level=2] [ref=e626]
+          - generic [ref=e627]: 10 · 2 failing
+        - list [ref=e628]:
+          - listitem [ref=e629]:
+            - button "passed LOGIN-001 Valid credentials sign the user in and show the welcome heading" [ref=e630] [cursor=pointer]:
+              - generic "passed" [ref=e631]
+              - generic [ref=e632]: LOGIN-001
+              - generic [ref=e633]: Valid credentials sign the user in and show the welcome heading
+          - listitem [ref=e634]:
+            - button "passed LOGIN-002 Submitting the empty form shows both field errors at once" [ref=e635] [cursor=pointer]:
+              - generic "passed" [ref=e636]
+              - generic [ref=e637]: LOGIN-002
+              - generic [ref=e638]: Submitting the empty form shows both field errors at once
+          - listitem [ref=e639]:
+            - button "passed LOGIN-003 Wrong credentials show a form-level alert, keep the form usable, and replace field errors" [ref=e640] [cursor=pointer]:
+              - generic "passed" [ref=e641]
+              - generic [ref=e642]: LOGIN-003
+              - generic [ref=e643]: Wrong credentials show a form-level alert, keep the form usable, and replace field errors
+          - listitem [ref=e644]:
+            - button "passed LOGIN-004 Malformed email addresses are rejected with the email error only" [ref=e645] [cursor=pointer]:
+              - generic "passed" [ref=e646]
+              - generic [ref=e647]: LOGIN-004
+              - generic [ref=e648]: Malformed email addresses are rejected with the email error only
+          - listitem [ref=e649]:
+            - button "passed LOGIN-005 Password shorter than 8 characters is rejected; exactly 8 characters is accepted for validation" [ref=e650] [cursor=pointer]:
+              - generic "passed" [ref=e651]
+              - generic [ref=e652]: LOGIN-005
+              - generic [ref=e653]: Password shorter than 8 characters is rejected; exactly 8 characters is accepted for validation
+          - listitem [ref=e654]:
+            - button "passed LOGIN-006 Submit button shows loading state while signing in" [ref=e655] [cursor=pointer]:
+              - generic "passed" [ref=e656]
+              - generic [ref=e657]: LOGIN-006
+              - generic [ref=e658]: Submit button shows loading state while signing in
+          - listitem [ref=e659]:
+            - button "passed LOGIN-007 Email is case-insensitive but password is case-sensitive" [ref=e660] [cursor=pointer]:
+              - generic "passed" [ref=e661]
+              - generic [ref=e662]: LOGIN-007
+              - generic [ref=e663]: Email is case-insensitive but password is case-sensitive
+          - listitem [ref=e664]:
+            - button "passed LOGIN-008 Header link opens the sign-in page and the form resets after navigating away" [ref=e665] [cursor=pointer]:
+              - generic "passed" [ref=e666]
+              - generic [ref=e667]: LOGIN-008
+              - generic [ref=e668]: Header link opens the sign-in page and the form resets after navigating away
+          - listitem [ref=e669]:
+            - button "failed LOGIN-009 Login form matches the Figma design tokens on desktop not analyzed" [ref=e670] [cursor=pointer]:
+              - generic "failed" [ref=e671]
+              - generic [ref=e672]: LOGIN-009
+              - generic [ref=e673]:
+                - text: Login form matches the Figma design tokens on desktop
+                - generic [ref=e674]: not analyzed
+            - button "Log in ClickUp" [ref=e676] [cursor=pointer]
+          - listitem [ref=e677]:
+            - button "failed LOGIN-010 Login page fits a 390px mobile viewport and header nav collapses not analyzed" [ref=e678] [cursor=pointer]:
+              - generic "failed" [ref=e679]
+              - generic [ref=e680]: LOGIN-010
+              - generic [ref=e681]:
+                - text: Login page fits a 390px mobile viewport and header nav collapses
+                - generic [ref=e682]: not analyzed
+            - button "Log in ClickUp" [ref=e684] [cursor=pointer]
+  - text: ▸ ▸
