@@ -61,6 +61,7 @@ export async function runTests(
   runId: string,
   filter: TestFilter = {},
   dir: string = runDirFor(ctx.paths, runId),
+  signal?: AbortSignal,
 ): Promise<TestRunResult> {
   ensureDir(dir);
   const specs = fs.existsSync(ctx.paths.testsDir)
@@ -86,6 +87,7 @@ export async function runTests(
         AI_QA_JSON_REPORT: jsonReport,
       }),
       onStdoutLine: (l) => log.debug(stripAnsi(l)),
+      signal,
     });
     fs.writeFileSync(
       path.join(dir, 'logs', 'playwright-stdout.log'),

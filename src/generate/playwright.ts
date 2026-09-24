@@ -53,6 +53,10 @@ await qa.compareWithDesign(screenName, locator?)
 
 await qa.expectNoHorizontalOverflow()
   Fails if the document scrolls horizontally and reports which elements stick out.
+
+await qa.expectAccessible({ include?: Locator, disableRules?: string[], label?: string })
+  Runs axe-core against WCAG 2.1 A/AA on the page (or only \`include\`). Fails on serious or critical
+  violations and attaches every violation to the report. Reach the state to check before calling it.
 `;
 
 export function specPath(ctx: QaContext, route: string): string {
@@ -82,6 +86,7 @@ export function testRules(ctx: QaContext): string {
 - Use test.step() for each scenario step so the report shows progress. Keep helpers local to the file.
 - Visual scenarios: use qa.expectDesignTokens with the scenario's design.tokens, and qa.compareWithDesign only when design.screen is set and has a reference image. Call qa.compareWithDesign FIRST (right after reaching the designed state), then token checks; use expect.soft for any extra custom visual assertions so every design check runs and is reported.
 - Responsive scenarios: use qa.expectNoHorizontalOverflow() where overflow matters, and assert visibility of responsive elements.
+- Accessibility scenarios: reach the state each step describes (e.g. submit an empty form, open the menu), then call await qa.expectAccessible() for it; scope with { include: locator } when the scenario is about one region. Add plain assertions for anything the expected results name that axe does not check.
 - Never modify application code. You may use the browser tools to open the running app and confirm accessible names before writing locators.`;
 }
 

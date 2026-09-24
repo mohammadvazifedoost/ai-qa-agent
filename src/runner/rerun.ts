@@ -18,6 +18,7 @@ export type Runner = (
   runId: string,
   filter: TestFilter,
   dir?: string,
+  signal?: AbortSignal,
 ) => Promise<TestRunResult>;
 
 const statsOf = (outcomes: readonly TestOutcome[]): TestRunResult['stats'] => ({
@@ -61,7 +62,7 @@ export interface ScenarioRun {
 export async function runScenarioTests(
   ctx: QaContext,
   rawIds: readonly string[],
-  opts: { runId?: string; runner?: Runner } = {},
+  opts: { runId?: string; runner?: Runner; signal?: AbortSignal } = {},
 ): Promise<ScenarioRun> {
   const ids = [...new Set(rawIds.map(normalizeId))];
   if (ids.length === 0) throw new Error('No scenario to run.');
@@ -92,7 +93,7 @@ export async function runScenarioTests(
   if (!target) {
     const record = ctx.state.startRun({ command: 'test', grep: ids.join(' ') });
     try {
-      const res = await runner(ctx, record.id, filter);
+      const res = await runner(ctx, record.id, filter, undefined, opts.signal);
       ctx.state.finishRun(record, 'completed');
       return { runId: record.id, merged: false, ...ranOf(res) };
     } catch (err) {
@@ -108,6 +109,7 @@ export async function runScenarioTests(
     target.runId,
     filter,
     path.join(runDir(ctx.paths, target.runId), 'reruns', name),
+    opts.signal,
   );
   const { outcomes, missing } = ranOf(res);
   const ran = [...new Set(outcomes.map((o) => o.scenarioId!))];
@@ -129,7 +131,7 @@ export async function runScenarioTests(
 export function runScenarioTest(
   ctx: QaContext,
   id: string,
-  opts: { runId?: string; runner?: Runner } = {},
+  opts: { runId?: string; runner?: Runner; signal?: AbortSignal } = {},
 ): Promise<ScenarioRun> {
   return runScenarioTests(ctx, [id], opts);
 }

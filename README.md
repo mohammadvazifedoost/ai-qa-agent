@@ -4,7 +4,7 @@ An AI-powered QA agent for web projects, published as the npm package `@company/
 command `ai-qa-agent`. Install it into any web application and it will:
 
 1. read your **Figma** design and your **source code**,
-2. write prioritized **test scenarios** (functional, visual, responsive),
+2. write prioritized **test scenarios** (functional, visual, responsive, accessibility),
 3. turn approved scenarios into maintainable **Playwright tests**,
 4. run them with **video, screenshots, traces, console and network logs**,
 5. **triage every failure** (product bug? test bug? environment? design mismatch?),
@@ -138,7 +138,7 @@ Scoping and flags:
 ai-qa-agent run --changed                # only new/changed pages (a new feature) — see `ai-qa-agent changes`
 ai-qa-agent run --changed --design       # also re-extract the design when Figma frames changed
 ai-qa-agent run --page checkout          # one page (route or name)
-ai-qa-agent run --category visual        # functional | visual | responsive
+ai-qa-agent run --category visual        # functional | visual | responsive | accessibility
 ai-qa-agent run --feature auth           # by feature tag
 ai-qa-agent run --resume                 # continue an interrupted run
 ai-qa-agent run --refresh                # ignore caches; re-read code and Figma
@@ -216,9 +216,13 @@ scenario* in a scenario's modal opens the same form for an existing scenario.
   An earlier AI analysis of that test is no longer shown, since it described an older failure.
   With no run yet, a new run is started. `ai-qa-agent test` still runs everything.
 - The toolbar has *Run not-run tests (N)* (every test without a result in the selected run, added
-  to that run), *Run all tests* (a new run with every test, like `ai-qa-agent test`; the dashboard
-  switches to it when done) and *Refresh* (reloads results and re-checks the bug trackers). Runs
-  continue in the background; reloading the page keeps showing their progress.
+  to that run), *Run failed tests (N)* (only the failed and flaky tests of the selected run, run
+  again and updated in it), *Run all tests* (a new run with every test, like `ai-qa-agent test`;
+  the dashboard switches to it when done) and *Refresh* (reloads results and re-checks the bug
+  trackers). Runs and fix plans continue in the background; reloading the page keeps showing their
+  progress. *Cancel* in the progress banner stops Playwright or the AI at once (the whole process
+  tree) and changes nothing: no results are merged, no plan is written, and a cancelled *Run all
+  tests* is recorded as failed with "Cancelled".
 - The sidebar shows Jira (always) and ClickUp (when configured): *Connected* (verified against
   the tracker with your token, with the project or list), *Credentials missing* (which variables to
   set), *Cannot connect* (the error), or *Not configured*; the one bugs are filed in is marked.
@@ -398,12 +402,31 @@ pipeline writes — no database, no external service.
   link, otherwise — never created, or deleted there — the button. A click creates it from the bug
   report (consolidated for confirmed defects; for failures the analyzer did not confirm it is built
   from the scenario and the error and labelled `needs-verification`). Filters: All / Failures /
-  Passing, type (functional, visual, responsive), search, and page.
+  Passing, type (functional, visual, responsive, accessibility), search, and page.
 - *Delete scenario* in the modal footer removes a scenario and its test after an inline
   confirmation (optional reason); see [Removing scenarios](#removing-scenarios).
 - The tracker credentials must be in the environment of the shell that started the UI
   (`CLICKUP_API_TOKEN=... npx ai-qa-agent ui`, or `JIRA_API_TOKEN` + `JIRA_EMAIL`). Filing results
   are written back to the run so the report and the dashboard stay consistent.
+
+### Accessibility checks
+
+Scenarios of type `accessibility` check WCAG 2.1 A/AA with [axe-core](https://github.com/dequelabs/axe-core)
+in the states that matter (page loaded, a form showing its errors, an open dialog or menu). The
+generated tests reach the state and call `qa.expectAccessible()`:
+
+```ts
+await qa.expectAccessible();                                   // the whole page
+await qa.expectAccessible({ include: page.getByRole('dialog') }); // one region
+await qa.expectAccessible({ disableRules: ['color-contrast'] });  // skip rules by id
+```
+
+- **Serious** and **critical** violations fail the test; minor and moderate ones do not. Every
+  violation (rule, impact, help text, elements) is attached to the result as `qa-a11y.json`.
+- The AI adds plain assertions for what axe does not check, e.g. that validation errors are
+  linked to their fields with `aria-describedby`.
+- Pages with a strict Content-Security-Policy that blocks inline scripts need Playwright's
+  `bypassCSP` for axe to be injected.
 
 ## Playwright setup
 

@@ -170,6 +170,7 @@ export class CodexRunner implements AiEngine {
       const proc = await this.exec(command, args, {
         cwd: task.cwd,
         input: message,
+        signal: task.signal,
         onStdoutLine: (l) => {
           const line = l.replace(/\r$/, '');
           if (!line.trim()) return;

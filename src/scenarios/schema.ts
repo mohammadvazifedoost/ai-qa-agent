@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CATEGORIES = ['functional', 'visual', 'responsive'] as const;
+export const CATEGORIES = ['functional', 'visual', 'responsive', 'accessibility'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 export const ScenarioSchema = z.object({

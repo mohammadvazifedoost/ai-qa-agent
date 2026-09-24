@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   fileIssues,
   FilingUnavailable,
@@ -26,6 +27,7 @@ import { TestRunResultSchema, type TestRunResult } from '../runner/results.js';
 import { scenarioTestStates, writeScenarioTest, type ScenarioTestState } from '../generate/scenario-test.js';
 import { loadAppModel } from '../analyze/app.js';
 import { runScenarioTest, runScenarioTests } from '../runner/rerun.js';
+import { Cancelled } from '../core/process.js';
 import { runTests } from '../runner/run.js';
 import { listTestIds } from '../scenarios/spec-edit.js';
 import { specPath } from '../generate/playwright.js';
@@ -35,7 +37,6 @@ import { removeScenarios } from '../scenarios/manage.js';
 import { CATEGORIES } from '../scenarios/schema.js';
 import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
 import { planFile, planStatus, writeBugFixPlan } from '../plan/plan.js';
-import { PAGE_HTML } from './page.js';
 
 const log = logger('ui');
 
@@ -285,8 +286,8 @@ export function adhocIssue(
   // The analysis of a test that was run again since describes an earlier failure.
   const failure = outcome.rerunAt ? undefined : triage?.failures.find((f) => f.key === key);
   const scenario = loadAllScenarios(ctx).find((s) => s.id === outcome.scenarioId);
-  const category =
-    scenario?.category === 'visual' || scenario?.category === 'responsive' ? scenario.category : 'functional';
+  // Scenario categories map onto bug categories one to one, except that there is no "content" scenario.
+  const category = scenario?.category ?? 'functional';
   const bug: BugDraft = failure?.bug ?? {
     title: scenario?.title ?? outcome.title,
     severity: 'medium',
@@ -351,9 +352,9 @@ let writing: Promise<unknown> = Promise.resolve();
 
 /** A long test run started from the dashboard; the page polls GET /api/job until it is done. */
 export interface Job {
-  kind: 'run-all' | 'run-not-run' | 'plan';
+  kind: 'run-all' | 'run-not-run' | 'run-failed' | 'plan';
   label: string;
-  status: 'running' | 'done' | 'failed';
+  status: 'running' | 'done' | 'failed' | 'cancelled';
   startedAt: string;
   finishedAt?: string;
   /** The run the results are in (known once it started). */
@@ -364,25 +365,48 @@ export interface Job {
 }
 
 let job: Job | null = null;
+/** Aborts the running job's processes (Playwright, the AI CLI); see POST /api/job/cancel. */
+let jobAbort: AbortController | null = null;
 
 /** Start a job unless one is running; it runs in the write queue so it never overlaps other edits. */
 function startJob(
   kind: Job['kind'],
   label: string,
-  work: (setRun: (runId: string) => void) => Promise<string>,
+  work: (setRun: (runId: string) => void, signal: AbortSignal) => Promise<string>,
 ): { status: number; payload: unknown } {
   if (job?.status === 'running')
     return { status: 409, payload: { error: `${job.label} is still running.`, job } };
   const current: Job = { kind, label, status: 'running', startedAt: new Date().toISOString() };
+  const abort = new AbortController();
   job = current;
-  serially(() => work((runId) => (current.runId = runId)))
+  jobAbort = abort;
+  serially(() => {
+    // Cancelled while waiting in the queue: do not start at all.
+    if (abort.signal.aborted) throw new Cancelled();
+    return work((runId) => (current.runId = runId), abort.signal);
+  })
     .then((message) => Object.assign(current, { status: 'done', message }))
     .catch((err: unknown) => {
+      if (err instanceof Cancelled) {
+        log.info(`${label}: cancelled`);
+        Object.assign(current, { status: 'cancelled', message: 'Cancelled. Nothing was changed.' });
+        return;
+      }
       log.error(`${label}: ${(err as Error).message}`);
       Object.assign(current, { status: 'failed', message: (err as Error).message });
     })
-    .finally(() => (current.finishedAt = new Date().toISOString()));
+    .finally(() => {
+      current.finishedAt = new Date().toISOString();
+      if (jobAbort === abort) jobAbort = null;
+    });
   return { status: 202, payload: current };
+}
+
+function handleCancelJob(): { status: number; payload: unknown } {
+  if (job?.status !== 'running' || !jobAbort)
+    return { status: 409, payload: { error: 'No job is running.' } };
+  jobAbort.abort();
+  return { status: 202, payload: job };
 }
 
 const summary = (stats: TestRunResult['stats']): string =>
@@ -390,11 +414,11 @@ const summary = (stats: TestRunResult['stats']): string =>
 
 /** A new run with every test, like `ai-qa-agent test`. */
 function handleRunAll(ctx: QaContext): { status: number; payload: unknown } {
-  return startJob('run-all', 'Running all tests', async (setRun) => {
+  return startJob('run-all', 'Running all tests', async (setRun, signal) => {
     const record = ctx.state.startRun({ command: 'test' });
     setRun(record.id);
     try {
-      const res = await runTests(ctx, record.id);
+      const res = await runTests(ctx, record.id, {}, undefined, signal);
       ctx.state.finishRun(record, 'completed');
       return `All tests ran: ${summary(res.stats)}.`;
     } catch (err) {
@@ -409,16 +433,71 @@ function notRunIds(ctx: QaContext, runId: string | undefined): string[] {
   const ran = new Set(
     (runId ? (loadRun(ctx, runId)?.outcomes ?? []) : []).map((o) => o.scenarioId).filter(Boolean),
   );
+  return withTests(ctx, (s) => !ran.has(s.id));
+}
+
+/** Approved scenarios whose test failed or was flaky in the run, and that still have a test. */
+function failedIds(ctx: QaContext, runId: string): string[] {
+  const failed = new Set(
+    (loadRun(ctx, runId)?.outcomes ?? [])
+      .filter((o) => o.status === 'failed' || o.status === 'flaky')
+      .map((o) => o.scenarioId)
+      .filter(Boolean),
+  );
+  return withTests(ctx, (s) => failed.has(s.id));
+}
+
+/** Ids of approved scenarios matching `pick` whose page spec has a test for them. */
+function withTests(ctx: QaContext, pick: (s: { id: string; page: string }) => boolean): string[] {
   const tests = new Map<string, string[]>();
   return loadAllScenarios(ctx)
     .filter((s) => {
-      if (!s.approved || ran.has(s.id)) return false;
+      if (!s.approved || !pick(s)) return false;
       const spec = specPath(ctx, s.page);
       if (!tests.has(spec))
         tests.set(spec, fs.existsSync(spec) ? listTestIds(fs.readFileSync(spec, 'utf8')) : []);
       return tests.get(spec)!.includes(s.id);
     })
     .map((s) => s.id);
+}
+
+/** Run these tests again as a job and merge their results into the run (or a new one). */
+function rerunJob(
+  ctx: QaContext,
+  kind: 'run-not-run' | 'run-failed',
+  label: string,
+  ids: string[],
+  runId: string | undefined,
+): { status: number; payload: unknown } {
+  return startJob(kind, label, async (setRun, signal) => {
+    if (runId) setRun(runId);
+    const res = await runScenarioTests(ctx, ids, { runId, signal });
+    setRun(res.runId);
+    const stats = {
+      passed: res.outcomes.filter((o) => o.status === 'passed').length,
+      failed: res.outcomes.filter((o) => o.status === 'failed').length,
+      flaky: res.outcomes.filter((o) => o.status === 'flaky').length,
+      skipped: 0,
+    };
+    return (
+      `Ran ${ids.length - res.missing.length} of ${ids.length} tests: ${summary(stats)}.` +
+      (res.missing.length ? ` No result for ${res.missing.join(', ')}.` : '')
+    );
+  });
+}
+
+function handleRunFailed(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { runId } = JSON.parse(body || '{}') as { runId?: unknown };
+  if (typeof runId !== 'string' || !runId) return { status: 400, payload: { error: 'runId is required' } };
+  const ids = failedIds(ctx, runId);
+  if (ids.length === 0) return { status: 400, payload: { error: 'No failed tests to run in this run.' } };
+  return rerunJob(
+    ctx,
+    'run-failed',
+    `Running ${ids.length} failed test${ids.length === 1 ? '' : 's'}`,
+    ids,
+    runId,
+  );
 }
 
 /** Write the bug-fix plan of a run into the project (same rules as `ai-qa-agent plan`). */
@@ -434,9 +513,9 @@ function handlePlan(ctx: QaContext, body: string): { status: number; payload: un
   return startJob(
     'plan',
     `Writing the fix plan for ${status.failures} failed test${status.failures === 1 ? '' : 's'}`,
-    async (setRun) => {
+    async (setRun, signal) => {
       setRun(runId);
-      const res = await writeBugFixPlan(ctx, { runId, force: true });
+      const res = await writeBugFixPlan(ctx, { runId, force: true, signal });
       if (job) job.file = res.file ?? undefined;
       return `Wrote ${res.file} with ${res.bugs} bug${res.bugs === 1 ? '' : 's'}.`;
     },
@@ -464,24 +543,12 @@ function handleRunNotRun(ctx: QaContext, body: string): { status: number; payloa
   const ids = notRunIds(ctx, runId);
   if (ids.length === 0)
     return { status: 400, payload: { error: 'Every test already has a result in this run.' } };
-  return startJob(
+  return rerunJob(
+    ctx,
     'run-not-run',
     `Running ${ids.length} not-run test${ids.length === 1 ? '' : 's'}`,
-    async (setRun) => {
-      if (runId) setRun(runId);
-      const res = await runScenarioTests(ctx, ids, { runId });
-      setRun(res.runId);
-      const stats = {
-        passed: res.outcomes.filter((o) => o.status === 'passed').length,
-        failed: res.outcomes.filter((o) => o.status === 'failed').length,
-        flaky: res.outcomes.filter((o) => o.status === 'flaky').length,
-        skipped: 0,
-      };
-      return (
-        `Ran ${ids.length - res.missing.length} of ${ids.length} tests: ${summary(stats)}.` +
-        (res.missing.length ? ` No result for ${res.missing.join(', ')}.` : '')
-      );
-    },
+    ids,
+    runId,
   );
 }
 
@@ -581,13 +648,38 @@ async function handleRunTest(ctx: QaContext, body: string): Promise<{ status: nu
   }
 }
 
+/**
+ * The dashboard's own files, compiled into dist/ui at package build time: the page (`/`) and its
+ * ES modules (`/client/*.js`). Nothing else under dist is reachable.
+ */
+function serveAsset(urlPath: string, res: http.ServerResponse): void {
+  const uiDir = fileURLToPath(new URL('.', import.meta.url));
+  const clientDir = path.join(uiDir, 'client');
+  const file =
+    urlPath === '/'
+      ? path.join(uiDir, 'index.html')
+      : path.resolve(clientDir, decodeURIComponent(urlPath.slice('/client/'.length)));
+  const allowed = urlPath === '/' || (file.startsWith(clientDir + path.sep) && file.endsWith('.js'));
+  if (!allowed || !fs.existsSync(file)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(
+      urlPath === '/' ? 'Dashboard not built: run `npm run build` in @company/ai-qa-agent' : 'Not found',
+    );
+    return;
+  }
+  res.writeHead(200, {
+    'Content-Type': urlPath === '/' ? 'text/html; charset=utf-8' : 'text/javascript; charset=utf-8',
+    'Cache-Control': 'no-cache',
+  });
+  fs.createReadStream(file).pipe(res);
+}
+
 export function startUi(ctx: QaContext, opts: { port: number; host?: string }): Promise<http.Server> {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     try {
-      if (req.method === 'GET' && url.pathname === '/') {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(PAGE_HTML);
+      if (req.method === 'GET' && (url.pathname === '/' || url.pathname.startsWith('/client/'))) {
+        serveAsset(url.pathname, res);
       } else if (req.method === 'GET' && url.pathname === '/api/overview') {
         json(res, 200, await buildOverview(ctx, url.searchParams.get('run') ?? undefined));
       } else if (req.method === 'GET' && url.pathname === '/api/tasks') {
@@ -618,6 +710,12 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'GET' && url.pathname === '/api/plan') {
         const { status, payload } = readPlan(ctx, url.searchParams.get('run') ?? '');
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/job/cancel') {
+        const { status, payload } = handleCancelJob();
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/runs/failed') {
+        const { status, payload } = handleRunFailed(ctx, await readBody(req));
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/runs/all') {
         const { status, payload } = handleRunAll(ctx);

@@ -228,10 +228,11 @@ ${JSON.stringify(ctx.config.viewports)}
 
 ${aiExisting.length ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(aiExisting, null, 2)}\n` : ''}${personSection(person)}${removedSection(existing?.removed ?? [])}
 ## Instructions
-- Produce at most ${max} high-value scenarios for this page across categories: functional, visual, responsive. Quality over quantity: no trivial duplicates.
+- Produce at most ${max} high-value scenarios for this page across categories: functional, visual, responsive, accessibility. Quality over quantity: no trivial duplicates.
 - functional: happy paths, validation, empty/error/loading states, navigation, and business rules (calculations!).
 - visual: compare against Figma. Use design.tokens with EXACT values from the Figma data above (e.g. a primary button's backgroundColor/borderRadius/height). Only reference a Figma screen in design.screen if it has hasReferenceImage=true. If no Figma data exists, do not create visual scenarios.
 - responsive: behaviour at tablet/mobile viewports (navigation collapse, no horizontal overflow, stacking), based on the design's mobile screens when available and general usability expectations.
+- accessibility: one or two per page, checking WCAG 2.1 A/AA with an automated audit in the states that matter (the page loaded, a form showing its validation errors, an open dialog or menu). Steps reach the state; expected results name what must be accessible (labels, alt text, contrast, headings, keyboard-reachable controls).
 - EXPECTED RESULTS MUST DESCRIBE CORRECT, INTENDED BEHAVIOUR — derived from the design, the UI copy and standard product conventions — NOT whatever the code happens to do. The page model flags suspicious logic; if code looks wrong (e.g. a discount shown but not subtracted from the total), the expected result must state the correct behaviour so the test can catch the bug.
 - Steps must be concrete and use visible text / accessible names from the page model, and include the preconditions needed (e.g. add products on / first, since the cart is in-memory).
 - ids: "${prefix}-001", "${prefix}-002", ... (reuse existing ids when updating).

@@ -5,6 +5,7 @@
  * helpers decide *whether it passed*, so a visual verdict never rests on an LLM saying "looks right".
  */
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { test as base, expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { PNG } from 'pngjs';
@@ -20,6 +21,7 @@ export const ANNOTATION = {
   visual: 'qa-visual',
   tokens: 'qa-design-tokens',
   overflow: 'qa-overflow',
+  a11y: 'qa-a11y',
 } as const;
 
 interface VisualSettings {
@@ -84,6 +86,84 @@ export function diffImages(
   const nonOverlap = totalArea - width * height;
   const diffPixels = overlapDiff + nonOverlap;
   return { diff, diffPixels, diffRatio: totalArea === 0 ? 0 : diffPixels / totalArea };
+}
+
+/** One axe-core rule violation, reduced to what a report needs. */
+export interface A11yViolation {
+  id: string;
+  /** axe impact: minor, moderate, serious, critical (null when axe gives none). */
+  impact: string | null;
+  help: string;
+  helpUrl: string;
+  /** CSS selectors of the offending elements (at most 10). */
+  targets: string[];
+}
+
+/** WCAG 2.0 and 2.1, levels A and AA. */
+const A11Y_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+const BLOCKING_IMPACTS = new Set(['serious', 'critical']);
+
+let axeSource: string | undefined;
+function loadAxe(): string {
+  axeSource ??= fs.readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
+  return axeSource;
+}
+
+/**
+ * Run axe-core in the page against WCAG 2.1 A/AA and return every violation. `include` limits the
+ * check to one element; `disableRules` skips rules by id.
+ */
+export async function runAxe(
+  page: Page,
+  opts: { include?: Locator; disableRules?: string[] } = {},
+): Promise<A11yViolation[]> {
+  const loaded = await page.evaluate(
+    () => typeof (window as unknown as { axe?: unknown }).axe !== 'undefined',
+  );
+  if (!loaded) await page.addScriptTag({ content: loadAxe() });
+  const el = opts.include ? await opts.include.elementHandle() : null;
+  return page.evaluate(
+    async ({ el, tags, disable }) => {
+      type AxeResult = {
+        violations: Array<{
+          id: string;
+          impact?: string | null;
+          help: string;
+          helpUrl: string;
+          nodes: Array<{ target: unknown[] }>;
+        }>;
+      };
+      const axe = (window as unknown as { axe: { run: (ctx: unknown, o: unknown) => Promise<AxeResult> } })
+        .axe;
+      const res = await axe.run(el ?? document, {
+        runOnly: { type: 'tag', values: tags },
+        rules: Object.fromEntries(disable.map((r) => [r, { enabled: false }])),
+      });
+      return res.violations.map((v) => ({
+        id: v.id,
+        impact: v.impact ?? null,
+        help: v.help,
+        helpUrl: v.helpUrl,
+        targets: v.nodes.slice(0, 10).map((n) => n.target.map(String).join(' ')),
+      }));
+    },
+    { el, tags: A11Y_TAGS, disable: opts.disableRules ?? [] },
+  );
+}
+
+/** The violations that fail a test: serious and critical ones. */
+export function blockingViolations(violations: readonly A11yViolation[]): A11yViolation[] {
+  return violations.filter((v) => v.impact !== null && BLOCKING_IMPACTS.has(v.impact));
+}
+
+export function a11yFailureMessage(violations: readonly A11yViolation[]): string {
+  const blocking = blockingViolations(violations);
+  const rest = violations.length - blocking.length;
+  return (
+    'Accessibility violations (WCAG 2.1 A/AA, serious or critical):\n' +
+    blocking.map((v) => `  ${v.id} [${v.impact}] ${v.help}: ${v.targets.join(', ')}`).join('\n') +
+    (rest ? `\n${rest} minor/moderate violation(s) are listed in the qa-a11y attachment.` : '')
+  );
 }
 
 export class QaHelpers {
@@ -190,6 +270,28 @@ export class QaHelpers {
       )
       .not.toBe('mismatch');
     return result;
+  }
+
+  /**
+   * Check the page (or `include`) with axe-core against WCAG 2.1 A/AA. Serious and critical
+   * violations fail the test; every violation is attached as `qa-a11y.json` and annotated.
+   * Call it after reaching the state to check (e.g. a form showing its errors, an open dialog).
+   */
+  async expectAccessible(
+    opts: { include?: Locator; disableRules?: string[]; label?: string } = {},
+  ): Promise<A11yViolation[]> {
+    const violations = await runAxe(this.page, opts);
+    const label = opts.label ?? (opts.include ? opts.include.toString() : 'page');
+    this.testInfo.annotations.push({
+      type: ANNOTATION.a11y,
+      description: JSON.stringify({ label, url: this.page.url(), violations }),
+    });
+    await this.testInfo.attach('qa-a11y.json', {
+      body: JSON.stringify({ label, url: this.page.url(), violations }, null, 2),
+      contentType: 'application/json',
+    });
+    expect.soft(blockingViolations(violations).length, a11yFailureMessage(violations)).toBe(0);
+    return violations;
   }
 
   /** Fail if the document scrolls horizontally; lists the elements that stick out of the viewport. */

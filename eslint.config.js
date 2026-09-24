@@ -17,4 +17,23 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
     },
   },
+  {
+    // Dashboard browser code: browser globals, and only type imports from the Node side.
+    files: ['src/ui/client/**/*.ts'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../*', 'node:*'],
+              allowTypeImports: true,
+              message: 'Browser code may only import types from outside src/ui/client.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

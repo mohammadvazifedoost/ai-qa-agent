@@ -267,7 +267,11 @@ describe('writeBugFixPlan', () => {
     await expect(writeBugFixPlan(ctx)).rejects.toThrow(PlanRefused);
     await expect(writeBugFixPlan(ctx)).rejects.toThrow(/--force/);
     await expect(writeBugFixPlan(ctx, { force: true })).resolves.toMatchObject({ bugs: 1 });
-    expect(planStatus(ctx, RUN)).toEqual({ failures: 1, exists: true, file: `docs/bug-fix-plan/${RUN}-plan.md` });
+    expect(planStatus(ctx, RUN)).toEqual({
+      failures: 1,
+      exists: true,
+      file: `docs/bug-fix-plan/${RUN}-plan.md`,
+    });
   });
 
   it('uses plans.dir and --dir for the folder', () => {

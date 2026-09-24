@@ -311,7 +311,7 @@ export interface PlanResult {
 
 export async function writeBugFixPlan(
   ctx: QaContext,
-  opts: { runId?: string; dir?: string; force?: boolean } = {},
+  opts: { runId?: string; dir?: string; force?: boolean; signal?: AbortSignal } = {},
 ): Promise<PlanResult> {
   const runId = opts.runId ?? latestRunId(ctx);
   if (!runId) throw new PlanRefused('No test run with results. Run `ai-qa-agent test` first.');
@@ -335,6 +335,7 @@ export async function writeBugFixPlan(
     prompt: buildPrompt(ctx, failures),
     schema: PlanSchema,
     tools: ['Read', 'Glob', 'Grep'],
+    signal: opts.signal,
   });
   const plan = reconcilePlan(res.output, failures);
   const md = renderPlan({

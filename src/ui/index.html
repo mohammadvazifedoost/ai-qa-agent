@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI QA Agent — test results</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/client/main.js"></script>
+  </head>
+  <body>
+    <header class="sticky top-0 z-20 flex h-14 items-center gap-3 bg-rail px-3 text-rail-ink lg:hidden">
+      <button
+        id="rail-open"
+        class="grid size-10 cursor-pointer place-items-center rounded-lg border-0 bg-transparent text-rail-ink hover:bg-rail-2"
+        aria-label="Open menu"
+        aria-controls="rail"
+        aria-expanded="false"
+        data-action="open-rail"
+      >
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          aria-hidden="true"
+        >
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
+      <div class="min-w-0">
+        <p class="m-0 truncate text-base font-extrabold tracking-tight" id="project-bar">…</p>
+        <p class="m-0 truncate text-xs text-rail-muted" id="page-bar"></p>
+      </div>
+    </header>
+    <div
+      id="rail-backdrop"
+      class="fixed inset-0 z-30 hidden bg-rail/60 backdrop-blur-[2px] lg:hidden"
+      data-action="close-rail"
+    ></div>
+    <div class="grid min-h-screen grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)]">
+      <aside
+        id="rail"
+        class="bg-rail text-rail-ink lg:sticky lg:top-0 lg:h-screen lg:overflow-auto max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-40 max-lg:w-[min(300px,85vw)] max-lg:-translate-x-full max-lg:overflow-auto max-lg:data-[open=true]:shadow-2xl max-lg:transition-transform max-lg:duration-200 max-lg:data-[open=true]:translate-x-0 motion-reduce:transition-none"
+        aria-label="Menu"
+      >
+        <div class="px-5 pb-4 pt-5 lg:pb-5 lg:pt-6">
+          <div class="flex items-start justify-between gap-2">
+            <p class="m-0 text-[11.5px] font-bold uppercase tracking-[0.12em] text-rail-muted">AI QA Agent</p>
+            <button
+              id="rail-close"
+              class="-mr-2 -mt-2 grid size-9 cursor-pointer place-items-center rounded-lg border-0 bg-transparent text-lg leading-none text-rail-ink hover:bg-rail-2 lg:hidden"
+              aria-label="Close menu"
+              data-action="close-rail"
+            >
+              ×
+            </button>
+          </div>
+          <p class="m-0 mt-1 text-xl font-extrabold tracking-tight" id="project">…</p>
+          <p class="m-0 mt-0.5 text-xs text-rail-muted break-all" id="url"></p>
+          <label class="mt-4 block text-xs font-semibold text-rail-muted"
+            >Run
+            <select id="run" class="rail-field mt-1" aria-label="Run"></select>
+          </label>
+          <p class="m-0 mt-1.5 text-xs text-rail-muted" id="runmeta"></p>
+        </div>
+        <nav class="border-t border-rail-line px-3 py-3" aria-label="Pages">
+          <ul class="m-0 list-none p-0" id="nav"></ul>
+        </nav>
+        <div class="border-t border-rail-line px-5 py-4 text-[13px] text-rail-muted" id="tracker"></div>
+      </aside>
+
+      <main class="max-w-[1160px] px-4 pb-20 pt-5 md:px-8 md:pt-7">
+        <div id="main"><p class="py-12 text-center text-muted">Loading…</p></div>
+      </main>
+    </div>
+    <dialog
+      id="modal"
+      class="m-auto w-[min(1040px,calc(100vw-32px))] max-h-[calc(100vh-32px)] rounded-2xl border-0 bg-surface p-0 text-ink shadow-[0_24px_70px_rgba(11,31,42,.28)] max-sm:h-dvh max-sm:max-h-dvh max-sm:w-screen max-sm:max-w-none max-sm:rounded-none"
+      aria-labelledby="m-title"
+    ></dialog>
+    <div
+      id="toast"
+      role="status"
+      aria-live="polite"
+      hidden
+      class="fixed bottom-5 left-1/2 z-10 max-w-[calc(100vw-32px)] -translate-x-1/2 rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-bg shadow-lg"
+    ></div>
+  </body>
+</html>
