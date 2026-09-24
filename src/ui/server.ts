@@ -71,23 +71,30 @@ async function verifyTask(
   }
 }
 
-/** The task recorded for a failed outcome: filed in this run, or for the same defect in an earlier run. */
-function knownTask(
+/**
+ * Tasks recorded for a failed outcome, most specific first: the one filed in this run, then the
+ * task filed for the same defect in an earlier run.
+ */
+function knownTasks(
   ctx: QaContext,
   test: TestRunResult,
   triage: TriageResult | undefined,
   filing: FilingResult[],
   key: string,
-): { taskId: string; url?: string } | undefined {
+): Array<{ taskId: string; url?: string }> {
   const outcome = test.outcomes.find((o) => o.key === key);
-  if (!outcome) return undefined;
+  if (!outcome) return [];
   const issue = triage?.issues.find((i) => i.failureKeys.includes(key)) ?? adhocIssue(ctx, test, triage, key);
+  const candidates: Array<{ taskId: string; url?: string }> = [];
   const filed = filing.find(
     (f) => f.taskId && (f.issueId === issue?.id || f.issueId === adhocIssueId(outcome)),
   );
-  if (filed?.taskId) return { taskId: filed.taskId, url: filed.url };
+  if (filed?.taskId) candidates.push({ taskId: filed.taskId, url: filed.url });
   const prior = issue ? previouslyFiled(ctx, issue) : undefined;
-  return prior?.taskId ? { taskId: prior.taskId, url: prior.url } : undefined;
+  if (prior?.taskId && !candidates.some((c) => c.taskId === prior.taskId)) {
+    candidates.push({ taskId: prior.taskId, url: prior.url });
+  }
+  return candidates;
 }
 
 /** Resolve and verify the ClickUp task for every failed/flaky outcome of a run. */
@@ -103,19 +110,19 @@ async function taskLinks(
   const failed = test.outcomes.filter((o) => o.status === 'failed' || o.status === 'flaky');
   const entries = await Promise.all(
     failed.map(async (o) => {
-      const known = knownTask(ctx, test, triage, filing, o.key);
-      if (!known) return null;
-      const v = await verifyTask(client, known.taskId);
-      return [
-        o.key,
-        {
+      let last: TaskLink | null = null;
+      for (const known of knownTasks(ctx, test, triage, filing, o.key)) {
+        const v = await verifyTask(client, known.taskId);
+        last = {
           taskId: known.taskId,
           url: v.url ?? known.url,
           exists: v.exists,
           verified: v.verified,
           status: v.status,
-        },
-      ] as const;
+        };
+        if (v.exists) break; // the first task that still exists in ClickUp wins
+      }
+      return last ? ([o.key, last] as const) : null;
     }),
   );
   return Object.fromEntries(entries.filter((e): e is NonNullable<typeof e> => e !== null));
