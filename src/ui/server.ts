@@ -36,6 +36,8 @@ export interface Overview {
     filing: FilingResult[];
     /** Per failed outcome key: the ClickUp task known for its defect, verified against ClickUp. */
     tasks: Record<string, TaskLink>;
+    /** True when /api/tasks should be called to verify tasks (ClickUp configured and token present). */
+    tasksPending: boolean;
   } | null;
   scenarios: ReturnType<typeof loadAllScenarios>;
 }
@@ -156,7 +158,9 @@ export async function buildOverview(ctx: QaContext, runId?: string): Promise<Ove
       failures: triage?.failures ?? [],
       issues: triage?.issues ?? [],
       filing,
-      tasks: await taskLinks(ctx, test, triage, filing),
+      // Filled in by a second request (/api/tasks) so the page never waits for ClickUp.
+      tasks: {},
+      tasksPending: !!(ctx.config.clickup && process.env[ctx.config.clickup.tokenEnv]),
     };
   }
   const cfg = ctx.config.clickup;
@@ -301,6 +305,13 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         res.end(PAGE_HTML);
       } else if (req.method === 'GET' && url.pathname === '/api/overview') {
         json(res, 200, await buildOverview(ctx, url.searchParams.get('run') ?? undefined));
+      } else if (req.method === 'GET' && url.pathname === '/api/tasks') {
+        const test = loadRun(ctx, url.searchParams.get('run') ?? '');
+        if (!test) json(res, 404, { error: 'run not found' });
+        else {
+          const triage = readJson(path.join(test.runDir, 'triage.json'), TriageResultSchema);
+          json(res, 200, { tasks: await taskLinks(ctx, test, triage, loadFiling(test)?.results ?? []) });
+        }
       } else if (req.method === 'POST' && url.pathname === '/api/file') {
         const { status, payload } = await handleFile(ctx, await readBody(req));
         json(res, status, payload);

@@ -35,7 +35,7 @@ export const PAGE_HTML = String.raw`<!doctype html>
     <div id="main"><p class="py-12 text-center text-muted">Loading…</p></div>
   </main>
 </div>
-<dialog id="modal" class="w-[min(1040px,calc(100vw-32px))] max-h-[calc(100vh-32px)] rounded-2xl border-0 bg-surface p-0 text-ink shadow-[0_24px_70px_rgba(11,31,42,.28)]" aria-labelledby="m-title"></dialog>
+<dialog id="modal" class="m-auto w-[min(1040px,calc(100vw-32px))] max-h-[calc(100vh-32px)] rounded-2xl border-0 bg-surface p-0 text-ink shadow-[0_24px_70px_rgba(11,31,42,.28)] max-sm:h-dvh max-sm:max-h-dvh max-sm:w-screen max-sm:max-w-none max-sm:rounded-none" aria-labelledby="m-title"></dialog>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -47,6 +47,24 @@ async function load(runId) {
   const res = await fetch('/api/overview' + (runId ? '?run=' + encodeURIComponent(runId) : ''));
   data = await res.json();
   render();
+  // ClickUp verification happens after the first paint so the page never waits for it.
+  if (data.run?.tasksPending) {
+    const runId = data.run.id;
+    try {
+      const t = await (await fetch('/api/tasks?run=' + encodeURIComponent(runId))).json();
+      if (data.run && data.run.id === runId) { data.run.tasks = t.tasks || {}; data.run.tasksPending = false; refreshActions(); }
+    } catch { if (data.run && data.run.id === runId) { data.run.tasksPending = false; refreshActions(); } }
+  }
+}
+
+/** Re-render only the action cells (and the open modal's footer) once ClickUp answered. */
+function refreshActions() {
+  for (const cell of document.querySelectorAll('[data-action-for]')) {
+    const sc = data.scenarios.find((x) => x.id === cell.dataset.actionFor);
+    if (sc) cell.innerHTML = action(sc, statusOf(sc.id));
+  }
+  const modal = $('#modal');
+  if (modal.open) openModal(modal.dataset.id);
 }
 
 /* ---------- joins ---------- */
@@ -187,7 +205,7 @@ function row(sc, status) {
     '<span class="hidden font-mono text-[12.5px] text-muted sm:block">' + esc(sc.id) + '</span>' +
     '<span class="flex min-w-0 items-center gap-2"><span class="min-w-0 truncate font-medium group-hover:text-accent">' + esc(sc.title) + '</span><span class="flex shrink-0 gap-1.5">' + chips + '</span>' +
     '<span class="ml-1 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true">›</span></span></button>' +
-    '<span class="col-start-2 flex items-center gap-2.5 whitespace-nowrap sm:col-start-4">' + action(sc, status) + '</span></li>';
+    '<span class="col-start-2 flex items-center gap-2.5 whitespace-nowrap sm:col-start-4" data-action-for="' + esc(sc.id) + '">' + action(sc, status) + '</span></li>';
 }
 
 function action(sc, status) {
@@ -195,6 +213,7 @@ function action(sc, status) {
   if (!data.clickup.configured) return '';
   const o = failingOutcome(sc);
   if (!o) return '';
+  if (data.run.tasksPending) return '<span class="text-xs text-muted" aria-live="polite">checking ClickUp…</span>';
   const task = data.run.tasks[o.key];
   if (task && task.exists) {
     return '<a class="btn btn-ghost" href="' + esc(task.url || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="' + esc(task.status ? 'Status in ClickUp: ' + task.status : '') + '">Open task ' + esc(task.taskId) + '</a>';
@@ -260,13 +279,13 @@ function openModal(id) {
     const o = failingOutcome(sc);
     if (foot && o && !issueFor(o.key)) foot += '<span class="text-[13px] text-muted">Not confirmed as a product bug by the analyzer — the task will be tagged needs-verification.</span>';
   }
-  modal.innerHTML = '<div class="flex items-start gap-4 border-b border-line px-6 pb-4 pt-[22px]"><div>' +
+  modal.innerHTML = '<div class="flex items-start gap-4 border-b border-line px-5 pb-4 pt-5 md:px-6 md:pt-[22px]"><div class="min-w-0">' +
     '<span class="pill pill-' + status + '">' + (status === 'none' ? 'not run' : status) + '</span> ' + typeChip(sc) +
     '<h2 id="m-title" class="mb-1 mt-1.5 text-xl font-extrabold tracking-tight">' + esc(sc.title) + '</h2>' +
     '<div class="text-[13px] text-muted"><span class="font-mono text-[12.5px]">' + esc(sc.id) + '</span> · ' + esc(sc.page) + ' · ' + esc(sc.viewport) + ' · ' + esc(sc.priority) + ' priority</div></div>' +
-    '<button class="ml-auto size-[34px] cursor-pointer rounded-full border-0 bg-line text-lg leading-none text-ink hover:bg-line-strong" onclick="document.getElementById(\'modal\').close()" aria-label="Close">×</button></div>' +
-    '<div class="grid max-h-[calc(100vh-210px)] grid-cols-1 gap-6 overflow-auto px-6 py-5 md:grid-cols-[minmax(300px,1fr)_minmax(300px,1.25fr)]"><div>' + left + '</div><div>' + right + '</div></div>' +
-    (foot ? '<div class="flex flex-wrap items-center gap-3 rounded-b-2xl border-t border-line bg-bg px-6 py-3.5">' + foot + '</div>' : '');
+    '<button class="ml-auto size-[34px] shrink-0 cursor-pointer rounded-full border-0 bg-line text-lg leading-none text-ink hover:bg-line-strong" onclick="document.getElementById(\'modal\').close()" aria-label="Close">×</button></div>' +
+    '<div class="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-auto px-5 py-5 md:grid-cols-[minmax(300px,1fr)_minmax(300px,1.25fr)] md:px-6"><div>' + left + '</div><div>' + right + '</div></div>' +
+    (foot ? '<div class="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-5 py-3.5 md:px-6">' + foot + '</div>' : '');
   if (!modal.open) modal.showModal();
 }
 const link = (href, text, blank) => href ? '<a class="text-accent underline-offset-2 hover:underline" href="' + file(href) + '"' + (blank ? ' target="_blank" rel="noopener"' : '') + '>' + esc(text) + '</a>' : '';

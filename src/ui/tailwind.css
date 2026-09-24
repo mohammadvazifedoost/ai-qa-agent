@@ -197,6 +197,14 @@
   }
 }
 
+/* The dialog is a column: fixed header, scrolling body, fixed footer. The page behind it stays put. */
+dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+body:has(dialog[open]) {
+  overflow: hidden;
+}
 dialog::backdrop {
   background: rgb(11 31 42 / 0.6);
   backdrop-filter: blur(3px);
