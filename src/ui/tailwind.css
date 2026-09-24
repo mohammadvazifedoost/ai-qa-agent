@@ -94,6 +94,16 @@
   .btn-ghost {
     @apply bg-accent-soft text-accent hover:underline hover:brightness-100;
   }
+  .btn-danger {
+    @apply bg-fail text-surface;
+  }
+  /* Secondary actions that must not compete with the primary button. */
+  .btn-quiet {
+    @apply inline-flex items-center rounded-lg border-0 bg-transparent px-2.5 py-[7px] text-sm font-semibold text-muted cursor-pointer hover:bg-line hover:text-ink disabled:opacity-55 disabled:cursor-default;
+  }
+  .btn-quiet-danger {
+    @apply hover:bg-fail-soft hover:text-fail;
+  }
   .chip {
     @apply inline-block rounded-full px-2 py-px text-[11.5px] font-bold whitespace-nowrap align-[1px] tracking-[0.01em];
   }
