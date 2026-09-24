@@ -15,26 +15,25 @@ export interface BugEnvironment {
 }
 
 export function environment(ctx: QaContext, runId: string): BugEnvironment {
-  let commit: string | null = null;
-  try {
-    const head = fs.readFileSync(path.join(ctx.root, '.git', 'HEAD'), 'utf8').trim();
-    commit = head.startsWith('ref: ')
-      ? fs
-          .readFileSync(path.join(ctx.root, '.git', head.slice(5)), 'utf8')
-          .trim()
-          .slice(0, 12)
-      : head.slice(0, 12);
-  } catch {
-    commit = null; // not a git checkout (or a worktree/submodule layout we do not parse)
-  }
   return {
     baseUrl: ctx.config.app.baseUrl,
     browsers: ctx.config.browsers,
     os: `${os.type()} ${os.release()}`,
     node: process.version,
-    commit,
+    commit: gitCommit(ctx.root),
     runId,
   };
+}
+
+/** Short HEAD commit of the target project, or null when it is not a plain git checkout. */
+function gitCommit(root: string): string | null {
+  try {
+    const head = fs.readFileSync(path.join(root, '.git', 'HEAD'), 'utf8').trim();
+    if (!head.startsWith('ref: ')) return head.slice(0, 12);
+    return fs.readFileSync(path.join(root, '.git', head.slice(5)), 'utf8').trim().slice(0, 12);
+  } catch {
+    return null;
+  }
 }
 
 export interface Evidence {

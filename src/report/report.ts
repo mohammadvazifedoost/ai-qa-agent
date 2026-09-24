@@ -128,13 +128,19 @@ function markdownToHtml(md: string, title: string): string {
       inTable = true;
       continue;
     }
-    if (inTable) (html.push('</table>'), (inTable = false));
+    if (inTable) {
+      html.push('</table>');
+      inTable = false;
+    }
     if (line.startsWith('- ')) {
       html.push(`${inList ? '' : '<ul>'}<li>${inline(line.slice(2))}</li>`);
       inList = true;
       continue;
     }
-    if (inList) (html.push('</ul>'), (inList = false));
+    if (inList) {
+      html.push('</ul>');
+      inList = false;
+    }
     const h = line.match(/^(#{1,3}) (.*)$/);
     if (h) html.push(`<h${h[1]!.length}>${inline(h[2]!)}</h${h[1]!.length}>`);
     else if (line.trim()) html.push(`<p>${inline(line)}</p>`);
