@@ -1,0 +1,11 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - paragraph [ref=e4]: ai-qa
+    - list
+  - main [ref=e6]:
+    - generic [ref=e7]:
+      - heading "Test results" [level=1] [ref=e8]
+      - generic [ref=e9]:
+        - text: Run
+        - combobox "Run" [ref=e10]
+    - paragraph [ref=e12]: Loading…

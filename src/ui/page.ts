@@ -104,8 +104,8 @@ select,.toggle{font:inherit;padding:7px 10px;border:1px solid var(--line-strong)
 .btn{display:inline-block;border:0;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer;background:var(--accent);color:var(--accent-ink);text-decoration:none;line-height:1.4}
 .btn:disabled{opacity:.55;cursor:default}
 .btn.ghost{background:var(--accent-soft);color:var(--accent)}
-.logged{color:var(--pass);font-weight:600;font-size:13px}
-.logged a{margin-left:4px}
+.tasklink{font-size:13px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.tasklink:hover{color:var(--accent)}
 @media (max-width:640px){
   .row{grid-template-columns:14px minmax(0,1fr)}
   .row .open{grid-column:1/3;grid-template-columns:14px minmax(0,1fr)}
@@ -168,7 +168,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const file = (p) => '/files/' + p.split('/').map(encodeURIComponent).join('/');
 let data;
-let view = { page: '', only: 'all', includeNotRun: false };
+let view = { page: '', only: 'all', type: '', includeNotRun: false };
 
 async function load(runId) {
   const res = await fetch('/api/overview' + (runId ? '?run=' + encodeURIComponent(runId) : ''));
@@ -250,9 +250,12 @@ function render() {
 
   const rows = all.filter((x) => (!view.page || x.sc.page === view.page) &&
     (view.only === 'all' ? true : view.only === 'failed' ? x.status === 'failed' || x.status === 'flaky' : x.status === 'passed') &&
+    (!view.type || x.sc.category === view.type) &&
     (view.includeNotRun || x.status !== 'none'));
   html += '<div class="controls"><div class="seg" role="group" aria-label="Show">' +
     ['all', 'failed', 'passed'].map((k) => '<button aria-pressed="' + (view.only === k) + '" onclick="setOnly(\'' + k + '\')">' + ({ all: 'All', failed: 'Failures', passed: 'Passing' })[k] + '</button>').join('') + '</div>' +
+    '<label>Type <select onchange="view.type=this.value;render()"><option value="">all types</option>' +
+    [...new Set(all.map((x) => x.sc.category))].sort().map((t) => '<option value="' + esc(t) + '"' + (view.type === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select></label>' +
     '<label class="chk"><input type="checkbox" ' + (view.includeNotRun ? 'checked' : '') + ' onchange="view.includeNotRun=this.checked;render()"> show scenarios not in this run</label>' +
     '<span class="count">' + rows.length + ' shown</span></div>';
 
@@ -287,20 +290,19 @@ function action(sc, status) {
   const body = cu.issue ? { issueId: cu.issue.id } : { failureKey: cu.outcome.key };
   const disabled = can ? '' : 'disabled title="ClickUp token missing in the shell that started ai-qa ui"';
   const call = ' onclick="event.stopPropagation(); fileBug(this, ' + esc(JSON.stringify(body)) + ')"';
-  if (cu.filed) {
-    // Already in ClickUp: open it, or push the latest run's details to it as a comment.
-    return '<a class="btn ghost" href="' + esc(cu.filed.url || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open task ' + esc(cu.filed.taskId) + '</a>' +
-      '<button class="btn ghost" ' + disabled + call + ' title="Add a comment with this run\'s result to the existing task">Update</button>';
-  }
-  return '<button class="btn" ' + disabled + call + '>Log in ClickUp</button>';
+  // A click always creates a task. Tasks created earlier are shown as a small link beside it.
+  const earlier = cu.filed
+    ? '<a class="tasklink" href="' + esc(cu.filed.url || '#') + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Created ' + esc((cu.filed.filedAt || '').slice(0, 16).replace('T', ' ')) + '">view ' + esc(cu.filed.taskId) + '</a>'
+    : '';
+  return earlier + '<button class="btn" ' + disabled + call + '>Create task</button>';
 }
 
 async function fileBug(btn, body) {
   const label = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Logging…';
+  btn.disabled = true; btn.textContent = 'Creating…';
   const res = await fetch('/api/file', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: data.run.id, ...body }) });
   const out = await res.json();
-  if (!res.ok) { btn.disabled = false; btn.textContent = label; alert('Could not log the bug: ' + (out.error || out.reason || res.status)); return; }
+  if (!res.ok) { btn.disabled = false; btn.textContent = label; alert('Could not create the task: ' + (out.error || out.reason || res.status)); return; }
   const open = $('#modal').open ? $('#modal').dataset.id : null;
   await load(data.run.id);
   if (open) openModal(open);
@@ -346,7 +348,7 @@ function openModal(id) {
   let foot = '';
   if (status === 'failed' || status === 'flaky') {
     foot = action(sc, status);
-    if (cu && !cu.filed && !cu.issue) foot += '<span class="note">Not confirmed as a product bug by the analyzer — the task will be tagged needs-verification.</span>';
+    if (cu && !cu.issue) foot += '<span class="note">Not confirmed as a product bug by the analyzer — the task will be tagged needs-verification.</span>';
   }
   modal.innerHTML = '<div class="m-head"><div><span class="pill ' + status + '">' + (status === 'none' ? 'not run' : status) + '</span>' +
     '<h2 id="m-title">' + esc(sc.title) + '</h2><div class="meta"><span class="id">' + esc(sc.id) + '</span> · ' + esc(sc.page) + ' · ' + esc(sc.category) + ' · ' + esc(sc.viewport) + ' · ' + esc(sc.priority) + ' priority</div></div>' +

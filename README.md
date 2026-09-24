@@ -198,9 +198,8 @@ keeps the partial result, and fetches missing reference screenshots on the next 
 
 **Nothing is ever filed automatically — there is no flag or setting for it.** After a run,
 confirmed defects wait in the report and in the dashboard (`ai-qa ui`); a task is created only when
-a person clicks *Log in ClickUp* on a failed test. Symptoms of one underlying defect are grouped
-into one bug report, and a defect that was already filed in an earlier run gets a comment on the
-existing task instead of a duplicate.
+a person clicks *Create task* on a failed test. Symptoms of one underlying defect are grouped into
+one bug report, so one click covers all the tests it affects.
 
 ## Dashboard (`ai-qa ui`)
 
@@ -213,10 +212,11 @@ pipeline writes — no database, no external service.
   Clicking a row opens a modal with what happened (analysis, root cause, expected vs actual), the
   evidence (screenshot, video, trace, console/network log, page snapshot) and, collapsed, the test
   error and the scenario's steps.
-- Every failed row has a *Log in ClickUp* button. It files the consolidated bug report for a
-  confirmed defect, comments on the existing task when the defect was filed in an earlier run, and
-  for failures the analyzer did not confirm (test bug, not analyzed) it still files a task built
-  from the scenario and the error, tagged `needs-verification`. Once filed, the row shows the task link.
+- Every failed row has a *Create task* button; a click always creates a ClickUp task from the
+  bug report (consolidated for confirmed defects; for failures the analyzer did not confirm it is
+  built from the scenario and the error and tagged `needs-verification`). Tasks created earlier for
+  the same test are shown as a small *view* link next to the button. Filters: All / Failures /
+  Passing, type (functional, visual, responsive) and page.
 - The token must be in the environment of the shell that started the UI
   (`CLICKUP_API_TOKEN=pk_... npx ai-qa ui`). Filing results are written back to the run so the
   report and the dashboard stay consistent.

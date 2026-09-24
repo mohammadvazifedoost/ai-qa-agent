@@ -180,6 +180,7 @@ async function handleFile(ctx: QaContext, body: string): Promise<{ status: numbe
   try {
     const [result] = await fileIssues(ctx, test, [issue], {
       extraTags: confirmed ? [] : ['needs-verification'],
+      force: true,
     });
     recordFiling(test, [result!], 'filed', 'Filed from the dashboard');
     return { status: result!.action === 'failed' ? 502 : 200, payload: result };

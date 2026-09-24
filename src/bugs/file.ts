@@ -126,7 +126,7 @@ export async function fileIssues(
   ctx: QaContext,
   run: TestRunResult,
   issues: Issue[],
-  opts: { fetchImpl?: Fetch; extraTags?: string[] } = {},
+  opts: { fetchImpl?: Fetch; extraTags?: string[]; force?: boolean } = {},
 ): Promise<FilingResult[]> {
   const { client, cfg } = clickupClient(ctx, opts.fetchImpl);
   const list = await client.getList(cfg.listId);
@@ -135,7 +135,9 @@ export async function fileIssues(
   const results: FilingResult[] = [];
   backfillBugRecords(ctx);
   for (const issue of issues) {
-    const prior = previouslyFiled(ctx, issue);
+    // `force` = a person explicitly asked for a task; always create one, even if a similar
+    // defect was filed before.
+    const prior = opts.force ? undefined : previouslyFiled(ctx, issue);
     const filedAt = new Date().toISOString();
     try {
       if (prior?.taskId) {
