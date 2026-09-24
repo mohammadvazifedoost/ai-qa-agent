@@ -7,54 +7,68 @@
   --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
 
-  --color-bg: #f2f5f4;
+  /* main area */
+  --color-bg: #eef1f2;
   --color-surface: #ffffff;
-  --color-ink: #10231f;
-  --color-muted: #5f6f6b;
-  --color-line: #dce3e0;
-  --color-line-strong: #b9c4c0;
-  --color-accent: #0e6b5c;
+  --color-ink: #0b1f2a;
+  --color-muted: #5c6b73;
+  --color-line: #dbe1e4;
+  --color-line-strong: #b7c2c8;
+  --color-accent: #0f766e;
   --color-accent-ink: #ffffff;
-  --color-accent-soft: #e1f0ec;
-  --color-pass: #2f7d4f;
-  --color-pass-soft: #e4f2e9;
-  --color-fail: #c03a2b;
-  --color-fail-soft: #fae6e2;
-  --color-flaky: #b7791f;
-  --color-flaky-soft: #fbefd9;
-  --color-idle: #9aa7a3;
-  --color-visual: #5b4bb5;
-  --color-visual-soft: #ebe7fb;
-  --color-responsive: #0d6e8f;
-  --color-responsive-soft: #e0f2f8;
-  --color-functional: #4d5b57;
-  --color-functional-soft: #e9edeb;
+  --color-accent-soft: #dcf1ee;
+  /* the rail */
+  --color-rail: #0b1f2a;
+  --color-rail-2: #12303e;
+  --color-rail-ink: #e6eef2;
+  --color-rail-muted: #8fa3ad;
+  --color-rail-line: #1f3a48;
+  /* results */
+  --color-pass: #15803d;
+  --color-pass-soft: #dcfce7;
+  --color-fail: #b91c1c;
+  --color-fail-soft: #fee2e2;
+  --color-flaky: #b45309;
+  --color-flaky-soft: #fef3c7;
+  --color-idle: #9aa9b1;
+  /* scenario types */
+  --color-functional: #475569;
+  --color-functional-soft: #e8edf2;
+  --color-visual: #6d28d9;
+  --color-visual-soft: #ede9fe;
+  --color-responsive: #0369a1;
+  --color-responsive-soft: #e0f2fe;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #0f1614;
-    --color-surface: #161f1c;
-    --color-ink: #e8eeec;
-    --color-muted: #98a6a2;
-    --color-line: #243230;
-    --color-line-strong: #3a4a46;
-    --color-accent: #4fb8a2;
-    --color-accent-ink: #0f1614;
-    --color-accent-soft: #17302b;
-    --color-pass: #5cc58a;
-    --color-pass-soft: #13301f;
-    --color-fail: #f0806f;
-    --color-fail-soft: #3b1c17;
-    --color-flaky: #e3aa4c;
-    --color-flaky-soft: #3a2b10;
-    --color-idle: #6c7a76;
-    --color-visual: #b3a6f5;
-    --color-visual-soft: #2a2450;
-    --color-responsive: #7cc9e6;
-    --color-responsive-soft: #12323f;
-    --color-functional: #aab6b1;
-    --color-functional-soft: #253330;
+    --color-bg: #0c1418;
+    --color-surface: #131f26;
+    --color-ink: #e6eef2;
+    --color-muted: #93a4ad;
+    --color-line: #22333d;
+    --color-line-strong: #34495593;
+    --color-accent: #4fd1c0;
+    --color-accent-ink: #0c1418;
+    --color-accent-soft: #143733;
+    --color-rail: #07121a;
+    --color-rail-2: #0f2430;
+    --color-rail-ink: #e6eef2;
+    --color-rail-muted: #7f95a1;
+    --color-rail-line: #1b3140;
+    --color-pass: #4ade80;
+    --color-pass-soft: #12351f;
+    --color-fail: #f87171;
+    --color-fail-soft: #3f1a1a;
+    --color-flaky: #fbbf24;
+    --color-flaky-soft: #3b2a0c;
+    --color-idle: #55666f;
+    --color-functional: #aab8c2;
+    --color-functional-soft: #24323b;
+    --color-visual: #c4b5fd;
+    --color-visual-soft: #2b2352;
+    --color-responsive: #7dd3fc;
+    --color-responsive-soft: #0f2f42;
   }
 }
 
@@ -68,7 +82,6 @@
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-accent;
   }
-  select,
   input[type='checkbox'] {
     @apply accent-accent;
   }
@@ -76,13 +89,13 @@
 
 @layer components {
   .btn {
-    @apply inline-block rounded-lg px-3 py-[7px] font-bold leading-snug no-underline cursor-pointer bg-accent text-accent-ink disabled:opacity-55 disabled:cursor-default;
+    @apply inline-flex items-center gap-1.5 rounded-lg px-3 py-[7px] font-bold leading-snug no-underline cursor-pointer bg-accent text-accent-ink transition-[filter] hover:brightness-110 disabled:opacity-55 disabled:cursor-default disabled:hover:brightness-100;
   }
   .btn-ghost {
-    @apply bg-accent-soft text-accent hover:underline;
+    @apply bg-accent-soft text-accent hover:underline hover:brightness-100;
   }
   .chip {
-    @apply inline-block rounded-full px-2 py-px text-xs font-semibold whitespace-nowrap align-[1px];
+    @apply inline-block rounded-full px-2 py-px text-[11.5px] font-bold whitespace-nowrap align-[1px] tracking-[0.01em];
   }
   .chip-functional {
     @apply bg-functional-soft text-functional;
@@ -126,20 +139,35 @@
   .dot-flaky {
     @apply bg-flaky;
   }
-  .seg-btn {
-    @apply border-0 bg-transparent px-3 py-[7px] font-semibold text-muted cursor-pointer aria-pressed:bg-ink aria-pressed:text-bg;
+  .cell {
+    @apply block h-2 w-2 rounded-[2px] bg-rail-line;
   }
-  .nav-btn {
-    @apply flex w-full items-center justify-between gap-2 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left text-ink cursor-pointer hover:bg-accent-soft aria-[current=true]:bg-surface aria-[current=true]:shadow-[inset_0_0_0_1px_var(--color-line)];
+  .cell-passed {
+    @apply bg-pass;
+  }
+  .cell-failed {
+    @apply bg-fail;
+  }
+  .cell-flaky {
+    @apply bg-flaky;
+  }
+  .seg-btn {
+    @apply border-0 bg-transparent px-3 py-[7px] text-sm font-semibold text-muted cursor-pointer aria-pressed:bg-ink aria-pressed:text-bg;
+  }
+  .rail-btn {
+    @apply flex w-full flex-col gap-1.5 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left text-rail-ink cursor-pointer hover:bg-rail-2 aria-[current=true]:bg-rail-2 aria-[current=true]:shadow-[inset_0_0_0_1px_var(--color-rail-line)];
   }
   .field {
-    @apply rounded-lg border border-line-strong bg-surface px-2.5 py-[7px] text-ink;
+    @apply rounded-lg border border-line-strong bg-surface px-2.5 py-[7px] text-sm text-ink;
+  }
+  .rail-field {
+    @apply w-full rounded-lg border border-rail-line bg-rail-2 px-2.5 py-[7px] text-sm text-rail-ink;
   }
   .section-title {
-    @apply mb-2 text-xs font-bold tracking-wide text-muted;
+    @apply mb-2 text-[11.5px] font-bold uppercase tracking-[0.08em] text-muted;
   }
   .disclosure > summary {
-    @apply cursor-pointer list-none font-semibold text-accent;
+    @apply cursor-pointer list-none text-sm font-semibold text-accent;
   }
   .disclosure > summary::-webkit-details-marker {
     display: none;
@@ -151,13 +179,28 @@
   .disclosure[open] > summary::before {
     content: '▾ ';
   }
+  .row-failed {
+    box-shadow: inset 3px 0 0 var(--color-fail);
+  }
+  .row-flaky {
+    box-shadow: inset 3px 0 0 var(--color-flaky);
+  }
+}
+
+/* Pass ring: drawn once on load. */
+.ring-arc {
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-arc {
+    transition: none;
+  }
 }
 
 dialog::backdrop {
-  background: rgb(16 35 31 / 0.55);
-  backdrop-filter: blur(2px);
+  background: rgb(11 31 42 / 0.6);
+  backdrop-filter: blur(3px);
 }
-
 @media (prefers-reduced-motion: no-preference) {
   dialog[open] {
     animation: pop 0.16s ease-out;
