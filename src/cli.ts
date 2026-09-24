@@ -35,6 +35,7 @@ import { TestRunResultSchema, type TestRunResult } from './runner/results.js';
 import { triageRun } from './triage/triage.js';
 import { TriageResultSchema } from './triage/schema.js';
 import { writeReport } from './report/report.js';
+import { writeBugFixPlan } from './plan/plan.js';
 import { FilingSummarySchema } from './bugs/file.js';
 import { createTracker, trackerInfo } from './integrations/tracker.js';
 import { chromium } from '@playwright/test';
@@ -307,6 +308,27 @@ program
     const filing = readJson(path.join(dir, 'filing.json'), FilingSummarySchema) ?? null;
     const report = writeReport(ctx, test, triage, filing, triage?.costUsd ?? 0);
     console.log(`Report: ${rel(ctx.root, report.markdown)}`);
+  });
+
+program
+  .command('plan')
+  .description(
+    'write a plan for fixing the confirmed bugs of a triaged run into the project (AI reads, never edits, code)',
+  )
+  .option('--run <id>', 'run id (default: latest run with results)')
+  .option('--dir <folder>', 'folder in the project root (default: plans.dir, docs/bug-fix-plan)')
+  .option('--force', 'overwrite an existing plan for the run')
+  .action(async (o: { run?: string; dir?: string; force?: boolean }) => {
+    const ctx = await createContext(root());
+    const res = await writeBugFixPlan(ctx, { runId: o.run, dir: o.dir, force: o.force });
+    if (!res.file) {
+      console.log(`No confirmed bugs in run ${res.runId}; nothing to plan.`);
+      return;
+    }
+    console.log(
+      `Bug-fix plan: ${pc.bold(res.file)}  (${res.bugs} bug${res.bugs === 1 ? '' : 's'}` +
+        `${res.notIncluded ? `, ${res.notIncluded} other failures listed as not included` : ''}, $${res.costUsd.toFixed(3)})`,
+    );
   });
 
 program

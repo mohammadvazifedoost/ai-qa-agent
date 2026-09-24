@@ -6,7 +6,8 @@
  * POST /api/scenarios/save (with AI drafts from /api/scenarios/draft) and writes one scenario's
  * test through POST /api/scenarios/test and runs it through POST /api/scenarios/run.
  * Whole runs (POST /api/runs/all, /api/runs/not-run) are background jobs polled through GET /api/job;
- * tracker connection status comes from GET /api/trackers.
+ * tracker connection status comes from GET /api/trackers. The bug-fix plan of a run is written
+ * by POST /api/plan (a job) and shown from GET /api/plan.
  */
 export const PAGE_HTML = String.raw`<!doctype html>
 <html lang="en">
@@ -147,7 +148,38 @@ function toolbar(notRunWithTest) {
     '<button class="btn-quiet" onclick="refreshAll(this)" title="Reload results and re-check the bug trackers">Refresh</button>' +
     (notRunWithTest ? '<button class="btn btn-ghost"' + dis + ' onclick="startJob(\'/api/runs/not-run\')" title="Run every test without a result in this run and add the results to it">Run not-run tests (' + notRunWithTest + ')</button>' : '') +
     '<button class="btn btn-ghost"' + dis + ' onclick="startJob(\'/api/runs/all\')" title="Start a new run with every test, like ai-qa-agent test">Run all tests</button>' +
-    addButton() + '</div>';
+    planButtons(busy) + addButton() + '</div>';
+}
+/** Create / update the bug-fix plan of the selected run, and open it once it exists. */
+function planButtons(busy) {
+  const pl = data.plan;
+  if (!pl) return '';
+  const why = !pl.failures ? 'No failed tests in this run, nothing to plan' : busy ? data.job.label + '…' : '';
+  const label = pl.exists ? 'Update fix plan' : 'Create fix plan';
+  const title = why || 'The AI reads your code and writes a plan for fixing the bugs behind the ' + pl.failures + ' failed test' + (pl.failures === 1 ? '' : 's') + ' to ' + pl.file;
+  return (pl.exists ? '<button class="btn-quiet" onclick="viewPlan()" title="' + esc(pl.file) + '">View plan</button>' : '') +
+    '<button class="btn btn-ghost"' + (why ? ' disabled' : '') + ' title="' + esc(title) + '" onclick="createPlan()">' + label + '</button>';
+}
+function createPlan() {
+  const pl = data.plan;
+  if (pl.exists && !confirm('Overwrite ' + pl.file + '? Any edits made to it will be lost.')) return;
+  startJob('/api/plan', { force: pl.exists });
+}
+async function viewPlan() {
+  let out = {}, ok = false;
+  try {
+    const res = await fetch('/api/plan?run=' + encodeURIComponent(data.run.id));
+    out = await res.json(); ok = res.ok;
+  } catch (err) { out = { error: String(err) }; }
+  if (!ok) { toast(out.error || 'Could not open the plan.'); return; }
+  const modal = $('#modal');
+  modal.dataset.id = ''; modal.dataset.mode = 'plan';
+  modal.innerHTML = '<div class="flex items-start gap-4 border-b border-line px-5 pb-4 pt-5 md:px-6 md:pt-[22px]"><div class="min-w-0">' +
+    '<h2 id="m-title" class="m-0 text-xl font-extrabold tracking-tight">Bug-fix plan</h2>' +
+    '<p class="m-0 mt-1 font-mono text-[12.5px] text-muted">' + esc(out.file) + '</p></div>' +
+    '<button class="ml-auto size-[34px] shrink-0 cursor-pointer rounded-full border-0 bg-line text-lg leading-none text-ink hover:bg-line-strong" onclick="document.getElementById(\'modal\').close()" aria-label="Close">×</button></div>' +
+    '<pre class="m-0 min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-5 py-5 font-mono text-[12.5px] leading-relaxed md:px-6">' + esc(out.text) + '</pre>';
+  if (!modal.open) modal.showModal();
 }
 function jobBanner() {
   const j = data.job;
@@ -161,12 +193,13 @@ function jobBanner() {
   const ok = j.status === 'done';
   return '<section class="mb-6 flex flex-wrap items-center gap-3 rounded-2xl px-5 py-4 ' + (ok ? 'bg-accent-soft' : 'bg-fail-soft') + '" role="status">' +
     '<p class="m-0 min-w-0 flex-1 text-sm font-semibold ' + (ok ? 'text-accent' : 'text-fail') + '">' + esc(ok ? j.message : 'Could not finish: ' + j.message) + '</p>' +
+    (ok && j.kind === 'plan' && j.file ? '<button class="btn btn-ghost" onclick="viewPlan()">View plan</button>' : '') +
     '<button class="btn-quiet" onclick="watched=null;render()">Dismiss</button></section>';
 }
-async function startJob(url) {
+async function startJob(url, extra) {
   let out = {}, ok = false;
   try {
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: data.run?.id }) });
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: data.run?.id, ...extra }) });
     out = await res.json(); ok = res.ok;
   } catch (err) { out = { error: String(err) }; }
   if (!ok) { toast(out.error || 'Could not start the run.'); return; }

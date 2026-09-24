@@ -34,6 +34,7 @@ import { loadAllScenarios } from '../scenarios/generate.js';
 import { removeScenarios } from '../scenarios/manage.js';
 import { CATEGORIES } from '../scenarios/schema.js';
 import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
+import { planFile, planStatus, writeBugFixPlan } from '../plan/plan.js';
 import { PAGE_HTML } from './page.js';
 
 const log = logger('ui');
@@ -71,6 +72,8 @@ export interface Overview {
   testStates: Record<string, ScenarioTestState>;
   /** The test run started from the dashboard that is running now, or the last one. */
   job: Job | null;
+  /** Bug-fix plan of the selected run: whether it can be made and whether it exists. */
+  plan: ReturnType<typeof planStatus> | null;
 }
 
 export interface TaskLink {
@@ -219,6 +222,7 @@ export async function buildOverview(ctx: QaContext, runId?: string): Promise<Ove
     },
     testStates: scenarioTestStates(ctx),
     job,
+    plan: run ? planStatus(ctx, run.id) : null,
   };
 }
 
@@ -347,7 +351,7 @@ let writing: Promise<unknown> = Promise.resolve();
 
 /** A long test run started from the dashboard; the page polls GET /api/job until it is done. */
 export interface Job {
-  kind: 'run-all' | 'run-not-run';
+  kind: 'run-all' | 'run-not-run' | 'plan';
   label: string;
   status: 'running' | 'done' | 'failed';
   startedAt: string;
@@ -355,6 +359,8 @@ export interface Job {
   /** The run the results are in (known once it started). */
   runId?: string;
   message?: string;
+  /** For a plan: the project-relative path of the written file. */
+  file?: string;
 }
 
 let job: Job | null = null;
@@ -413,6 +419,42 @@ function notRunIds(ctx: QaContext, runId: string | undefined): string[] {
       return tests.get(spec)!.includes(s.id);
     })
     .map((s) => s.id);
+}
+
+/** Write the bug-fix plan of a run into the project (same rules as `ai-qa-agent plan`). */
+function handlePlan(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { runId, force } = JSON.parse(body || '{}') as { runId?: unknown; force?: unknown };
+  if (typeof runId !== 'string' || !runId) return { status: 400, payload: { error: 'runId is required' } };
+  const status = planStatus(ctx, runId);
+  if (status.failures === 0)
+    return { status: 409, payload: { error: 'No failed tests to plan in this run.' } };
+  if (status.exists && force !== true) {
+    return { status: 409, payload: { error: `${status.file} already exists.`, exists: true } };
+  }
+  return startJob(
+    'plan',
+    `Writing the fix plan for ${status.failures} failed test${status.failures === 1 ? '' : 's'}`,
+    async (setRun) => {
+      setRun(runId);
+      const res = await writeBugFixPlan(ctx, { runId, force: true });
+      if (job) job.file = res.file ?? undefined;
+      return `Wrote ${res.file} with ${res.bugs} bug${res.bugs === 1 ? '' : 's'}.`;
+    },
+  );
+}
+
+/** The plan file's text for the dashboard viewer (only this file, never other paths). */
+function readPlan(ctx: QaContext, runId: string): { status: number; payload: unknown } {
+  if (!/^[\w-]+$/.test(runId)) return { status: 400, payload: { error: 'invalid run id' } };
+  const file = planFile(ctx, runId);
+  if (!fs.existsSync(file)) return { status: 404, payload: { error: 'No plan for this run yet.' } };
+  return {
+    status: 200,
+    payload: {
+      file: path.relative(ctx.root, file).split(path.sep).join('/'),
+      text: fs.readFileSync(file, 'utf8'),
+    },
+  };
 }
 
 function handleRunNotRun(ctx: QaContext, body: string): { status: number; payload: unknown } {
@@ -571,6 +613,12 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, 200, { trackers: await trackerStatus(ctx, url.searchParams.has('fresh')) });
       } else if (req.method === 'GET' && url.pathname === '/api/job') {
         json(res, 200, { job });
+      } else if (req.method === 'POST' && url.pathname === '/api/plan') {
+        const { status, payload } = handlePlan(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'GET' && url.pathname === '/api/plan') {
+        const { status, payload } = readPlan(ctx, url.searchParams.get('run') ?? '');
+        json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/runs/all') {
         const { status, payload } = handleRunAll(ctx);
         json(res, status, payload);

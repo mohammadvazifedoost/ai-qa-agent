@@ -127,6 +127,7 @@ To file bugs in Jira instead of ClickUp, replace `--clickup-list <listId>` with
 | `ai-qa-agent test` | Run the tests and collect evidence — no AI involved |
 | `ai-qa-agent triage` | Classify the failures of the latest run and write a report |
 | `ai-qa-agent report` | Rebuild the report of a run from stored results |
+| `ai-qa-agent plan` | Write a plan for fixing the bugs behind a run's failed tests into the project (`docs/bug-fix-plan/<run>-plan.md`); `--run`, `--dir`, `--force` |
 | `ai-qa-agent run` | The full pipeline: analyze → scenarios → generate → test → triage → (file) → report |
 | `ai-qa-agent changes` | Show what changed since the last analysis: new/changed/removed pages, changed shared files, and with `--design` new/changed Figma frames |
 | `ai-qa-agent ui` | Local dashboard: every scenario with its result, screenshots, videos, traces, analysis, and a button to log confirmed bugs in ClickUp or Jira |
@@ -221,6 +222,21 @@ scenario* in a scenario's modal opens the same form for an existing scenario.
 - The sidebar shows Jira (always) and ClickUp (when configured): *Connected* (verified against
   the tracker with your token, with the project or list), *Credentials missing* (which variables to
   set), *Cannot connect* (the error), or *Not configured*; the one bugs are filed in is marked.
+
+### Bug-fix plans
+
+`ai-qa-agent plan` (or *Create fix plan* in the dashboard toolbar) turns the failed tests of a run
+into a document for developers: a summary table in the suggested fix order, then per bug what is
+wrong, steps to reproduce, the root cause with file and line, the proposed fix (with a short code
+hint where it helps), files to change, risks, how to verify, and screenshot evidence. Failed tests
+the AI judges to be test bugs, flaky or environment problems are listed at the end with the reason.
+
+- It is written to `<project>/docs/bug-fix-plan/<run-id>-plan.md`; change the folder with `plans: { dir: '...' }`
+  in `.qa/config.ts` or `--dir`.
+- One AI call reads the source code and the failures; it never edits code. It needs only a test
+  run with failures, no other step first.
+- An existing plan is not overwritten without `--force` (the dashboard asks first), since the team
+  may have edited it.
 
 ## Configuration (`.qa/config.ts`)
 
