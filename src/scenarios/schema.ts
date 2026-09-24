@@ -38,11 +38,22 @@ export const ScenarioSchema = z.object({
 });
 export type Scenario = z.infer<typeof ScenarioSchema>;
 
+/** A scenario a person deleted. Kept so regeneration does not bring it back, and for `restore`. */
+export const RemovedScenarioSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  reason: z.string().optional(),
+  removedAt: z.string(),
+  scenario: ScenarioSchema,
+});
+export type RemovedScenario = z.infer<typeof RemovedScenarioSchema>;
+
 export const ScenarioFileSchema = z.object({
   page: z.string(),
   generatedAt: z.string(),
   /** Hash of everything the scenarios were derived from; a change marks them outdated. */
   inputHash: z.string(),
   scenarios: z.array(ScenarioSchema),
+  removed: z.array(RemovedScenarioSchema).default([]),
 });
 export type ScenarioFile = z.infer<typeof ScenarioFileSchema>;

@@ -10,6 +10,12 @@ import { extractDesign } from './design/figma.js';
 import { analyzeApp } from './analyze/app.js';
 import { generateScenarios, normalizePageArg, pageSlug } from './scenarios/generate.js';
 import { generateTests } from './generate/playwright.js';
+import {
+  formatScenarioTable,
+  listScenarioRows,
+  removeScenarios,
+  restoreScenarios,
+} from './scenarios/manage.js';
 import { runTests, type TestFilter } from './runner/run.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -173,9 +179,9 @@ program
     if (!o.skipDesign) await extractDesign(ctx, { force: o.refresh });
   });
 
-program
+const scenarios = program
   .command('scenarios')
-  .description('generate or update test scenarios in .qa/scenarios/')
+  .description('generate or update test scenarios in .qa/scenarios/ (subcommands: list, remove, restore)')
   .option('--page <route>', 'only this page (route or name)')
   .option('--force', 'regenerate even if inputs did not change')
   .option('--max <n>', 'maximum scenarios per page', (v) => Number(v), 10)
@@ -187,6 +193,56 @@ program
         .map(([n, l]) => `${n}=${l?.length}`)
         .join(' ');
     console.log(`${all.length} scenarios (${by('category')}; ${by('priority')})`);
+  });
+
+scenarios
+  .command('list')
+  .description('list scenarios with id, type, page, status and title')
+  .option('--page <route>', 'only this page (route or name)')
+  .option('--removed', 'also show removed scenarios')
+  .action(async (o: { page?: string; removed?: boolean }) => {
+    const ctx = await createContext(root());
+    // Commander hands `--page` to the parent `scenarios` command, which declares the same option.
+    const page = o.page ?? scenarios.opts<{ page?: string }>().page;
+    const rows = listScenarioRows(ctx, { page, removed: o.removed });
+    if (rows.length === 0) {
+      console.log('No scenarios yet. Run `ai-qa-agent scenarios` first.');
+      return;
+    }
+    for (const [i, line] of formatScenarioTable(rows).entries()) console.log(i === 0 ? pc.dim(line) : line);
+  });
+
+scenarios
+  .command('remove')
+  .description('delete scenarios and their tests; they are not regenerated (undo with `restore`)')
+  .argument('<ids...>', 'scenario ids, e.g. CHECKOUT-008')
+  .option('--reason <text>', 'why the scenario is not needed (kept with the tombstone, shown to the AI)')
+  .action(async (ids: string[], o: { reason?: string }) => {
+    const ctx = await createContext(root());
+    for (const r of await removeScenarios(ctx, ids, { reason: o.reason })) {
+      const spec =
+        r.spec === 'test-removed'
+          ? `test removed from ${r.specFile}`
+          : r.spec === 'no-test'
+            ? `no test in ${r.specFile}`
+            : 'no spec file yet';
+      console.log(`  ${pc.red('removed')} ${r.id} ${r.title} ${pc.dim(`(${spec})`)}`);
+    }
+    console.log(pc.dim('Undo with `ai-qa-agent scenarios restore <id>`.'));
+  });
+
+scenarios
+  .command('restore')
+  .description('bring removed scenarios back (approved); their tests return on the next `generate`')
+  .argument('<ids...>', 'scenario ids')
+  .action(async (ids: string[]) => {
+    const ctx = await createContext(root());
+    const restored = restoreScenarios(ctx, ids);
+    for (const r of restored) console.log(`  ${pc.green('restored')} ${r.id} ${r.title}`);
+    const pages = [...new Set(restored.map((r) => pageSlug(r.page)))];
+    console.log(
+      `Run ${pages.map((p) => pc.bold(`ai-qa-agent generate --page ${p}`)).join(' and ')} to regenerate the test(s).`,
+    );
   });
 
 program

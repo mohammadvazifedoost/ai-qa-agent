@@ -40,7 +40,8 @@ init ──► analyze ──► design ──► scenarios ──► generate �
 | triage | `triage/*` | outcomes + evidence + scenario + source + design | `triage.json` (per-failure verdicts, consolidated issues) | — |
 | file | `bugs/file.ts` | confirmed issues | `filing.json` marking them *pending* — the pipeline never creates tasks | — |
 | (dashboard button) | `bugs/file.ts` `fileIssues`, `integrations/clickup.ts` | one issue or one failure, on a person's click | ClickUp task + attachments (or a comment on the task filed earlier), `filing.json`, `state.bugs` | fingerprint of scenario ids, root-cause files |
-| ui | `ui/server.ts`, `ui/page.ts` | scenarios, run results, triage, filing | local dashboard (`/api/overview`, `/files/*`, `POST /api/file` to log one issue) | — |
+| ui | `ui/server.ts`, `ui/page.ts` | scenarios, run results, triage, filing | local dashboard (`/api/overview`, `/files/*`, `POST /api/file` to log one issue, `POST /api/scenarios/delete` to remove a scenario) | — |
+| (remove / restore) | `scenarios/manage.ts`, `scenarios/spec-edit.ts` | scenario ids from the CLI or the dashboard | scenario moved to `removed` in `scenarios/<page>.json`; its test cut from the spec (validated with `--list`, rolled back on failure); `generatedSpecs` kept fresh | — |
 | report | `report/report.ts` | everything above | `reports/<id>/report.md|html`, `bugs/*.md` | — |
 
 ## Modules
@@ -72,7 +73,10 @@ src/
   design/schema.ts        DesignSystem schema with observed/inferred/unknown certainty
   design/figma.ts         extraction task (read-only Figma tools), reference image download,
                           rate-limit reporting, back-fill of missing references
-  scenarios/              Scenario schema, generation per page, page selection helpers
+  scenarios/              Scenario schema, generation per page (respects removed scenarios), page
+                          selection helpers
+  scenarios/manage.ts     list/remove/restore scenarios; removal tombstones and spec cache upkeep
+  scenarios/spec-edit.ts  lexer-based removal of one test('<ID>: …') block from a spec (no AI)
   generate/playwright.ts  test generation + validation loop
   playwright/index.ts     runtime for generated tests (fixtures: qa helpers, log capture)
   playwright/style.ts     pure CSS value comparison

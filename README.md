@@ -85,6 +85,9 @@ Both `--figma` and `--clickup-list` are optional; add them later by editing `.qa
 | `ai-qa-agent doctor` | Verify Claude Code, Playwright, the app URL, Figma and ClickUp configuration |
 | `ai-qa-agent analyze` | Analyze the source code (`.qa/app-model.json`) and the Figma file (`.qa/design-system.json`) |
 | `ai-qa-agent scenarios` | Generate/refresh test scenarios per page (`.qa/scenarios/*.json`) |
+| `ai-qa-agent scenarios list` | List scenarios (id, type, page, latest status, title); `--page`, `--removed` |
+| `ai-qa-agent scenarios remove <id...>` | Delete unnecessary/unusable scenarios and their tests; they are not regenerated (`--reason "<text>"`) |
+| `ai-qa-agent scenarios restore <id...>` | Undo a removal; the test comes back on the next `generate` |
 | `ai-qa-agent generate` | Generate Playwright tests from approved scenarios (`.qa/tests/*.spec.ts`) |
 | `ai-qa-agent test` | Run the tests and collect evidence — no AI involved |
 | `ai-qa-agent triage` | Classify the failures of the latest run and write a report |
@@ -105,6 +108,8 @@ ai-qa-agent run --resume                 # continue an interrupted run
 ai-qa-agent run --refresh                # ignore caches; re-read code and Figma
 ai-qa-agent test --grep CHECKOUT-002     # specific scenario ids
 ai-qa-agent scenarios --page login --force --max 8
+ai-qa-agent scenarios list --page checkout
+ai-qa-agent scenarios remove CHECKOUT-008 --reason "order placement is out of scope"
 ai-qa-agent ui --port 4310
 ai-qa-agent --cwd ../other-project doctor
 ```
@@ -128,6 +133,25 @@ Nothing is regenerated from scratch on every run:
 
 Typical flow after adding a feature: `ai-qa-agent changes` → `ai-qa-agent run --changed` → review in
 `ai-qa-agent ui` → log the confirmed bugs from the dashboard.
+
+### Removing scenarios
+
+Some generated scenarios are not worth keeping (duplicates, out of scope, untestable). Delete them
+with `ai-qa-agent scenarios remove <id...> [--reason "<text>"]` (find ids with
+`ai-qa-agent scenarios list`) or with *Delete scenario* in the dashboard's scenario modal.
+
+- The scenario leaves the `scenarios` array of `.qa/scenarios/<page>.json` and its
+  `test('<ID>: …')` block is cut out of `.qa/tests/<page>.spec.ts` — no AI; other tests and
+  helpers are untouched. The edited spec is checked with `playwright test --list`; if it no longer
+  loads, the original is put back and nothing changes.
+- It is recorded under `removed` in the same scenario file (id, title, reason, time, full
+  scenario). Scenario generation tells the AI not to recreate removed scenarios and drops any that
+  come back with a removed id or title, so it stays gone after `scenarios --force` or a page change.
+- The spec's generation cache is updated, so `generate` does not rewrite the spec because of it.
+- Past run results and evidence are kept; the dashboard just stops listing the scenario.
+- Undo with `ai-qa-agent scenarios restore <id>`: the scenario returns (approved) to the JSON and
+  its test comes back on the next `ai-qa-agent generate --page <page>` (or `run`), which
+  regenerates that page's spec with AI.
 
 ## Configuration (`.qa/config.ts`)
 
@@ -287,6 +311,8 @@ pipeline writes — no database, no external service.
   report (consolidated for confirmed defects; for failures the analyzer did not confirm it is built
   from the scenario and the error and labelled `needs-verification`). Filters: All / Failures /
   Passing, type (functional, visual, responsive), search, and page.
+- *Delete scenario* in the modal footer removes a scenario and its test after an inline
+  confirmation (optional reason); see [Removing scenarios](#removing-scenarios).
 - The tracker credentials must be in the environment of the shell that started the UI
   (`CLICKUP_API_TOKEN=... npx ai-qa-agent ui`, or `JIRA_API_TOKEN` + `JIRA_EMAIL`). Filing results
   are written back to the run so the report and the dashboard stay consistent.
@@ -362,7 +388,7 @@ npx ai-qa-agent init --figma https://www.figma.com/design/KEY/Shop --clickup-lis
 export CLICKUP_API_TOKEN=pk_...
 npx ai-qa-agent doctor
 npx ai-qa-agent analyze                  # review .qa/app-model.json and .qa/design-system.json
-npx ai-qa-agent scenarios                # review .qa/scenarios/*.json, set approved:false to drop one
+npx ai-qa-agent scenarios                # review .qa/scenarios/*.json; `scenarios remove <id>` drops one
 npx ai-qa-agent run                      # generates tests, runs, triages, files bugs, writes report
 open .qa/reports/latest.md
 ```
@@ -377,7 +403,7 @@ open .qa/reports/latest.md
 | `Claude Code exited ... without a result` | Run `claude --version` and `claude -p "hi"`; log in with `claude` if needed. |
 | `No page matches "..."` | Use a route (`/checkout`), a slug (`checkout`) or the page name from `app-model.json`. |
 | Visual tests fail with `no-reference` | The screen has no downloaded reference; check `design-system.json` → `references`. |
-| A test is wrong, not the app | The triage report says `TEST_BUG` with the reason; fix `.qa/scenarios/<page>.json` (the expectation) and rerun `ai-qa-agent generate --page <page> --force`, or set `approved: false`. |
+| A test is wrong, not the app | The triage report says `TEST_BUG` with the reason; fix `.qa/scenarios/<page>.json` (the expectation) and rerun `ai-qa-agent generate --page <page> --force`, or drop it with `ai-qa-agent scenarios remove <id>`. |
 | Everything is regenerated each run | `.qa/state.json` is missing or ignored; keep it writable (it is git-ignored but must persist locally/in CI cache). |
 
 Logs: `.qa/artifacts/logs/ai-qa.log` (all levels), `ai-qa-agent --debug ...` for console verbosity,

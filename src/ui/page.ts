@@ -1,8 +1,8 @@
 /**
  * The dashboard is a single static page served by `ai-qa-agent ui`. Styling is Tailwind, compiled at
  * package build time into dist/ui/styles.css (see src/ui/tailwind.css). The page reads
- * /api/overview, links evidence under /files/, and creates ClickUp tasks / Jira issues through
- * POST /api/file.
+ * /api/overview, links evidence under /files/, creates ClickUp tasks / Jira issues through
+ * POST /api/file and deletes scenarios through POST /api/scenarios/delete.
  */
 export const PAGE_HTML = String.raw`<!doctype html>
 <html lang="en">
@@ -37,6 +37,7 @@ export const PAGE_HTML = String.raw`<!doctype html>
   </main>
 </div>
 <dialog id="modal" class="m-auto w-[min(1040px,calc(100vw-32px))] max-h-[calc(100vh-32px)] rounded-2xl border-0 bg-surface p-0 text-ink shadow-[0_24px_70px_rgba(11,31,42,.28)] max-sm:h-dvh max-sm:max-h-dvh max-sm:w-screen max-sm:max-w-none max-sm:rounded-none" aria-labelledby="m-title"></dialog>
+<div id="toast" role="status" aria-live="polite" hidden class="fixed bottom-5 left-1/2 z-10 max-w-[calc(100vw-32px)] -translate-x-1/2 rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-bg shadow-lg"></div>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -288,8 +289,48 @@ function openModal(id) {
     '<div class="text-[13px] text-muted"><span class="font-mono text-[12.5px]">' + esc(sc.id) + '</span> · ' + esc(sc.page) + ' · ' + esc(sc.viewport) + ' · ' + esc(sc.priority) + ' priority</div></div>' +
     '<button class="ml-auto size-[34px] shrink-0 cursor-pointer rounded-full border-0 bg-line text-lg leading-none text-ink hover:bg-line-strong" onclick="document.getElementById(\'modal\').close()" aria-label="Close">×</button></div>' +
     '<div class="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-auto px-5 py-5 md:grid-cols-[minmax(300px,1fr)_minmax(300px,1.25fr)] md:px-6"><div>' + left + '</div><div>' + right + '</div></div>' +
-    (foot ? '<div class="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-5 py-3.5 md:px-6">' + foot + '</div>' : '');
+    '<div class="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-5 py-3.5 md:px-6">' + foot + deleteArea(sc.id) + '</div>';
   if (!modal.open) modal.showModal();
+}
+
+/* ---------- delete scenario (inline confirm in the modal footer) ---------- */
+function deleteArea(id) {
+  return '<div id="del-area" class="ml-auto flex flex-wrap items-center justify-end gap-2">' +
+    '<button class="btn-quiet btn-quiet-danger" onclick="askDelete(\'' + esc(id) + '\')">Delete scenario</button></div>';
+}
+function askDelete(id) {
+  const area = $('#del-area');
+  area.innerHTML = '<span class="text-[13px] text-muted">Delete <span class="font-mono text-[12.5px] text-ink">' + esc(id) + '</span> and its test?</span>' +
+    '<input id="del-reason" class="field w-48 py-[5px]" placeholder="Reason (optional)" aria-label="Reason for deleting (optional)" maxlength="200">' +
+    '<button class="btn-quiet" onclick="cancelDelete(\'' + esc(id) + '\')">Cancel</button>' +
+    '<button id="del-confirm" class="btn btn-danger" onclick="confirmDelete(\'' + esc(id) + '\')">Delete</button>' +
+    '<p id="del-error" class="m-0 w-full text-right text-[13px] text-fail" role="alert"></p>';
+  const input = $('#del-reason');
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirmDelete(id); });
+  input.focus();
+}
+function cancelDelete(id) { $('#del-area').outerHTML = deleteArea(id); }
+async function confirmDelete(id) {
+  const btn = $('#del-confirm');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  const reason = $('#del-reason').value.trim();
+  let out = {}, ok = false;
+  try {
+    const res = await fetch('/api/scenarios/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, reason: reason || undefined }) });
+    out = await res.json(); ok = res.ok;
+  } catch (err) { out = { error: String(err) }; }
+  if (!ok) { btn.disabled = false; btn.textContent = 'Delete'; $('#del-error').textContent = 'Could not delete: ' + (out.error || 'unknown error'); return; }
+  $('#modal').close();
+  await load(data.run?.id);
+  toast(id + ' deleted' + (out.spec === 'test-removed' ? ' and its test removed' : '') + '. Undo: ai-qa-agent scenarios restore ' + id);
+}
+let toastTimer;
+function toast(text) {
+  const el = $('#toast');
+  el.textContent = text; el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 8000);
 }
 const link = (href, text, blank) => href ? '<a class="text-accent underline-offset-2 hover:underline" href="' + file(href) + '"' + (blank ? ' target="_blank" rel="noopener"' : '') + '>' + esc(text) + '</a>' : '';
 $('#modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });

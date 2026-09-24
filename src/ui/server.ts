@@ -18,6 +18,7 @@ import { runDir } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
 import { TestRunResultSchema, type TestRunResult } from '../runner/results.js';
 import { loadAllScenarios } from '../scenarios/generate.js';
+import { removeScenarios } from '../scenarios/manage.js';
 import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
 import { PAGE_HTML } from './page.js';
 
@@ -310,6 +311,31 @@ async function handleFile(ctx: QaContext, body: string): Promise<{ status: numbe
   }
 }
 
+/** Deletions edit spec and scenario files; run them one at a time. */
+let deleting: Promise<unknown> = Promise.resolve();
+
+async function handleDeleteScenario(
+  ctx: QaContext,
+  body: string,
+): Promise<{ status: number; payload: unknown }> {
+  const { id, reason } = JSON.parse(body || '{}') as { id?: unknown; reason?: unknown };
+  if (typeof id !== 'string' || !id.trim()) return { status: 400, payload: { error: 'id is required' } };
+  const task = deleting.then(() =>
+    removeScenarios(ctx, [id], { reason: typeof reason === 'string' ? reason.trim() : undefined }),
+  );
+  deleting = task.catch(() => undefined);
+  try {
+    const [removed] = await task;
+    return { status: 200, payload: removed };
+  } catch (err) {
+    const message = (err as Error).message;
+    return {
+      status: /^Unknown scenario|already removed/.test(message) ? 404 : 409,
+      payload: { error: message },
+    };
+  }
+}
+
 export function startUi(ctx: QaContext, opts: { port: number; host?: string }): Promise<http.Server> {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -328,6 +354,9 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         }
       } else if (req.method === 'POST' && url.pathname === '/api/file') {
         const { status, payload } = await handleFile(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/scenarios/delete') {
+        const { status, payload } = await handleDeleteScenario(ctx, await readBody(req));
         json(res, status, payload);
       } else if (req.method === 'GET' && url.pathname.startsWith('/files/')) {
         serveFile(ctx, url.pathname, res);
