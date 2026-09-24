@@ -151,7 +151,7 @@ Return every page with its top-level frames (direct children of the canvas that 
 
 export function describeChanges(code: CodeChanges, design?: DesignChanges): string[] {
   const lines: string[] = [];
-  if (!code.hasModel) lines.push('No app model yet — everything is new. Run `ai-qa analyze`.');
+  if (!code.hasModel) lines.push('No app model yet — everything is new. Run `ai-qa-agent analyze`.');
   for (const p of code.newPages) lines.push(`new page      ${p.route}  (${p.file})`);
   for (const r of code.changedPages) lines.push(`changed page  ${r}`);
   for (const r of code.removedPages) lines.push(`removed page  ${r}`);

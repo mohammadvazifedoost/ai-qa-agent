@@ -24,7 +24,7 @@ export function renderConfig(info: ProjectInfo, opts: InitOptions): string {
   const baseUrl = opts.baseUrl ?? `http://${info.devHost ?? 'localhost'}:${info.devPort ?? 3000}`;
   const include = info.sourceDirs.length ? info.sourceDirs : ['.'];
   const lines: string[] = [];
-  lines.push(`import { defineConfig } from '@company/ai-qa';`, '');
+  lines.push(`import { defineConfig } from '@company/ai-qa-agent';`, '');
   lines.push(`export default defineConfig({`);
   lines.push(`  project: {`);
   lines.push(`    name: ${JSON.stringify(info.name)},`);
@@ -42,7 +42,7 @@ export function renderConfig(info: ProjectInfo, opts: InitOptions): string {
     lines.push(`  figma: {`);
     lines.push(`    fileUrl: ${JSON.stringify(opts.figmaUrl)},`);
     lines.push(
-      `    // Frames used as visual references. Filled in by \`ai-qa design\`; edit to pin specific frames.`,
+      `    // Frames used as visual references. Filled in by \`ai-qa-agent design\`; edit to pin specific frames.`,
     );
     lines.push(`    frames: [],`);
     lines.push(`  },`);

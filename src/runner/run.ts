@@ -63,7 +63,7 @@ export async function runTests(
   const specs = fs.existsSync(ctx.paths.testsDir)
     ? fs.readdirSync(ctx.paths.testsDir).filter((f) => f.endsWith('.spec.ts'))
     : [];
-  if (specs.length === 0) throw new Error('No tests in .qa/tests. Run `ai-qa generate` first.');
+  if (specs.length === 0) throw new Error('No tests in .qa/tests. Run `ai-qa-agent generate` first.');
 
   writePlaywrightConfig(ctx.paths, ctx.config);
   const app = await ensureApp(ctx.root, ctx.config, path.join(dir, 'logs', 'app-server.log'));

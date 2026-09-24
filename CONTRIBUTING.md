@@ -39,13 +39,13 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the module map. Rules of thumb:
 
 `fixtures/demo-shop` is a small Vite + React app with planted defects, documented in
 `fixtures/README.md` (kept outside the app so the agent cannot read the answers). The fixture is
-linked to the engine via `"@company/ai-qa": "file:../.."`.
+linked to the engine via `"@company/ai-qa-agent": "file:../.."`.
 
 ```bash
 npm run build
 cd fixtures/demo-shop && npm install
-npx ai-qa doctor
-npx ai-qa run --no-file          # full pipeline; ~5 min and ~$1.50 of AI usage on Sonnet
+npx ai-qa-agent doctor
+npx ai-qa-agent run --no-file          # full pipeline; ~5 min and ~$1.50 of AI usage on Sonnet
 cat .qa/reports/latest.md
 ```
 
@@ -59,20 +59,20 @@ The fixture's Figma file is `https://www.figma.com/design/RPpqNkGynHaWPphAXkpFFH
 Figma MCP `use_figma` tool: variables, text styles, a Button component set and four screens). Its
 design values intentionally differ from the app's CSS where `fixtures/README.md` says so.
 
-Note the Figma MCP quota: Starter plans allow 20 read calls per month, so run `ai-qa analyze` on the
+Note the Figma MCP quota: Starter plans allow 20 read calls per month, so run `ai-qa-agent analyze` on the
 fixture sparingly; extracted results are cached in `.qa/design-system.json`.
 
 ### Validating feature-scoped runs
 
 The fixture's `/contact` page was added after the first analysis specifically to exercise this
-path. To replay it: check out the commit before the page existed, run `ai-qa analyze`, check out
-HEAD again, then `npx ai-qa changes` must report `new page /contact` plus the changed shared files
-(`src/main.tsx`, `src/components/Layout.tsx`, …) and nothing else; `npx ai-qa run --changed` must
+path. To replay it: check out the commit before the page existed, run `ai-qa-agent analyze`, check out
+HEAD again, then `npx ai-qa-agent changes` must report `new page /contact` plus the changed shared files
+(`src/main.tsx`, `src/components/Layout.tsx`, …) and nothing else; `npx ai-qa-agent run --changed` must
 analyze, generate and execute tests for `/contact` only.
 
 ### Dashboard
 
-`npx ai-qa ui` in the fixture (with `CLICKUP_API_TOKEN` exported if you want to try the
+`npx ai-qa-agent ui` in the fixture (with `CLICKUP_API_TOKEN` exported if you want to try the
 *Log bug in ClickUp* button) serves the dashboard on http://127.0.0.1:4310. The page is a single
 static HTML string in `src/ui/page.ts`; the JSON it consumes comes from `buildOverview()` in
 `src/ui/server.ts`.
@@ -83,9 +83,9 @@ Unit tests cover the client with a fake `fetch`. To verify against a real worksp
 
 ```bash
 export CLICKUP_API_TOKEN=pk_...
-npx ai-qa init --force --clickup-list <listId> ...   # or add the clickup section by hand
-npx ai-qa doctor                                    # validates the token and prints the list name
-npx ai-qa run                                       # files confirmed defects
+npx ai-qa-agent init --force --clickup-list <listId> ...   # or add the clickup section by hand
+npx ai-qa-agent doctor                                    # validates the token and prints the list name
+npx ai-qa-agent run                                       # files confirmed defects
 ```
 
 ## Commit conventions

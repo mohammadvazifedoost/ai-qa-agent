@@ -53,7 +53,7 @@ const log = logger('cli');
 const program = new Command();
 
 program
-  .name('ai-qa')
+  .name('ai-qa-agent')
   .description(
     'AI QA Agent: design + code analysis, Playwright test generation, failure triage, ClickUp bugs',
   )
@@ -83,7 +83,7 @@ program
     });
     for (const f of created) console.log(`  ${pc.green('created')} ${rel(root(), f)}`);
     console.log(
-      `\nNext: review .qa/config.ts, then run ${pc.bold('npx ai-qa doctor')} and ${pc.bold('npx ai-qa run')}.`,
+      `\nNext: review .qa/config.ts, then run ${pc.bold('npx ai-qa-agent doctor')} and ${pc.bold('npx ai-qa-agent run')}.`,
     );
   });
 
@@ -197,7 +197,7 @@ function loadRun(ctx: QaContext, runId?: string): TestRunResult {
     [...ctx.state.data.runs]
       .reverse()
       .find((r) => fs.existsSync(path.join(runDir(ctx.paths, r.id), 'results.json')))?.id;
-  if (!id) throw new Error('No test run with results found. Run `ai-qa test` first.');
+  if (!id) throw new Error('No test run with results found. Run `ai-qa-agent test` first.');
   const res = readJson(path.join(runDir(ctx.paths, id), 'results.json'), TestRunResultSchema);
   if (!res) throw new Error(`Run ${id} has no results.json`);
   return res;
@@ -237,7 +237,7 @@ program
   .option('--page <route>', 'only this page (route or name)')
   .option('--category <category>', 'only run tests of this category: functional | visual | responsive')
   .option('--feature <feature>', 'only run tests of this feature tag, e.g. auth')
-  .option('--changed', 'only new or changed pages (see `ai-qa changes`)')
+  .option('--changed', 'only new or changed pages (see `ai-qa-agent changes`)')
   .option('--design', 'with --changed: also inspect Figma for new/changed frames (uses Figma MCP calls)')
   .option('--resume', 'continue the last unfinished run')
   .option('--refresh', 'ignore caches and re-analyze code and design')
@@ -259,7 +259,7 @@ program
     const s = res.test.stats;
     console.log(
       `\n${pc.bold('Result')}: ${s.passed} passed, ${s.failed} failed · ${res.triage.issues.length} defect(s) · ${res.filing.message}\n` +
-        `Report: ${rel(ctx.root, res.report.markdown)} — browse with ${pc.bold('npx ai-qa ui')}`,
+        `Report: ${rel(ctx.root, res.report.markdown)} — browse with ${pc.bold('npx ai-qa-agent ui')}`,
     );
     if (res.triage.issues.length) process.exitCode = 1;
   });
@@ -276,7 +276,7 @@ program
     const routes = routesToAnalyze(code);
     if (routes.length || design?.newScreens.length || design?.changedPages.length) {
       console.log(
-        `\nRun ${pc.bold('npx ai-qa run --changed' + (o.design ? ' --design' : ''))} to test only these.`,
+        `\nRun ${pc.bold('npx ai-qa-agent run --changed' + (o.design ? ' --design' : ''))} to test only these.`,
       );
     }
   });

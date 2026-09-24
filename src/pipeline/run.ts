@@ -66,7 +66,9 @@ export async function runPipeline(ctx: QaContext, opts: RunOptions): Promise<Pip
     designChanged = !!design && (design.newScreens.length > 0 || design.changedPages.length > 0);
     pages = code.hasModel ? routesToAnalyze(code) : undefined;
     if (code.hasModel && pages!.length === 0 && !designChanged) {
-      log.info('Nothing changed — no tests to run. Use `ai-qa run` (without --changed) for a full run.');
+      log.info(
+        'Nothing changed — no tests to run. Use `ai-qa-agent run` (without --changed) for a full run.',
+      );
       return {
         run: ctx.state.latestRun()!,
         test: null,
@@ -134,7 +136,7 @@ export async function runPipeline(ctx: QaContext, opts: RunOptions): Promise<Pip
   } catch (err) {
     ctx.state.finishRun(run, 'failed', (err as Error).message);
     log.error(
-      `Run ${run.id} stopped: ${(err as Error).message}. Fix the cause and use \`ai-qa run --resume\`.`,
+      `Run ${run.id} stopped: ${(err as Error).message}. Fix the cause and use \`ai-qa-agent run --resume\`.`,
     );
     throw err;
   }

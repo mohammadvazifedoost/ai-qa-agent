@@ -185,7 +185,7 @@ function reportFigmaErrors(calls: ToolCallRecord[]): boolean {
   log.warn(
     `Figma MCP rejected ${limited.length} call(s) because of plan limits: "${limited[0]!.text.trim().slice(0, 160)}". ` +
       'Starter plans allow 20 read calls/month; Dev/Full seats on paid plans allow 200+/day. ' +
-      'Results below are partial; re-run `ai-qa analyze` after the limit resets to fill the gaps.',
+      'Results below are partial; re-run `ai-qa-agent analyze` after the limit resets to fill the gaps.',
   );
   return true;
 }

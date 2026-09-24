@@ -75,7 +75,7 @@ export interface ScenarioScope {
 
 export async function generateScenarios(ctx: QaContext, scope: ScenarioScope = {}): Promise<Scenario[]> {
   const app = loadAppModel(ctx);
-  if (!app) throw new Error('No .qa/app-model.json yet. Run `ai-qa analyze` first.');
+  if (!app) throw new Error('No .qa/app-model.json yet. Run `ai-qa-agent analyze` first.');
   const design = loadDesign(ctx);
   const pages = selectPages(app.pages, scope.page).filter(
     (p) => !scope.pages || scope.pages.includes(p.route),

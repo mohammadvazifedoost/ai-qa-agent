@@ -9,7 +9,7 @@ export class ConfigError extends Error {}
 export async function loadConfig(root: string): Promise<QaConfig> {
   const file = qaPaths(root).config;
   if (!fs.existsSync(file)) {
-    throw new ConfigError(`No QA config found at ${file}. Run \`ai-qa init\` first.`);
+    throw new ConfigError(`No QA config found at ${file}. Run \`ai-qa-agent init\` first.`);
   }
   const jiti = createJiti(import.meta.url, { moduleCache: false });
   const mod = await jiti.import<{ default?: unknown }>(file);

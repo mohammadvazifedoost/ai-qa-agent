@@ -18,7 +18,7 @@ export interface QaContext {
 export async function createContext(root: string): Promise<QaContext> {
   const paths = qaPaths(path.resolve(root));
   const config = await loadConfig(paths.root);
-  setLogFile(path.join(paths.logsDir, 'ai-qa.log'));
+  setLogFile(path.join(paths.logsDir, 'ai-qa-agent.log'));
   const ai = new ClaudeRunner({
     claudePath: config.ai.claudePath,
     model: config.ai.model,

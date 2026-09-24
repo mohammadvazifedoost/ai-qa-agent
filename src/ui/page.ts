@@ -1,5 +1,5 @@
 /**
- * The dashboard is a single static page served by `ai-qa ui`. Styling is Tailwind, compiled at
+ * The dashboard is a single static page served by `ai-qa-agent ui`. Styling is Tailwind, compiled at
  * package build time into dist/ui/styles.css (see src/ui/tailwind.css). The page reads
  * /api/overview, links evidence under /files/, and creates ClickUp tasks through POST /api/file.
  */
@@ -104,13 +104,13 @@ function render() {
   const cu = $('#clickup');
   const head = '<b class="block text-[11.5px] font-bold uppercase tracking-[0.12em] text-rail-muted">ClickUp</b>';
   if (!data.clickup.configured) cu.innerHTML = head + '<span class="mt-1 block">Not configured — bugs stay in the report.</span>';
-  else if (!data.clickup.tokenPresent) cu.innerHTML = head + '<span class="mt-1 block text-flaky">Token missing in the shell that started ai-qa ui.</span>';
+  else if (!data.clickup.tokenPresent) cu.innerHTML = head + '<span class="mt-1 block text-flaky">Token missing in the shell that started ai-qa-agent ui.</span>';
   else cu.innerHTML = head + '<span class="mt-1 block"><span class="text-pass">Ready</span> · list ' + esc(data.clickup.listId) + '</span>';
 
   const main = $('#main');
   const empty = (msg) => '<div class="rounded-2xl border border-dashed border-line-strong px-6 py-14 text-center text-muted">' + msg + '</div>';
-  if (!data.scenarios.length) { $('#nav').innerHTML = ''; main.innerHTML = empty('No scenarios yet. Run <code class="font-mono text-[13px]">ai-qa scenarios</code> first.'); return; }
-  if (!data.run) { $('#nav').innerHTML = ''; main.innerHTML = empty('No test run yet. Run <code class="font-mono text-[13px]">ai-qa run</code> or <code class="font-mono text-[13px]">ai-qa test</code>.'); return; }
+  if (!data.scenarios.length) { $('#nav').innerHTML = ''; main.innerHTML = empty('No scenarios yet. Run <code class="font-mono text-[13px]">ai-qa-agent scenarios</code> first.'); return; }
+  if (!data.run) { $('#nav').innerHTML = ''; main.innerHTML = empty('No test run yet. Run <code class="font-mono text-[13px]">ai-qa-agent run</code> or <code class="font-mono text-[13px]">ai-qa-agent test</code>.'); return; }
 
   const all = data.scenarios.map((sc) => ({ sc, status: statusOf(sc.id) }));
   const inRun = all.filter((x) => x.status !== 'none');
@@ -220,7 +220,7 @@ function action(sc, status) {
   }
   const issue = issueFor(o.key);
   const body = issue ? { issueId: issue.id } : { failureKey: o.key };
-  const disabled = data.clickup.tokenPresent ? '' : 'disabled title="ClickUp token missing in the shell that started ai-qa ui"';
+  const disabled = data.clickup.tokenPresent ? '' : 'disabled title="ClickUp token missing in the shell that started ai-qa-agent ui"';
   return '<button class="btn" ' + disabled + ' onclick="event.stopPropagation(); fileBug(this, ' + esc(JSON.stringify(body)) + ')">Create task</button>';
 }
 
@@ -258,7 +258,7 @@ function openModal(id) {
                : (f?.testProblem ? '<p class="mt-2 mb-0 text-sm text-muted">Test problem: ' + esc(f.testProblem) + '</p>' : '')));
       if (issue) left += section('Expected vs actual', '<p class="mb-1.5 mt-0"><b>Expected</b> ' + esc(issue.bug.expectedResult) + '</p><p class="m-0"><b>Actual</b> ' + esc(issue.bug.actualResult) + '</p>');
     } else if (o.status !== 'passed') {
-      left += section('', '<p class="m-0 text-base font-semibold">Failed; not analyzed yet (run <code class="font-mono text-[13px]">ai-qa triage</code>).</p>');
+      left += section('', '<p class="m-0 text-base font-semibold">Failed; not analyzed yet (run <code class="font-mono text-[13px]">ai-qa-agent triage</code>).</p>');
     }
     if (o.error) left += section('', '<details class="disclosure"><summary>Test error</summary><pre class="mt-2.5 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-bg p-3 font-mono text-xs">' + esc(o.error.message) + '</pre></details>');
     const a = o.artifacts;

@@ -32,7 +32,7 @@ describe('ClickUpClient', () => {
     const task = await client.createTask('123', {
       name: 'Bug',
       markdown: '# md',
-      tags: ['ai-qa'],
+      tags: ['ai-qa-agent'],
       priority: PRIORITY.high,
       status: 'to do',
     });
@@ -42,7 +42,7 @@ describe('ClickUpClient', () => {
     expect(JSON.parse(calls[0]!.init.body as string)).toEqual({
       name: 'Bug',
       markdown_content: '# md',
-      tags: ['ai-qa'],
+      tags: ['ai-qa-agent'],
       priority: 2,
       status: 'to do',
     });

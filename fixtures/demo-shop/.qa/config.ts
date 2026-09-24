@@ -1,4 +1,4 @@
-import { defineConfig } from '@company/ai-qa';
+import { defineConfig } from '@company/ai-qa-agent';
 
 export default defineConfig({
   project: {
@@ -15,7 +15,7 @@ export default defineConfig({
   },
   figma: {
     fileUrl: "https://www.figma.com/design/RPpqNkGynHaWPphAXkpFFH/ai-qa-demo-shop-design",
-    // Frames used as visual references. Filled in by `ai-qa design`; edit to pin specific frames.
+    // Optional: pin frames { name, nodeId, route, viewport }. Otherwise screens are discovered by `ai-qa-agent analyze`.
     frames: [],
   },
   clickup: {

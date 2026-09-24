@@ -322,7 +322,7 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         const css = new URL('./styles.css', import.meta.url);
         if (!fs.existsSync(css)) {
           res.writeHead(404);
-          res.end('/* styles.css missing: run `npm run build` in @company/ai-qa */');
+          res.end('/* styles.css missing: run `npm run build` in @company/ai-qa-agent */');
         } else {
           res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': 'no-cache' });
           fs.createReadStream(css).pipe(res);

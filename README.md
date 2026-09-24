@@ -1,7 +1,7 @@
 # AI QA Agent
 
-An AI-powered QA agent for web projects, published as the npm package `@company/ai-qa` with the
-command `ai-qa`. Install it into any web application and it will:
+An AI-powered QA agent for web projects, published as the npm package `@company/ai-qa-agent` with the
+command `ai-qa-agent`. Install it into any web application and it will:
 
 1. read your **Figma** design and your **source code**,
 2. write prioritized **test scenarios** (functional, visual, responsive),
@@ -46,10 +46,10 @@ against Figma frames, never from a model saying "looks right".
 ## Installation
 
 ```bash
-npm install -D @company/ai-qa @playwright/test
+npm install -D @company/ai-qa-agent @playwright/test
 npx playwright install chromium
-npx ai-qa init --figma "https://www.figma.com/design/<fileKey>/<name>" --clickup-list <listId>
-npx ai-qa doctor
+npx ai-qa-agent init --figma "https://www.figma.com/design/<fileKey>/<name>" --clickup-list <listId>
+npx ai-qa-agent doctor
 ```
 
 `init` detects the framework (Next.js, Nuxt, SvelteKit, Remix/React Router, Astro, Angular, Vite…),
@@ -62,41 +62,41 @@ Both `--figma` and `--clickup-list` are optional; add them later by editing `.qa
 
 | Command | What it does |
 |---|---|
-| `ai-qa init` | Detect the project and create `.qa/config.ts`, `.qa/rules.md`, `.qa/.gitignore` |
-| `ai-qa doctor` | Verify Claude Code, Playwright, the app URL, Figma and ClickUp configuration |
-| `ai-qa analyze` | Analyze the source code (`.qa/app-model.json`) and the Figma file (`.qa/design-system.json`) |
-| `ai-qa scenarios` | Generate/refresh test scenarios per page (`.qa/scenarios/*.json`) |
-| `ai-qa generate` | Generate Playwright tests from approved scenarios (`.qa/tests/*.spec.ts`) |
-| `ai-qa test` | Run the tests and collect evidence — no AI involved |
-| `ai-qa triage` | Classify the failures of the latest run and write a report |
-| `ai-qa report` | Rebuild the report of a run from stored results |
-| `ai-qa run` | The full pipeline: analyze → scenarios → generate → test → triage → (file) → report |
-| `ai-qa changes` | Show what changed since the last analysis: new/changed/removed pages, changed shared files, and with `--design` new/changed Figma frames |
-| `ai-qa ui` | Local dashboard: every scenario with its result, screenshots, videos, traces, analysis, and a button to log confirmed bugs in ClickUp |
+| `ai-qa-agent init` | Detect the project and create `.qa/config.ts`, `.qa/rules.md`, `.qa/.gitignore` |
+| `ai-qa-agent doctor` | Verify Claude Code, Playwright, the app URL, Figma and ClickUp configuration |
+| `ai-qa-agent analyze` | Analyze the source code (`.qa/app-model.json`) and the Figma file (`.qa/design-system.json`) |
+| `ai-qa-agent scenarios` | Generate/refresh test scenarios per page (`.qa/scenarios/*.json`) |
+| `ai-qa-agent generate` | Generate Playwright tests from approved scenarios (`.qa/tests/*.spec.ts`) |
+| `ai-qa-agent test` | Run the tests and collect evidence — no AI involved |
+| `ai-qa-agent triage` | Classify the failures of the latest run and write a report |
+| `ai-qa-agent report` | Rebuild the report of a run from stored results |
+| `ai-qa-agent run` | The full pipeline: analyze → scenarios → generate → test → triage → (file) → report |
+| `ai-qa-agent changes` | Show what changed since the last analysis: new/changed/removed pages, changed shared files, and with `--design` new/changed Figma frames |
+| `ai-qa-agent ui` | Local dashboard: every scenario with its result, screenshots, videos, traces, analysis, and a button to log confirmed bugs in ClickUp |
 
 Scoping and flags:
 
 ```bash
-ai-qa run --changed                # only new/changed pages (a new feature) — see `ai-qa changes`
-ai-qa run --changed --design       # also re-extract the design when Figma frames changed
-ai-qa run --page checkout          # one page (route or name)
-ai-qa run --category visual        # functional | visual | responsive
-ai-qa run --feature auth           # by feature tag
-ai-qa run --resume                 # continue an interrupted run
-ai-qa run --refresh                # ignore caches; re-read code and Figma
-ai-qa test --grep CHECKOUT-002     # specific scenario ids
-ai-qa scenarios --page login --force --max 8
-ai-qa ui --port 4310
-ai-qa --cwd ../other-project doctor
+ai-qa-agent run --changed                # only new/changed pages (a new feature) — see `ai-qa-agent changes`
+ai-qa-agent run --changed --design       # also re-extract the design when Figma frames changed
+ai-qa-agent run --page checkout          # one page (route or name)
+ai-qa-agent run --category visual        # functional | visual | responsive
+ai-qa-agent run --feature auth           # by feature tag
+ai-qa-agent run --resume                 # continue an interrupted run
+ai-qa-agent run --refresh                # ignore caches; re-read code and Figma
+ai-qa-agent test --grep CHECKOUT-002     # specific scenario ids
+ai-qa-agent scenarios --page login --force --max 8
+ai-qa-agent ui --port 4310
+ai-qa-agent --cwd ../other-project doctor
 ```
 
-`ai-qa run` exits with code 1 when defects were found, so it can gate a CI job.
+`ai-qa-agent run` exits with code 1 when defects were found, so it can gate a CI job.
 
 ### Checking only what is new
 
 Nothing is regenerated from scratch on every run:
 
-- **Analysis** is per page. `ai-qa changes` compares each page's own source files with the hashes
+- **Analysis** is per page. `ai-qa-agent changes` compares each page's own source files with the hashes
   stored at analysis time (free, no AI). Only new and changed pages are re-analyzed; unchanged
   pages keep their model verbatim, so their scenarios and tests stay cached too.
 - Files shared by every page (router entry, layout, global CSS) are tracked separately as
@@ -107,13 +107,13 @@ Nothing is regenerated from scratch on every run:
 - **Design**: the Figma extraction is cached; `--design` inspects the file (one metadata call per
   Figma page) and re-extracts only when frames were added or a page's structure changed.
 
-Typical flow after adding a feature: `ai-qa changes` → `ai-qa run --changed` → review in
-`ai-qa ui` → log the confirmed bugs from the dashboard.
+Typical flow after adding a feature: `ai-qa-agent changes` → `ai-qa-agent run --changed` → review in
+`ai-qa-agent ui` → log the confirmed bugs from the dashboard.
 
 ## Configuration (`.qa/config.ts`)
 
 ```ts
-import { defineConfig } from '@company/ai-qa';
+import { defineConfig } from '@company/ai-qa-agent';
 
 export default defineConfig({
   project: { name: 'shop', framework: 'next', packageManager: 'pnpm' },
@@ -133,7 +133,7 @@ export default defineConfig({
   clickup: {
     listId: '901523571090',
     tokenEnv: 'CLICKUP_API_TOKEN',   // the token is read from this env var, never from config
-    tags: ['ai-qa'],
+    tags: ['ai-qa-agent'],
     status: 'to do',                 // optional; default is the list's first status
     attachEvidence: true,
   },
@@ -182,10 +182,10 @@ With no `clickup` section, confirmed defects stay in the report (`.qa/reports/<r
 and in the dashboard, which shows no *Create task* buttons.
 
 ```bash
-npm install -D @company/ai-qa @playwright/test && npx playwright install chromium
-npx ai-qa init            # no --figma, no --clickup-list
-npx ai-qa run             # code-only end-to-end QA
-npx ai-qa ui
+npm install -D @company/ai-qa-agent @playwright/test && npx playwright install chromium
+npx ai-qa-agent init            # no --figma, no --clickup-list
+npx ai-qa-agent run             # code-only end-to-end QA
+npx ai-qa-agent ui
 ```
 
 Add `figma` / `clickup` to `.qa/config.ts` later at any time; the next run picks them up.
@@ -212,20 +212,20 @@ keeps the partial result, and fetches missing reference screenshots on the next 
 
 1. Create a personal API token in ClickUp (Settings → Apps) and export it:
    `export CLICKUP_API_TOKEN=pk_...` (or set the variable in CI).
-2. Put the target list id in `clickup.listId` (from the list URL or the API). `ai-qa doctor`
+2. Put the target list id in `clickup.listId` (from the list URL or the API). `ai-qa-agent doctor`
    verifies the token and shows the list name.
 3. Confirmed defects become tasks named `[AI QA Agent] <title>` with a markdown description (severity,
    category, page, steps, expected/actual, root cause, environment, test ids) and the screenshot,
    video, trace and design-diff images attached. Priority maps from severity.
 
 **Nothing is ever filed automatically — there is no flag or setting for it.** After a run,
-confirmed defects wait in the report and in the dashboard (`ai-qa ui`); a task is created only when
+confirmed defects wait in the report and in the dashboard (`ai-qa-agent ui`); a task is created only when
 a person clicks *Create task* on a failed test. Symptoms of one underlying defect are grouped into
 one bug report, so one click covers all the tests it affects.
 
-## Dashboard (`ai-qa ui`)
+## Dashboard (`ai-qa-agent ui`)
 
-`npx ai-qa ui` serves a local page (default `http://127.0.0.1:4310`) built from the files the
+`npx ai-qa-agent ui` serves a local page (default `http://127.0.0.1:4310`) built from the files the
 pipeline writes — no database, no external service.
 
 - The sidebar lists pages with pass/fail counts; the verdict panel shows the run's pass ratio and
@@ -242,7 +242,7 @@ pipeline writes — no database, no external service.
   the error and tagged `needs-verification`). Filters: All / Failures / Passing, type (functional,
   visual, responsive) and page.
 - The token must be in the environment of the shell that started the UI
-  (`CLICKUP_API_TOKEN=pk_... npx ai-qa ui`). Filing results are written back to the run so the
+  (`CLICKUP_API_TOKEN=pk_... npx ai-qa-agent ui`). Filing results are written back to the run so the
   report and the dashboard stay consistent.
 
 ## Playwright setup
@@ -256,7 +256,7 @@ cd .qa && npx playwright test --config playwright.config.ts --grep @checkout
 npx playwright show-trace .qa/artifacts/runs/<run>/traces/CHECKOUT-002_chromium-desktop.zip
 ```
 
-Generated tests import `test`/`expect` from `@company/ai-qa/playwright`, which adds:
+Generated tests import `test`/`expect` from `@company/ai-qa-agent/playwright`, which adds:
 
 - `qa.expectDesignTokens(locator, { backgroundColor: '#2563EB', borderRadius: '8px', ... })` —
   computed-style comparison against Figma values (colors as RGBA, lengths ±0.5px, families,
@@ -281,7 +281,7 @@ Generated tests import `test`/`expect` from `@company/ai-qa/playwright`, which a
   playwright.config.ts   generated on each run
   state.json             stage hashes, run checkpoints, filed-bug fingerprints (resumability)
   artifacts/runs/<run>/  videos/ traces/ screenshots/ logs/ design/ results.json triage.json filing.json
-  artifacts/logs/        ai-qa.log and every AI transcript
+  artifacts/logs/        ai-qa-agent.log and every AI transcript
   reports/<run>/         report.md, report.html, bugs.json, bugs/BUG-00n.md
   reports/latest.md
 ```
@@ -305,19 +305,19 @@ agent never edits tests to make them pass, and never edits application code.
 
 Stages are cached on content hashes: analysis reruns only when source files change, scenarios only
 when a page's model/design changed, tests only when scenarios changed. Runs are checkpointed in
-`.qa/state.json`; `ai-qa run --resume` continues an interrupted run from the last completed stage
+`.qa/state.json`; `ai-qa-agent run --resume` continues an interrupted run from the last completed stage
 using the stored results. `--refresh` forces re-analysis.
 
 ## Example workflow
 
 ```bash
-npm install -D @company/ai-qa @playwright/test && npx playwright install chromium
-npx ai-qa init --figma https://www.figma.com/design/KEY/Shop --clickup-list 901523571090
+npm install -D @company/ai-qa-agent @playwright/test && npx playwright install chromium
+npx ai-qa-agent init --figma https://www.figma.com/design/KEY/Shop --clickup-list 901523571090
 export CLICKUP_API_TOKEN=pk_...
-npx ai-qa doctor
-npx ai-qa analyze                  # review .qa/app-model.json and .qa/design-system.json
-npx ai-qa scenarios                # review .qa/scenarios/*.json, set approved:false to drop one
-npx ai-qa run                      # generates tests, runs, triages, files bugs, writes report
+npx ai-qa-agent doctor
+npx ai-qa-agent analyze                  # review .qa/app-model.json and .qa/design-system.json
+npx ai-qa-agent scenarios                # review .qa/scenarios/*.json, set approved:false to drop one
+npx ai-qa-agent run                      # generates tests, runs, triages, files bugs, writes report
 open .qa/reports/latest.md
 ```
 
@@ -326,15 +326,15 @@ open .qa/reports/latest.md
 | Symptom | Cause / fix |
 |---|---|
 | `App did not become ready at http://localhost:...` while the dev server log says ready | `localhost` resolved to IPv6 (`::1`) but the server or the OS only accepts IPv4 (or vice versa). The error prints a loopback probe; bind the server explicitly (`--host 127.0.0.1`) and use `http://127.0.0.1:<port>` in `app.baseUrl`. |
-| `Figma MCP rejected N call(s) because of plan limits` | Monthly/daily Figma MCP quota exhausted. Partial results are kept; re-run `ai-qa analyze` later. |
+| `Figma MCP rejected N call(s) because of plan limits` | Monthly/daily Figma MCP quota exhausted. Partial results are kept; re-run `ai-qa-agent analyze` later. |
 | `AI task ... failed (error_max_budget_usd)` | Raise `ai.maxBudgetUsdPerTask` or narrow the scope (`--page`). |
 | `Claude Code exited ... without a result` | Run `claude --version` and `claude -p "hi"`; log in with `claude` if needed. |
 | `No page matches "..."` | Use a route (`/checkout`), a slug (`checkout`) or the page name from `app-model.json`. |
 | Visual tests fail with `no-reference` | The screen has no downloaded reference; check `design-system.json` → `references`. |
-| A test is wrong, not the app | The triage report says `TEST_BUG` with the reason; fix `.qa/scenarios/<page>.json` (the expectation) and rerun `ai-qa generate --page <page> --force`, or set `approved: false`. |
+| A test is wrong, not the app | The triage report says `TEST_BUG` with the reason; fix `.qa/scenarios/<page>.json` (the expectation) and rerun `ai-qa-agent generate --page <page> --force`, or set `approved: false`. |
 | Everything is regenerated each run | `.qa/state.json` is missing or ignored; keep it writable (it is git-ignored but must persist locally/in CI cache). |
 
-Logs: `.qa/artifacts/logs/ai-qa.log` (all levels), `ai-qa --debug ...` for console verbosity,
+Logs: `.qa/artifacts/logs/ai-qa.log` (all levels), `ai-qa-agent --debug ...` for console verbosity,
 `AI_QA_DEBUG=1` to print stack traces.
 
 ## Architecture

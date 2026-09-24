@@ -1,5 +1,5 @@
 /**
- * Runtime helpers imported by generated tests: `import { test, expect } from '@company/ai-qa/playwright'`.
+ * Runtime helpers imported by generated tests: `import { test, expect } from '@company/ai-qa-agent/playwright'`.
  *
  * Everything here is deterministic. The AI decides *what* to check when it writes a test; these
  * helpers decide *whether it passed*, so a visual verdict never rests on an LLM saying "looks right".
