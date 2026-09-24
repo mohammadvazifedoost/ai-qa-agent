@@ -6,6 +6,7 @@ import { CartProvider } from './cart';
 import { HomePage } from './pages/HomePage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { LoginPage } from './pages/LoginPage';
+import { ContactPage } from './pages/ContactPage';
 import './styles.css';
 
 const router = createBrowserRouter([
@@ -15,6 +16,7 @@ const router = createBrowserRouter([
       { path: '/', element: <HomePage /> },
       { path: '/checkout', element: <CheckoutPage /> },
       { path: '/login', element: <LoginPage /> },
+      { path: '/contact', element: <ContactPage /> },
     ],
   },
 ]);

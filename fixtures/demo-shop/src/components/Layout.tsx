@@ -31,6 +31,7 @@ export function Layout() {
             </span>
           </NavLink>
           <NavLink to="/login">Sign in to your account</NavLink>
+          <NavLink to="/contact">Contact</NavLink>
         </nav>
       </header>
       <main className="container">

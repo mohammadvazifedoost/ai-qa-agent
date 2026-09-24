@@ -139,6 +139,8 @@ async function validateSpec(ctx: QaContext, file: string, scenarios: Scenario[])
 
 export interface GenerateScope {
   page?: string;
+  /** Limit to these routes (used by `run --changed`). */
+  pages?: string[];
   force?: boolean;
 }
 
@@ -148,7 +150,9 @@ export async function generateTests(ctx: QaContext, scope: GenerateScope = {}): 
   ensureDir(ctx.paths.testsDir);
   writePlaywrightConfig(ctx.paths, ctx.config);
   const written: string[] = [];
-  const pages = selectPages(app.pages, scope.page);
+  const pages = selectPages(app.pages, scope.page).filter(
+    (p) => !scope.pages || scope.pages.includes(p.route),
+  );
   const todo = pages
     .map((page) => {
       const scenarios = (

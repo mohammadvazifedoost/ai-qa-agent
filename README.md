@@ -69,23 +69,46 @@ Both `--figma` and `--clickup-list` are optional; add them later by editing `.qa
 | `ai-qa test` | Run the tests and collect evidence — no AI involved |
 | `ai-qa triage` | Classify the failures of the latest run and write a report |
 | `ai-qa report` | Rebuild the report of a run from stored results |
-| `ai-qa run` | The full pipeline: analyze → scenarios → generate → test → triage → file → report |
+| `ai-qa run` | The full pipeline: analyze → scenarios → generate → test → triage → (file) → report |
+| `ai-qa changes` | Show what changed since the last analysis: new/changed/removed pages, changed shared files, and with `--design` new/changed Figma frames |
+| `ai-qa ui` | Local dashboard: every scenario with its result, screenshots, videos, traces, analysis, and a button to log confirmed bugs in ClickUp |
 
 Scoping and flags:
 
 ```bash
+ai-qa run --changed                # only new/changed pages (a new feature) — see `ai-qa changes`
+ai-qa run --changed --design       # also re-extract the design when Figma frames changed
 ai-qa run --page checkout          # one page (route or name)
 ai-qa run --category visual        # functional | visual | responsive
 ai-qa run --feature auth           # by feature tag
-ai-qa run --no-file                # never create ClickUp tasks
+ai-qa run --file                   # create ClickUp tasks (default: off)
 ai-qa run --resume                 # continue an interrupted run
 ai-qa run --refresh                # ignore caches; re-read code and Figma
 ai-qa test --grep CHECKOUT-002     # specific scenario ids
 ai-qa scenarios --page login --force --max 8
+ai-qa ui --port 4310
 ai-qa --cwd ../other-project doctor
 ```
 
 `ai-qa run` exits with code 1 when defects were found, so it can gate a CI job.
+
+### Checking only what is new
+
+Nothing is regenerated from scratch on every run:
+
+- **Analysis** is per page. `ai-qa changes` compares each page's own source files with the hashes
+  stored at analysis time (free, no AI). Only new and changed pages are re-analyzed; unchanged
+  pages keep their model verbatim, so their scenarios and tests stay cached too.
+- Files shared by every page (router entry, layout, global CSS) are tracked separately as
+  *shared files*: registering a new route does not mark every page as changed. A changed shared
+  file is reported with a hint to do a full run when it matters (e.g. global styles).
+- **Scenarios** and **tests** are cached per page on their inputs. When a page changes, its
+  existing scenarios are handed to the AI to update — ids and `approved` flags are kept.
+- **Design**: the Figma extraction is cached; `--design` inspects the file (one metadata call per
+  Figma page) and re-extracts only when frames were added or a page's structure changed.
+
+Typical flow after adding a feature: `ai-qa changes` → `ai-qa run --changed` → review in
+`ai-qa ui` → log the confirmed bugs from the dashboard.
 
 ## Configuration (`.qa/config.ts`)
 
@@ -112,6 +135,7 @@ export default defineConfig({
     tokenEnv: 'CLICKUP_API_TOKEN',   // the token is read from this env var, never from config
     tags: ['ai-qa'],
     status: 'to do',                 // optional; default is the list's first status
+    autoFile: false,                 // true = file confirmed defects at the end of `ai-qa run`
     attachEvidence: true,
   },
   browsers: ['chromium'],            // chromium | firefox | webkit
@@ -174,10 +198,23 @@ keeps the partial result, and fetches missing reference screenshots on the next 
    category, page, steps, expected/actual, root cause, environment, test ids) and the screenshot,
    video, trace and design-diff images attached. Priority maps from severity.
 
-Tasks are created only for failures the analyzer classified as `PRODUCT_BUG` or `DESIGN_MISMATCH`,
-that failed on every retry, and whose confidence is at least `ai.minConfidenceToFile`. Symptoms of
-one underlying defect are grouped into one task. A defect that was already filed in an earlier run
-(same scenarios) gets a comment instead of a duplicate task.
+**Nothing is filed automatically.** After a run, confirmed defects wait in the report and in the
+dashboard (`ai-qa ui`), where each one has a *Log bug in ClickUp* button. Automatic filing is
+available with `ai-qa run --file` or `clickup.autoFile: true`, and then only for failures the
+analyzer classified as `PRODUCT_BUG` or `DESIGN_MISMATCH`, that failed on every retry, and whose
+confidence is at least `ai.minConfidenceToFile`. Symptoms of one underlying defect are grouped into
+one task. A defect that was already filed in an earlier run (same scenarios) gets a comment instead
+of a duplicate task.
+
+## Dashboard (`ai-qa ui`)
+
+`npx ai-qa ui` serves a local page (default `http://127.0.0.1:4310`) built from the files the
+pipeline writes — no database, no external service. It lists every scenario grouped by page with
+its result in the selected run, the failure classification and linked defect, the final screenshot,
+the video, the trace and logs, and the AI's analysis with the suspected root cause. Confirmed
+defects have a *Log bug in ClickUp* button; the token must be in the environment of the shell that
+started the UI (`CLICKUP_API_TOKEN=pk_... npx ai-qa ui`). Filing results are written back to the run
+so the report and the dashboard stay consistent.
 
 ## Playwright setup
 

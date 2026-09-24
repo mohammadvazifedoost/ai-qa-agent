@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { ToolCallRecord } from '../ai/claude.js';
 import { BASE_SYSTEM, figmaFileKey, projectInfoJson, projectRules } from '../ai/context.js';
 import { ensureDir, sha256, slugify, writeJson } from '../core/fs.js';
+import { pageStructureHashes } from '../changes/detect.js';
 import { logger } from '../core/logger.js';
 import { rel } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
@@ -159,7 +160,12 @@ export async function extractDesign(
     if (s) Object.assign(s, { route: pin.route, routeCertainty: 'observed', viewport: pin.viewport });
   }
   const references = await saveReferences(ctx, design.screens, res.toolCalls);
-  const file: DesignSystemFile = { ...design, extractedAt: new Date().toISOString(), references };
+  const file: DesignSystemFile = {
+    ...design,
+    extractedAt: new Date().toISOString(),
+    figmaPageHashes: pageStructureHashes(res.toolCalls),
+    references,
+  };
   writeJson(ctx.paths.designSystem, file);
   ctx.state.markStage('design', inputHash);
   log.info(
@@ -196,6 +202,15 @@ async function fetchMissingReferences(
   const have = new Set(file.references.map((r) => r.nodeId));
   const missing = file.screens.filter((s) => !have.has(s.nodeId));
   if (missing.length === 0) return file;
+  const last = ctx.state.data.designRefsAttemptAt;
+  if (last && Date.now() - Date.parse(last) < 24 * 60 * 60 * 1000) {
+    log.info(
+      `${missing.length} design reference image(s) still missing; last fetch attempt ${last.slice(0, 16)} — retrying after 24h or with --refresh`,
+    );
+    return file;
+  }
+  ctx.state.data.designRefsAttemptAt = new Date().toISOString();
+  ctx.state.save();
   log.info(`Fetching ${missing.length} missing design reference image(s)`);
   const res = await ctx.ai.run({
     name: 'design-refs',

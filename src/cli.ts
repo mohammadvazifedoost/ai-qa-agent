@@ -17,6 +17,14 @@ import { readJson } from './core/fs.js';
 import { runDir } from './core/paths.js';
 import type { QaContext } from './pipeline/context.js';
 import { runPipeline } from './pipeline/run.js';
+import {
+  describeChanges,
+  detectCodeChanges,
+  detectDesignChanges,
+  routesToAnalyze,
+} from './changes/detect.js';
+import { loadDesign } from './scenarios/generate.js';
+import { startUi } from './ui/server.js';
 import { TestRunResultSchema, type TestRunResult } from './runner/results.js';
 import { triageRun } from './triage/triage.js';
 import { TriageResultSchema } from './triage/schema.js';
@@ -227,24 +235,78 @@ program
   .option('--page <route>', 'only this page (route or name)')
   .option('--category <category>', 'only run tests of this category: functional | visual | responsive')
   .option('--feature <feature>', 'only run tests of this feature tag, e.g. auth')
+  .option('--changed', 'only new or changed pages (see `ai-qa changes`)')
+  .option('--design', 'with --changed: also inspect Figma for new/changed frames (uses Figma MCP calls)')
   .option('--resume', 'continue the last unfinished run')
   .option('--refresh', 'ignore caches and re-analyze code and design')
-  .option('--no-file', 'do not create ClickUp tasks')
-  .action(async (o: Scope & { resume?: boolean; refresh?: boolean; file: boolean }) => {
+  .option(
+    '--file',
+    'create ClickUp tasks for confirmed defects (default: off; or clickup.autoFile in config)',
+  )
+  .action(
+    async (
+      o: Scope & { changed?: boolean; design?: boolean; resume?: boolean; refresh?: boolean; file?: boolean },
+    ) => {
+      const ctx = await createContext(root());
+      const res = await runPipeline(ctx, {
+        page: o.page,
+        filter: scopeToFilter(o),
+        changed: o.changed,
+        design: o.design,
+        resume: o.resume,
+        refresh: o.refresh,
+        file: o.file ?? ctx.config.clickup?.autoFile ?? false,
+      });
+      if (res.nothingChanged || !res.test || !res.triage || !res.filing || !res.report) {
+        console.log('Nothing changed since the last analysis; no tests were run.');
+        return;
+      }
+      const s = res.test.stats;
+      console.log(
+        `\n${pc.bold('Result')}: ${s.passed} passed, ${s.failed} failed · ${res.triage.issues.length} defect(s) · ${res.filing.message}\n` +
+          `Report: ${rel(ctx.root, res.report.markdown)} — browse with ${pc.bold('npx ai-qa ui')}`,
+      );
+      if (res.triage.issues.length) process.exitCode = 1;
+    },
+  );
+
+program
+  .command('changes')
+  .description('show which pages (and, with --design, Figma frames) changed since the last analysis')
+  .option('--design', 'also inspect the Figma file (costs 1 + number-of-pages Figma MCP calls)')
+  .action(async (o: { design?: boolean }) => {
     const ctx = await createContext(root());
-    const res = await runPipeline(ctx, {
-      page: o.page,
-      filter: scopeToFilter(o),
-      resume: o.resume,
-      refresh: o.refresh,
-      file: o.file,
-    });
-    const s = res.test.stats;
-    console.log(
-      `\n${pc.bold('Result')}: ${s.passed} passed, ${s.failed} failed · ${res.triage.issues.length} defect(s) · ${res.filing.message}\n` +
-        `Report: ${rel(ctx.root, res.report.markdown)}`,
-    );
-    if (res.triage.issues.length) process.exitCode = 1;
+    const code = detectCodeChanges(ctx);
+    const design = o.design && loadDesign(ctx) ? await detectDesignChanges(ctx, loadDesign(ctx)!) : undefined;
+    for (const line of describeChanges(code, design)) console.log(line);
+    const routes = routesToAnalyze(code);
+    if (routes.length || design?.newScreens.length || design?.changedPages.length) {
+      console.log(
+        `\nRun ${pc.bold('npx ai-qa run --changed' + (o.design ? ' --design' : ''))} to test only these.`,
+      );
+    }
+  });
+
+program
+  .command('ui')
+  .description(
+    'open a local dashboard with all scenarios, results, evidence and a button to log bugs in ClickUp',
+  )
+  .option('--port <port>', 'port to listen on', (v) => Number(v), 4310)
+  .option('--host <host>', 'interface to bind', '127.0.0.1')
+  .action(async (o: { port: number; host: string }) => {
+    const ctx = await createContext(root());
+    const server = await startUi(ctx, { port: o.port, host: o.host });
+    const addr = server.address();
+    const url =
+      typeof addr === 'object' && addr ? `http://${o.host}:${addr.port}/` : `http://${o.host}:${o.port}/`;
+    console.log(`ai-qa dashboard: ${pc.bold(url)}  (Ctrl+C to stop)`);
+    if (ctx.config.clickup && !process.env[ctx.config.clickup.tokenEnv]) {
+      console.log(
+        pc.yellow(`ClickUp filing is disabled: ${ctx.config.clickup.tokenEnv} is not set in this shell.`),
+      );
+    }
+    await new Promise(() => undefined);
   });
 
 program.parseAsync().catch((err: unknown) => {

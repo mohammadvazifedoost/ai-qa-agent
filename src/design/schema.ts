@@ -76,6 +76,8 @@ export type DesignSystem = z.infer<typeof DesignSystemSchema>;
 /** What the engine persists: the AI output plus the locally saved reference images. */
 export const DesignSystemFileSchema = DesignSystemSchema.extend({
   extractedAt: z.string(),
+  /** Hash of each Figma page's metadata XML at extraction time; used by `ai-qa changes --design`. */
+  figmaPageHashes: z.record(z.string(), z.string()).optional(),
   references: z.array(
     z.object({
       screen: z.string(),

@@ -50,6 +50,8 @@ export const QaStateSchema = z.object({
   generatedSpecs: z.record(z.string(), z.string()).default({}),
   runs: z.array(RunRecordSchema).default([]),
   bugs: z.record(z.string(), FiledBugSchema).default({}),
+  /** When missing Figma reference images were last requested (retried at most once a day). */
+  designRefsAttemptAt: z.string().optional(),
 });
 export type QaState = z.infer<typeof QaStateSchema>;
 

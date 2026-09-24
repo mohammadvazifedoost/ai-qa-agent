@@ -67,6 +67,8 @@ function inputHashFor(
 
 export interface ScenarioScope {
   page?: string;
+  /** Limit to these routes (used by `run --changed`). */
+  pages?: string[];
   force?: boolean;
   maxPerPage?: number;
 }
@@ -75,7 +77,9 @@ export async function generateScenarios(ctx: QaContext, scope: ScenarioScope = {
   const app = loadAppModel(ctx);
   if (!app) throw new Error('No .qa/app-model.json yet. Run `ai-qa analyze` first.');
   const design = loadDesign(ctx);
-  const pages = selectPages(app.pages, scope.page);
+  const pages = selectPages(app.pages, scope.page).filter(
+    (p) => !scope.pages || scope.pages.includes(p.route),
+  );
 
   for (const page of pages) {
     const file = scenarioFilePath(ctx, page.route);

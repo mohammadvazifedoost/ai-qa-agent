@@ -365,10 +365,17 @@
     "No loading, error or empty states exist on the Home page (static data).",
     "Focus management and keyboard behaviour beyond native elements were not verified in a browser; this analysis is from source only."
   ],
-  "analyzedAt": "2026-09-24T00:16:20.914Z",
+  "analyzedAt": "2026-09-24T02:04:26.472Z",
   "pageHashes": {
-    "/": "a7990ae3984c8683869cae3768fb4e1ae90d56f8f3bf995388552f7bb5763c98",
-    "/checkout": "30db97093d8cd704ec528fd2804b71619733bcfce231a306a95597c9a8691a9a",
-    "/login": "d034baa38f226d011f1362041189308e90a7ea96ffbd38c583980e0def1c9fdc"
+    "/": "d75db4b702b6f82199199ef2a1083e505d2ea76588a51631154dbc38ce411fad",
+    "/checkout": "f102c520f1b4f2a0877a405cb7b9353a6fcb377a58874a54574f57890ce1a40e",
+    "/login": "b55f679a27b85220764f85bcedee508b3bec08c759780cb238d60e919756ab14"
+  },
+  "globalFileHashes": {
+    "src/api/catalog.ts": "3e6f7df1d908be7277a8052406f16eb50af69ba03e58d47f57e46b40f66e86dd",
+    "src/components/Button.tsx": "410b147e8e5329e39fbfba353fc7a0e23c15ce9c032f706422d421e1437d07ee",
+    "src/components/Layout.tsx": "ceb285a0f8c4eb605a23aac86245c08d4262f6170ae9cd9037dd0a85930d7f77",
+    "src/main.tsx": "29c0d0f2666fd21a24783abe2a36c16cd7eb02bf20253abda26139ced5298619",
+    "src/styles.css": "9b60854733a829678c9dc34895c98b25de18944cd4d0d6bbde940086aa4d180a"
   }
 }

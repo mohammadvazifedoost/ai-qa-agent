@@ -27,6 +27,13 @@ export async function login(email: string, password: string): Promise<{ ok: bool
   return { ok: false };
 }
 
+/** Simulated contact API. */
+export async function sendMessage(input: { name: string; email: string; message: string }): Promise<{ ok: true }> {
+  await new Promise((r) => setTimeout(r, 400));
+  void input;
+  return { ok: true };
+}
+
 export function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }

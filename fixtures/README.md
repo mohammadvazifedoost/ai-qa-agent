@@ -14,6 +14,8 @@ AI agent cannot read the answers while it analyzes the app.
 | 2 | Responsive | header, all pages | The mobile breakpoint is `max-width: 320px` instead of `768px`, so at 390 px / 834 px the hamburger never appears and the nowrap nav overflows horizontally (page scrolls sideways). The Figma mobile frame shows a hamburger button. | `PRODUCT_BUG` (responsive) |
 | 3 | Visual | all primary buttons | Primary button fill is `#7C3AED` with a `2px` radius. The Figma design specifies `#2563EB` fill and `8px` radius. | `DESIGN_MISMATCH` |
 
+| 4 | Functional | `/contact` (added later to validate feature-scoped runs) | The message field is never validated: submitting with an empty message shows "Message sent". | `PRODUCT_BUG` |
+
 ### Working behaviour (should NOT be reported)
 
 - Login: `demo@shop.test` / `password123` shows "Welcome back, Demo User"; invalid credentials show
