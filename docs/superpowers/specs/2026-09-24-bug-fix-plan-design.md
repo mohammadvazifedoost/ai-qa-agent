@@ -99,6 +99,21 @@ only and a "no fix plan from the AI" note. The AI is not asked again for these c
 
 The command prints the file path, bug count and AI cost.
 
+## Dashboard
+
+A *Create fix plan* button in the toolbar plans the selected run, with the same rules as the
+command (default folder, no implicit triage).
+
+- Disabled, with the reason as its tooltip, when the run has no `triage.json` ("Run
+  `ai-qa-agent triage` first") or no confirmed bugs ("No confirmed bugs to plan").
+- When `<dir>/<run-id>.md` exists the button reads *Update fix plan* and asks for confirmation
+  before overwriting (the same as `--force`), because the team may have edited the file.
+- It runs as a background job (`kind: 'plan'`, POST `/api/plan` with `{ runId }`), sharing the
+  progress banner and the one-job-at-a-time rule of the run buttons. When done, the banner shows
+  the file path and a *View plan* button that shows the Markdown in the modal (GET
+  `/api/plan?run=<id>`, which returns only that plan file's text).
+- The overview gains `plan: { exists, file, confirmedBugs, triaged }` for the selected run.
+
 ## Components
 
 - `src/plan/plan.ts`: `collectPlanInput(ctx, run, triage)` (what is included / not included,
@@ -106,6 +121,7 @@ The command prints the file path, bug count and AI cost.
   `renderPlan` (Markdown, pure), `writeBugFixPlan(ctx, opts)` (orchestration, file write).
 - `src/config/schema.ts`: `plans.dir` with default.
 - `src/cli.ts`: the `plan` command.
+- `src/ui/server.ts`, `src/ui/page.ts`: the overview `plan` field, `/api/plan`, the button.
 - README: command table row and a short "Bug-fix plans" section.
 
 ## Testing
@@ -122,4 +138,4 @@ Then one real run of `ai-qa-agent plan` on the demo-shop copy.
 
 ## Out of scope
 
-A dashboard button, per-bug plan files, applying fixes automatically, and triaging implicitly.
+Per-bug plan files, applying fixes automatically, and triaging implicitly.
