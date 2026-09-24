@@ -3,7 +3,9 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { AppModelFile } from '../src/analyze/app.js';
 import { qaPaths } from '../src/core/paths.js';
-import { specHash } from '../src/generate/playwright.js';
+import { recordScenarioTests, specHash } from '../src/generate/playwright.js';
+import { scenarioTestStates, writeScenarioTest } from '../src/generate/scenario-test.js';
+import { draftScenario, saveScenario, ScenarioInputError } from '../src/scenarios/author.js';
 import type { QaContext } from '../src/pipeline/context.js';
 import { dropRemoved, generateScenarios, removedSection } from '../src/scenarios/generate.js';
 import {
@@ -103,7 +105,11 @@ function setup(
     root,
     paths,
     state,
-    config: { viewports: { desktop: { width: 1440, height: 900 } } },
+    config: {
+      viewports: { desktop: { width: 1440, height: 900 } },
+      app: { baseUrl: 'http://127.0.0.1:5173' },
+      ai: { mcpServers: {} },
+    },
   } as unknown as QaContext;
   // The spec is up to date with the current approved scenarios.
   state.data.generatedSpecs['tests/checkout.spec.ts'] = specHash(
@@ -340,5 +346,245 @@ describe('scenario generation with tombstones', () => {
       [{ id: 'A-002', title: 'Gone', removedAt: 'x', scenario: scenario('A-002', 'Gone') }],
     );
     expect(kept.map((s) => s.id)).toEqual(['A-001']);
+  });
+});
+
+describe('saveScenario', () => {
+  const input = (extra: Record<string, unknown> = {}) => ({
+    page: '/checkout',
+    title: 'Coupon SAVE10 takes 10% off',
+    category: 'functional',
+    priority: 'high',
+    viewport: 'desktop',
+    steps: ['Add a product', "Apply coupon 'SAVE10'"],
+    expectedResults: ['The total is 10% lower'],
+    ...extra,
+  });
+
+  it('adds a person scenario with the next free id, skipping removed ids', async () => {
+    const { ctx, read } = setup();
+    await removeScenarios(ctx, ['CHECKOUT-003'], { validate: ok });
+    const saved = saveScenario(ctx, input());
+    expect(saved).toMatchObject({
+      id: 'CHECKOUT-004',
+      origin: 'person',
+      approved: true,
+      feature: 'checkout',
+      design: null,
+      preconditions: [],
+      testData: [],
+      source: { figma: false, code: false },
+    });
+    expect(saved.editedAt).toMatch(/^\d{4}-/);
+    expect(read().scenarios.map((s) => s.id)).toEqual(['CHECKOUT-001', 'CHECKOUT-002', 'CHECKOUT-004']);
+  });
+
+  it('creates the scenario file for an analyzed page that has none yet', () => {
+    const { ctx } = setup();
+    fs.rmSync(path.join(ctx.paths.scenariosDir, 'checkout.json'));
+    expect(saveScenario(ctx, input()).id).toBe('CHECKOUT-001');
+    const file = ScenarioFileSchema.parse(
+      JSON.parse(fs.readFileSync(path.join(ctx.paths.scenariosDir, 'checkout.json'), 'utf8')),
+    );
+    expect(file).toMatchObject({ page: '/checkout', inputHash: '', removed: [] });
+    expect(() => saveScenario(ctx, input({ page: '/nowhere' }))).toThrow(/Unknown page \/nowhere/);
+  });
+
+  it('edits a scenario in place, locking it as written by a person', () => {
+    const design = { screen: 'Checkout', tokens: [] };
+    const { ctx, read } = setup([
+      scenario('CHECKOUT-001', 'One', { design }),
+      scenario('CHECKOUT-002', 'Two'),
+    ]);
+    const saved = saveScenario(ctx, input({ title: 'One, clarified' }), 'checkout-001');
+    expect(saved).toMatchObject({ id: 'CHECKOUT-001', title: 'One, clarified', origin: 'person', design });
+    expect(read().scenarios.map((s) => s.title)).toEqual(['One, clarified', 'Two']);
+    expect(() => saveScenario(ctx, input({ page: '/other' }), 'CHECKOUT-001')).toThrow(/cannot move/);
+    expect(() => saveScenario(ctx, input(), 'CHECKOUT-009')).toThrow(/Unknown scenario CHECKOUT-009/);
+  });
+
+  it('rejects invalid input with a readable message', () => {
+    const { ctx } = setup();
+    expect(() => saveScenario(ctx, input({ steps: [' '] }))).toThrow(ScenarioInputError);
+    expect(() => saveScenario(ctx, input({ title: '' }))).toThrow(/title/);
+    expect(() => saveScenario(ctx, input({ viewport: 'watch' }))).toThrow(/Unknown viewport "watch"/);
+  });
+
+  it('marks the new scenario as having no test yet', () => {
+    const { ctx } = setup();
+    expect(scenarioTestStates(ctx)).toEqual({});
+    saveScenario(ctx, input());
+    expect(scenarioTestStates(ctx)).toEqual({ 'CHECKOUT-004': 'missing' });
+  });
+});
+
+describe('draftScenario', () => {
+  it('asks the AI to fill in the form fields without saving anything', async () => {
+    const { ctx, read } = setup();
+    let prompt = '';
+    (ctx as { ai: unknown }).ai = {
+      run: async (task: { prompt: string }) => {
+        prompt = task.prompt;
+        return {
+          output: {
+            title: 'Coupon works',
+            category: 'functional',
+            priority: 'medium',
+            viewport: 'desktop',
+            feature: 'coupons',
+            preconditions: [],
+            steps: ['Apply SAVE10'],
+            expectedResults: ['10% off'],
+            testData: ['SAVE10'],
+            rationale: 'money',
+          },
+        };
+      },
+    };
+    const draft = await draftScenario(ctx, { page: '/checkout', description: 'check the SAVE10 coupon' });
+    expect(draft).toMatchObject({ page: '/checkout', title: 'Coupon works', feature: 'coupons' });
+    expect(prompt).toContain('check the SAVE10 coupon');
+    expect(prompt).toContain('CHECKOUT-001: One');
+    expect(read().scenarios).toHaveLength(3);
+  });
+});
+
+describe('scenario generation with person scenarios', () => {
+  it('keeps person scenarios untouched and drops AI scenarios that collide with them', async () => {
+    const mine = scenario('CHECKOUT-002', 'My check', { origin: 'person', editedAt: 'x', steps: ['mine'] });
+    const { ctx, read } = setup([scenario('CHECKOUT-001', 'One'), mine]);
+    let prompt = '';
+    (ctx as { ai: unknown }).ai = {
+      run: async (task: { prompt: string }) => {
+        prompt = task.prompt;
+        return {
+          output: {
+            scenarios: [
+              scenario('CHECKOUT-001', 'One'),
+              scenario('CHECKOUT-002', 'Overwrites mine'), // person id reused
+              scenario('CHECKOUT-003', 'my  CHECK'), // person title under a new id
+              scenario('CHECKOUT-004', 'Four'),
+            ],
+          },
+        };
+      },
+    };
+    await generateScenarios(ctx, { force: true });
+    expect(prompt).toContain('## Scenarios written by a person — keep as they are');
+    expect(prompt).toContain('- CHECKOUT-002: My check');
+    expect(prompt).not.toContain('"title": "My check"');
+    expect(read().scenarios.map((s) => s.id)).toEqual(['CHECKOUT-001', 'CHECKOUT-002', 'CHECKOUT-004']);
+    expect(read().scenarios[1]).toEqual(mine);
+  });
+
+  it('never lets the AI mark its own scenarios as written by a person', async () => {
+    const { ctx, read } = setup([scenario('CHECKOUT-001', 'One')]);
+    (ctx as { ai: unknown }).ai = {
+      run: async () => ({
+        output: { scenarios: [{ ...scenario('CHECKOUT-001', 'One'), origin: 'person' }] },
+      }),
+    };
+    await generateScenarios(ctx, { force: true });
+    expect(read().scenarios[0]!.origin).toBeUndefined();
+  });
+});
+
+describe('scenarioTestStates', () => {
+  it('flags edited scenarios whose test was written before the edit', () => {
+    const { ctx } = setup();
+    recordScenarioTests(ctx, [scenario('CHECKOUT-002', 'Two')]);
+    saveScenario(ctx, { ...scenario('CHECKOUT-002', 'Two, edited'), page: '/checkout' }, 'CHECKOUT-002');
+    // CHECKOUT-001: edited by a person, no fingerprint from before this feature → assume outdated.
+    saveScenario(ctx, { ...scenario('CHECKOUT-001', 'One'), page: '/checkout' }, 'CHECKOUT-001');
+    expect(scenarioTestStates(ctx)).toEqual({ 'CHECKOUT-001': 'outdated', 'CHECKOUT-002': 'outdated' });
+  });
+
+  it('treats an unchanged fingerprint as up to date and ignores unapproved scenarios', () => {
+    const two = scenario('CHECKOUT-002', 'Two', { origin: 'person' });
+    const { ctx } = setup([
+      scenario('CHECKOUT-001', 'One'),
+      two,
+      scenario('CHECKOUT-004', 'Four', { approved: false }),
+    ]);
+    recordScenarioTests(ctx, [two]);
+    expect(scenarioTestStates(ctx)).toEqual({});
+  });
+
+  it('marks everything missing when the page has no spec file', () => {
+    const { ctx } = setup([scenario('CHECKOUT-001', 'One')]);
+    fs.rmSync(path.join(ctx.paths.testsDir, 'checkout.spec.ts'));
+    expect(scenarioTestStates(ctx)).toEqual({ 'CHECKOUT-001': 'missing' });
+  });
+});
+
+describe('writeScenarioTest', () => {
+  const block = (id: string, title = 'written') =>
+    `test('${id}: ${title}', async ({ page }) => {
+  await page.goto('/checkout?${id}');
+});`;
+  const withAi = (ctx: QaContext, answers: string[]) => {
+    const prompts: string[] = [];
+    (ctx as { ai: unknown }).ai = {
+      run: async (task: { prompt: string }) => {
+        prompts.push(task.prompt);
+        return { output: { code: answers[Math.min(prompts.length, answers.length) - 1], notes: [] } };
+      },
+    };
+    return prompts;
+  };
+
+  it('rewrites only that test, records it, and leaves the spec cache fresh', async () => {
+    const { ctx, spec } = setup();
+    saveScenario(ctx, { ...scenario('CHECKOUT-002', 'Two, edited'), page: '/checkout' }, 'CHECKOUT-002');
+    const prompts = withAi(ctx, [block('CHECKOUT-002')]);
+    let expected: string[] = [];
+    const validate: SpecValidator = async (_c, _f, ids) => ((expected = ids), []);
+    const before = spec();
+    const res = await writeScenarioTest(ctx, 'checkout-002', { validate, startApp: false });
+    expect(res).toMatchObject({ id: 'CHECKOUT-002', action: 'replaced', file: '.qa/tests/checkout.spec.ts' });
+    expect(prompts[0]).toContain('"title": "Two, edited"');
+    expect(prompts[0]).toContain("test('CHECKOUT-001: one'"); // the current file, for its helpers
+    expect(spec()).toContain("goto('/checkout?CHECKOUT-002')");
+    expect(spec().split("test('CHECKOUT-002")[0]).toBe(before.split("test('CHECKOUT-002")[0]);
+    expect(spec()).toContain("test('CHECKOUT-003: three'");
+    expect(expected.sort()).toEqual(['CHECKOUT-001', 'CHECKOUT-002', 'CHECKOUT-003']);
+    expect(scenarioTestStates(ctx)).toEqual({});
+    const approved = ScenarioFileSchema.parse(
+      JSON.parse(fs.readFileSync(path.join(ctx.paths.scenariosDir, 'checkout.json'), 'utf8')),
+    ).scenarios;
+    expect(ctx.state.data.generatedSpecs['tests/checkout.spec.ts']).toBe(specHash(ctx, page, approved));
+  });
+
+  it('adds the test of a new scenario and retries with the problem when the AI gets it wrong', async () => {
+    const { ctx, spec } = setup();
+    const added = saveScenario(ctx, { ...scenario('X', 'Four'), page: '/checkout' });
+    const prompts = withAi(ctx, [block('CHECKOUT-009'), block(added.id)]);
+    const res = await writeScenarioTest(ctx, added.id, { validate: ok, startApp: false });
+    expect(res.action).toBe('added');
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain('exactly one test titled "CHECKOUT-004: …"');
+    expect(listTestIds(spec())).toEqual(['CHECKOUT-001', 'CHECKOUT-002', 'CHECKOUT-003', 'CHECKOUT-004']);
+  });
+
+  it('puts the original file back when no attempt passes validation', async () => {
+    const { ctx, spec } = setup();
+    saveScenario(ctx, { ...scenario('CHECKOUT-002', 'Two, edited'), page: '/checkout' }, 'CHECKOUT-002');
+    const prompts = withAi(ctx, [block('CHECKOUT-002')]);
+    const before = spec();
+    const failing: SpecValidator = async () => ['Playwright could not load the file'];
+    await expect(
+      writeScenarioTest(ctx, 'CHECKOUT-002', { validate: failing, startApp: false }),
+    ).rejects.toThrow(/Could not write a valid test for CHECKOUT-002/);
+    expect(prompts).toHaveLength(3);
+    expect(spec()).toBe(before);
+    expect(scenarioTestStates(ctx)).toEqual({ 'CHECKOUT-002': 'outdated' });
+  });
+
+  it('rejects unknown and unapproved scenarios', async () => {
+    const { ctx } = setup([scenario('CHECKOUT-001', 'One', { approved: false })]);
+    await expect(writeScenarioTest(ctx, 'CHECKOUT-404', { startApp: false })).rejects.toThrow(
+      /Unknown scenario/,
+    );
+    await expect(writeScenarioTest(ctx, 'CHECKOUT-001', { startApp: false })).rejects.toThrow(/not approved/);
   });
 });

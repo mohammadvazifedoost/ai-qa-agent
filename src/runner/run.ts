@@ -52,13 +52,17 @@ export function playwrightEnv(ctx: QaContext, extra: Record<string, string> = {}
   };
 }
 
-/** Run Playwright for the given filter, starting/stopping the app as needed. */
+/**
+ * Run Playwright for the given filter, starting/stopping the app as needed. Evidence and
+ * results.json go to the run's directory, or to `dir` when given (a single-test re-run).
+ */
 export async function runTests(
   ctx: QaContext,
   runId: string,
   filter: TestFilter = {},
+  dir: string = runDirFor(ctx.paths, runId),
+  signal?: AbortSignal,
 ): Promise<TestRunResult> {
-  const dir = runDirFor(ctx.paths, runId);
   ensureDir(dir);
   const specs = fs.existsSync(ctx.paths.testsDir)
     ? fs.readdirSync(ctx.paths.testsDir).filter((f) => f.endsWith('.spec.ts'))
@@ -83,6 +87,7 @@ export async function runTests(
         AI_QA_JSON_REPORT: jsonReport,
       }),
       onStdoutLine: (l) => log.debug(stripAnsi(l)),
+      signal,
     });
     fs.writeFileSync(
       path.join(dir, 'logs', 'playwright-stdout.log'),

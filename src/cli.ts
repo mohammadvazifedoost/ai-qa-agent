@@ -35,6 +35,7 @@ import { TestRunResultSchema, type TestRunResult } from './runner/results.js';
 import { triageRun } from './triage/triage.js';
 import { TriageResultSchema } from './triage/schema.js';
 import { writeReport } from './report/report.js';
+import { writeBugFixPlan } from './plan/plan.js';
 import { FilingSummarySchema } from './bugs/file.js';
 import { createTracker, trackerInfo } from './integrations/tracker.js';
 import { chromium } from '@playwright/test';
@@ -310,6 +311,27 @@ program
   });
 
 program
+  .command('plan')
+  .description(
+    'write a plan for fixing the confirmed bugs of a triaged run into the project (AI reads, never edits, code)',
+  )
+  .option('--run <id>', 'run id (default: latest run with results)')
+  .option('--dir <folder>', 'folder in the project root (default: plans.dir, docs/bug-fix-plan)')
+  .option('--force', 'overwrite an existing plan for the run')
+  .action(async (o: { run?: string; dir?: string; force?: boolean }) => {
+    const ctx = await createContext(root());
+    const res = await writeBugFixPlan(ctx, { runId: o.run, dir: o.dir, force: o.force });
+    if (!res.file) {
+      console.log(`No confirmed bugs in run ${res.runId}; nothing to plan.`);
+      return;
+    }
+    console.log(
+      `Bug-fix plan: ${pc.bold(res.file)}  (${res.bugs} bug${res.bugs === 1 ? '' : 's'}` +
+        `${res.notIncluded ? `, ${res.notIncluded} other failures listed as not included` : ''}, $${res.costUsd.toFixed(3)})`,
+    );
+  });
+
+program
   .command('run')
   .description(
     'full pipeline: analyze → scenarios → generate → test → triage → report (bugs are logged from the dashboard)',
@@ -379,7 +401,7 @@ program
     if (info.kind && !info.credentialsPresent) {
       console.log(
         pc.yellow(
-          `${info.name} filing is disabled: its credentials are not set in this shell (see ai-qa-agent doctor).`,
+          `${info.name} filing is disabled: set ${info.missingEnv.join(' and ')} in this shell (see ai-qa-agent doctor).`,
         ),
       );
     }

@@ -158,6 +158,7 @@ export class ClaudeRunner implements AiEngine {
       const proc = await run(this.settings.claudePath, args, {
         cwd: task.cwd,
         input: task.prompt,
+        signal: task.signal,
         onStdoutLine: onLine,
         env: { ...process.env, CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' },
       });

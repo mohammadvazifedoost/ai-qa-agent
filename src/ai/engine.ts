@@ -30,6 +30,8 @@ export interface AiTask<T extends z.ZodType> {
   addDirs?: string[];
   /** Images to attach to the prompt where the provider supports it (e.g. a failure screenshot). */
   images?: string[];
+  /** Aborting stops the agent CLI; the task then rejects with `Cancelled`. */
+  signal?: AbortSignal;
 }
 
 /** One tool call the agent made, with what the tool returned (captured from the event stream). */

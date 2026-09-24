@@ -185,6 +185,7 @@ export class OpenCodeRunner implements AiEngine {
       const proc = await this.exec(command, args, {
         cwd: task.cwd,
         input: message,
+        signal: task.signal,
         env: { ...process.env, OPENCODE_CONFIG_CONTENT: config },
         onStdoutLine: (l) => {
           const line = l.replace(/\r$/, '');

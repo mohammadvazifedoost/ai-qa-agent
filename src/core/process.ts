@@ -8,14 +8,42 @@ export interface RunResult {
   stderr: string;
 }
 
-/** Run a command to completion, capturing output. Never rejects on non-zero exit. */
+/** A run stopped through its AbortSignal (e.g. the dashboard's Cancel button). */
+export class Cancelled extends Error {
+  constructor() {
+    super('Cancelled');
+    this.name = 'Cancelled';
+  }
+}
+
+/**
+ * Run a command to completion, capturing output. Never rejects on non-zero exit. With `signal`,
+ * aborting kills the whole process tree (browsers, dev servers) and rejects with {@link Cancelled}.
+ */
 export function run(
   command: string,
   args: readonly string[],
-  opts: SpawnOptions & { input?: string; onStdoutLine?: (line: string) => void } = {},
+  opts: Omit<SpawnOptions, 'signal'> & {
+    input?: string;
+    onStdoutLine?: (line: string) => void;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<RunResult> {
+  const { signal, ...spawnOpts } = opts;
+  if (signal?.aborted) return Promise.reject(new Cancelled());
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { ...opts, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(command, args, {
+      ...spawnOpts,
+      // Its own process group elsewhere than Windows, so the whole tree can be killed on abort.
+      detached: spawnOpts.detached ?? (!!signal && process.platform !== 'win32'),
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let aborted = false;
+    const onAbort = () => {
+      aborted = true;
+      killTree(child);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
     let stdout = '';
     let stderr = '';
     let pending = '';
@@ -30,8 +58,13 @@ export function run(
       }
     });
     child.stderr?.on('data', (chunk: Buffer) => (stderr += chunk.toString()));
-    child.on('error', reject);
+    child.on('error', (err) => {
+      signal?.removeEventListener('abort', onAbort);
+      reject(aborted ? new Cancelled() : err);
+    });
     child.on('close', (code) => {
+      signal?.removeEventListener('abort', onAbort);
+      if (aborted) return reject(new Cancelled());
       if (pending && opts.onStdoutLine) opts.onStdoutLine(pending);
       resolve({ code, stdout, stderr });
     });

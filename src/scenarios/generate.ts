@@ -8,8 +8,9 @@ import { logger } from '../core/logger.js';
 import type { DesignSystemFile } from '../design/schema.js';
 import type { QaContext } from '../pipeline/context.js';
 import {
+  AiScenarioSchema,
+  isPersonScenario,
   ScenarioFileSchema,
-  ScenarioSchema,
   type RemovedScenario,
   type Scenario,
   type ScenarioFile,
@@ -23,6 +24,11 @@ export function scenarioFilePath(ctx: QaContext, route: string): string {
 
 export function pageSlug(route: string): string {
   return route === '/' ? 'home' : slugify(route);
+}
+
+/** Id prefix of a page's scenarios, e.g. "/order-history" → "ORDERHISTORY". */
+export function scenarioIdPrefix(route: string): string {
+  return pageSlug(route).toUpperCase().replace(/-/g, '');
 }
 
 export function loadDesign(ctx: QaContext): DesignSystemFile | undefined {
@@ -163,6 +169,30 @@ export function dropRemoved(scenarios: Scenario[], removed: readonly RemovedScen
   });
 }
 
+/** Prompt section listing scenarios a person wrote or edited, which the AI must leave alone. */
+export function personSection(person: readonly Scenario[]): string {
+  if (person.length === 0) return '';
+  return `## Scenarios written by a person — keep as they are
+These are maintained by a person and are kept exactly as written. Do not return them, do not return scenarios that test the same thing, and do not reuse their ids.
+${person.map((s) => `- ${s.id}: ${s.title}`).join('\n')}
+`;
+}
+
+/**
+ * Merge the AI's scenarios with the ones a person owns: person scenarios win on id and title,
+ * and the result is ordered by id.
+ */
+export function mergePersonScenarios(ai: Scenario[], person: readonly Scenario[]): Scenario[] {
+  const ids = new Set(person.map((s) => s.id));
+  const titles = new Set(person.map((s) => normalizeTitle(s.title)));
+  const kept = ai.filter((s) => {
+    const hit = ids.has(s.id) || titles.has(normalizeTitle(s.title));
+    if (hit) log.warn(`Dropping ${s.id} "${s.title}": it collides with a scenario written by a person`);
+    return !hit;
+  });
+  return [...kept, ...person].sort((a, b) => a.id.localeCompare(b.id));
+}
+
 async function generateForPage(
   ctx: QaContext,
   app: AppModelFile,
@@ -171,7 +201,9 @@ async function generateForPage(
   existing: ScenarioFile | undefined,
   max: number,
 ): Promise<Scenario[]> {
-  const prefix = pageSlug(page.route).toUpperCase().replace(/-/g, '');
+  const prefix = scenarioIdPrefix(page.route);
+  const person = existing?.scenarios.filter(isPersonScenario) ?? [];
+  const aiExisting = existing?.scenarios.filter((s) => !isPersonScenario(s)) ?? [];
   const flows = app.flows.filter((f) => f.routes.includes(page.route));
   const res = await ctx.ai.run({
     name: `scenarios-${pageSlug(page.route)}`,
@@ -194,26 +226,30 @@ ${JSON.stringify(designForPage(design, page.route), null, 2)}
 ## Viewports available
 ${JSON.stringify(ctx.config.viewports)}
 
-${existing ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(existing.scenarios, null, 2)}\n` : ''}${removedSection(existing?.removed ?? [])}
+${aiExisting.length ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(aiExisting, null, 2)}\n` : ''}${personSection(person)}${removedSection(existing?.removed ?? [])}
 ## Instructions
-- Produce at most ${max} high-value scenarios for this page across categories: functional, visual, responsive. Quality over quantity: no trivial duplicates.
+- Produce at most ${max} high-value scenarios for this page across categories: functional, visual, responsive, accessibility. Quality over quantity: no trivial duplicates.
 - functional: happy paths, validation, empty/error/loading states, navigation, and business rules (calculations!).
 - visual: compare against Figma. Use design.tokens with EXACT values from the Figma data above (e.g. a primary button's backgroundColor/borderRadius/height). Only reference a Figma screen in design.screen if it has hasReferenceImage=true. If no Figma data exists, do not create visual scenarios.
 - responsive: behaviour at tablet/mobile viewports (navigation collapse, no horizontal overflow, stacking), based on the design's mobile screens when available and general usability expectations.
+- accessibility: one or two per page, checking WCAG 2.1 A/AA with an automated audit in the states that matter (the page loaded, a form showing its validation errors, an open dialog or menu). Steps reach the state; expected results name what must be accessible (labels, alt text, contrast, headings, keyboard-reachable controls).
 - EXPECTED RESULTS MUST DESCRIBE CORRECT, INTENDED BEHAVIOUR — derived from the design, the UI copy and standard product conventions — NOT whatever the code happens to do. The page model flags suspicious logic; if code looks wrong (e.g. a discount shown but not subtracted from the total), the expected result must state the correct behaviour so the test can catch the bug.
 - Steps must be concrete and use visible text / accessible names from the page model, and include the preconditions needed (e.g. add products on / first, since the cart is in-memory).
 - ids: "${prefix}-001", "${prefix}-002", ... (reuse existing ids when updating).
 - source.figma = the expectation comes from Figma data; source.code = derived from reading code.
 - Set approved: true for new scenarios.${projectRules(ctx)}`,
-    schema: z.object({ scenarios: z.array(ScenarioSchema) }),
+    schema: z.object({ scenarios: z.array(AiScenarioSchema) }),
     tools: ['Read', 'Glob', 'Grep'],
   });
   const viewports = Object.keys(ctx.config.viewports);
-  return dropRemoved(res.output.scenarios, existing?.removed ?? []).map((s) => {
+  // Strip ownership fields in case an engine returns them anyway: only a person sets them.
+  const fromAi = res.output.scenarios.map(({ origin: _o, editedAt: _e, ...s }: Scenario): Scenario => s);
+  const ai = dropRemoved(fromAi, existing?.removed ?? []).map((s) => {
     if (!viewports.includes(s.viewport)) {
       log.warn(`Scenario ${s.id} uses unknown viewport "${s.viewport}", using "${viewports[0]}"`);
       return { ...s, viewport: viewports[0]! };
     }
     return s;
   });
+  return mergePersonScenarios(ai, person);
 }

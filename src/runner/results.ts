@@ -94,6 +94,8 @@ export const TestOutcomeSchema = z.object({
     logs: z.string().nullable(),
     design: z.array(z.string()),
   }),
+  /** Set when this test was run again on its own (dashboard *Run test*) and merged into the run. */
+  rerunAt: z.string().optional(),
 });
 export type TestOutcome = z.infer<typeof TestOutcomeSchema>;
 

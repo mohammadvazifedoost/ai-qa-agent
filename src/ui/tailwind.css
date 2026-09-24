@@ -1,7 +1,8 @@
 /* Dashboard stylesheet. Compiled by Tailwind at package build time into dist/ui/styles.css and
-   served at /styles.css; the class names live in page.ts. */
+   served at /styles.css; the class names live in index.html and the client modules. */
 @import 'tailwindcss';
-@source './page.ts';
+@source './index.html';
+@source './client';
 
 @theme {
   --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -38,6 +39,8 @@
   --color-visual-soft: #ede9fe;
   --color-responsive: #0369a1;
   --color-responsive-soft: #e0f2fe;
+  --color-accessibility: #a21caf;
+  --color-accessibility-soft: #fae8ff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -69,6 +72,8 @@
     --color-visual-soft: #2b2352;
     --color-responsive: #7dd3fc;
     --color-responsive-soft: #0f2f42;
+    --color-accessibility: #f0abfc;
+    --color-accessibility-soft: #3b1640;
   }
 }
 
@@ -116,11 +121,20 @@
   .chip-responsive {
     @apply bg-responsive-soft text-responsive;
   }
+  .chip-accessibility {
+    @apply bg-accessibility-soft text-accessibility;
+  }
   .chip-bug {
     @apply bg-fail-soft text-fail;
   }
   .chip-other {
     @apply bg-line text-muted;
+  }
+  .chip-person {
+    @apply bg-accent-soft text-accent;
+  }
+  .chip-todo {
+    @apply bg-flaky-soft text-flaky;
   }
   .pill {
     @apply inline-block rounded-full px-2.5 py-[3px] text-xs font-bold;
@@ -233,4 +247,12 @@ dialog::backdrop {
       opacity: 1;
     }
   }
+}
+
+/* The sidebar (and the mobile drawer) scrolls without showing a scrollbar. */
+#rail {
+  scrollbar-width: none;
+}
+#rail::-webkit-scrollbar {
+  display: none;
 }

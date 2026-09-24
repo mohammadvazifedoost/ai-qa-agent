@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { listTestIds, removeTestBlock, tokenize } from '../src/scenarios/spec-edit.js';
+import { listTestIds, removeTestBlock, tokenize, upsertTestBlock } from '../src/scenarios/spec-edit.js';
 
 /** Syntax errors reported by the real TypeScript parser (devDependency, used only in tests). */
 function syntaxErrors(code: string): string[] {
@@ -215,5 +215,64 @@ test('B-001: other', async () => {
         expect(src.length - code.length, `${f} ${id}`).toBeLessThan(src.length / 2);
       }
     }
+  });
+});
+
+describe('upsertTestBlock', () => {
+  const FILE = `import { test, expect } from '@company/ai-qa-agent/playwright';
+
+test.describe('/checkout', () => {
+  test('CHECKOUT-001: one', async ({ page }) => {
+    await page.goto('/checkout');
+  });
+
+  // about two
+  test('CHECKOUT-002: two', async ({ page }) => {
+    await page.goto('/');
+  });
+});
+`;
+  const block = (id: string, body = "await page.goto('/new');") =>
+    `test('${id}: fresh', async ({ page }) => {\n  ${body}\n});`;
+
+  it('replaces the existing test in place, re-indented, keeping its comment and the other tests', () => {
+    const res = upsertTestBlock(FILE, 'CHECKOUT-002', block('CHECKOUT-002'));
+    expect(res.action).toBe('replaced');
+    expect(res.code).toContain(`  // about two
+  test('CHECKOUT-002: fresh', async ({ page }) => {
+    await page.goto('/new');
+  });
+});`);
+    expect(res.code).toContain("test('CHECKOUT-001: one'");
+    expect(res.code).not.toContain("'CHECKOUT-002: two'");
+    expect(syntaxErrors(res.code)).toEqual([]);
+  });
+
+  it('inserts a new test after the last one, inside the same describe block', () => {
+    const res = upsertTestBlock(FILE, 'CHECKOUT-003', block('CHECKOUT-003'));
+    expect(res.action).toBe('added');
+    expect(res.code).toContain(`    await page.goto('/');
+  });
+
+  test('CHECKOUT-003: fresh', async ({ page }) => {
+    await page.goto('/new');
+  });
+});`);
+    expect(listTestIds(res.code)).toEqual(['CHECKOUT-001', 'CHECKOUT-002', 'CHECKOUT-003']);
+    expect(syntaxErrors(res.code)).toEqual([]);
+  });
+
+  it('rejects a block that is not exactly one test for that id', () => {
+    expect(() => upsertTestBlock(FILE, 'CHECKOUT-003', block('CHECKOUT-004'))).toThrow(/exactly one test/);
+    expect(() =>
+      upsertTestBlock(FILE, 'CHECKOUT-003', block('CHECKOUT-003') + '\n' + block('CHECKOUT-003')),
+    ).toThrow(/exactly one test/);
+    expect(() => upsertTestBlock(FILE, 'CHECKOUT-003', `${block('CHECKOUT-003')}\nconst x = 1;`)).toThrow(
+      /only the test/,
+    );
+  });
+
+  it('refuses a file without tests to anchor on', () => {
+    expect(() => upsertTestBlock("import { test } from 'x';\n", 'A-001', block('A-001'))).toThrow(/no tests/);
   });
 });

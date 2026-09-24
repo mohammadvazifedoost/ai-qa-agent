@@ -120,6 +120,12 @@ export const QaConfigSchema = z
         acceptableDiffRatio: z.number().min(0).max(1).default(0.02),
       })
       .default({ pixelThreshold: 0.1, acceptableDiffRatio: 0.02 }),
+    plans: z
+      .object({
+        /** Folder in the project (relative to its root) where `ai-qa-agent plan` writes bug-fix plans. */
+        dir: z.string().min(1).default('docs/bug-fix-plan'),
+      })
+      .default({ dir: 'docs/bug-fix-plan' }),
     ai: z
       .object({
         /** Which locally installed, logged-in agent CLI does the reasoning. */

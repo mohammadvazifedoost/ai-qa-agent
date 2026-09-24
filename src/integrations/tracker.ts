@@ -49,51 +49,116 @@ export function trackerKind(config: QaConfig): TrackerKind | null {
   return null;
 }
 
-/** Static facts about the configured tracker, without touching the network or secrets. */
+/**
+ * Static facts about the configured tracker (or the one named by `kind`), without touching the
+ * network or secrets.
+ */
 export function trackerInfo(
   config: QaConfig,
   env: NodeJS.ProcessEnv = process.env,
+  kind: TrackerKind | null = trackerKind(config),
 ): {
   kind: TrackerKind | null;
   name: string;
   noun: 'task' | 'issue';
   credentialsPresent: boolean;
+  /** Names (never values) of the environment variables that still need to be set. */
+  missingEnv: string[];
   target: string | null;
 } {
-  const kind = trackerKind(config);
   if (kind === 'jira' && config.jira) {
     const j = config.jira;
+    const missingEnv = [
+      ...(env[j.tokenEnv] ? [] : [j.tokenEnv]),
+      ...((j.email ?? env[j.emailEnv]) ? [] : [j.emailEnv]),
+    ];
     return {
       kind,
       name: 'Jira',
       noun: 'issue',
-      credentialsPresent: !!env[j.tokenEnv] && !!(j.email ?? env[j.emailEnv]),
+      credentialsPresent: missingEnv.length === 0,
+      missingEnv,
       target: `project ${j.projectKey}`,
     };
   }
   if (kind === 'clickup' && config.clickup) {
+    const missingEnv = env[config.clickup.tokenEnv] ? [] : [config.clickup.tokenEnv];
     return {
       kind,
       name: 'ClickUp',
       noun: 'task',
-      credentialsPresent: !!env[config.clickup.tokenEnv],
+      credentialsPresent: missingEnv.length === 0,
+      missingEnv,
       target: `list ${config.clickup.listId}`,
     };
   }
-  return { kind: null, name: 'Bug tracker', noun: 'task', credentialsPresent: false, target: null };
+  return {
+    kind: null,
+    name: 'Bug tracker',
+    noun: 'task',
+    credentialsPresent: false,
+    missingEnv: [],
+    target: null,
+  };
 }
 
 export function createTracker(
   config: QaConfig,
   env: NodeJS.ProcessEnv = process.env,
   fetchImpl?: Fetch,
+  kind: TrackerKind | null = trackerKind(config),
 ): IssueTracker {
-  const kind = trackerKind(config);
   if (kind === 'jira' && config.jira) return jiraTracker(config.jira, env, fetchImpl);
   if (kind === 'clickup' && config.clickup) return clickupTracker(config.clickup, env, fetchImpl);
   throw new FilingUnavailable(
     'not-configured',
     'No bug tracker configured (add a clickup or jira section to .qa/config.ts)',
+  );
+}
+
+export interface TrackerStatus {
+  kind: TrackerKind;
+  name: string;
+  /** Bugs are filed here (the tracker in use). */
+  active: boolean;
+  state: 'not-configured' | 'missing-credentials' | 'connected' | 'error';
+  /** Names (never values) of the environment variables that still need to be set. */
+  missingEnv: string[];
+  target: string | null;
+  /** Where bugs go when connected, or the error. */
+  detail?: string;
+}
+
+/**
+ * Status of each tracker for the dashboard: Jira always (so it can be set up), ClickUp when
+ * configured. Trackers with credentials are contacted to verify them and their destination.
+ */
+export async function trackerStatuses(
+  config: QaConfig,
+  env: NodeJS.ProcessEnv = process.env,
+  fetchImpl?: Fetch,
+): Promise<TrackerStatus[]> {
+  const active = trackerKind(config);
+  const kinds: TrackerKind[] = ['jira', ...(config.clickup ? (['clickup'] as const) : [])];
+  return Promise.all(
+    kinds.map(async (kind): Promise<TrackerStatus> => {
+      const info = trackerInfo(config, env, kind);
+      const base = {
+        kind,
+        name: kind === 'jira' ? 'Jira' : 'ClickUp',
+        active: kind === active,
+        missingEnv: info.missingEnv,
+        target: info.target,
+      };
+      if (info.kind === null) return { ...base, state: 'not-configured' };
+      if (!info.credentialsPresent) return { ...base, state: 'missing-credentials' };
+      try {
+        const detail = await createTracker(config, env, fetchImpl, kind).describeTarget();
+        return { ...base, state: 'connected', detail };
+      } catch (err) {
+        return { ...base, state: 'error', detail: (err as Error).message };
+      }
+    }),
   );
 }
 

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   fileIssues,
   FilingUnavailable,
@@ -9,7 +10,13 @@ import {
   recordFiling,
   type FilingResult,
 } from '../bugs/file.js';
-import { createTracker, trackerInfo, type IssueTracker } from '../integrations/tracker.js';
+import {
+  createTracker,
+  trackerInfo,
+  trackerStatuses,
+  type IssueTracker,
+  type TrackerStatus,
+} from '../integrations/tracker.js';
 import { readJson, sha256, slugify } from '../core/fs.js';
 import type { TestOutcome } from '../runner/results.js';
 import type { BugDraft, Issue } from '../triage/schema.js';
@@ -17,10 +24,19 @@ import { logger } from '../core/logger.js';
 import { runDir } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
 import { TestRunResultSchema, type TestRunResult } from '../runner/results.js';
+import { scenarioTestStates, writeScenarioTest, type ScenarioTestState } from '../generate/scenario-test.js';
+import { loadAppModel } from '../analyze/app.js';
+import { runScenarioTest, runScenarioTests } from '../runner/rerun.js';
+import { Cancelled } from '../core/process.js';
+import { runTests } from '../runner/run.js';
+import { listTestIds } from '../scenarios/spec-edit.js';
+import { specPath } from '../generate/playwright.js';
+import { draftScenario, saveScenario, ScenarioInputError } from '../scenarios/author.js';
 import { loadAllScenarios } from '../scenarios/generate.js';
 import { removeScenarios } from '../scenarios/manage.js';
+import { CATEGORIES } from '../scenarios/schema.js';
 import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
-import { PAGE_HTML } from './page.js';
+import { planFile, planStatus, writeBugFixPlan } from '../plan/plan.js';
 
 const log = logger('ui');
 
@@ -33,6 +49,8 @@ export interface Overview {
     noun: 'task' | 'issue';
     configured: boolean;
     tokenPresent: boolean;
+    /** Names of the credential environment variables that are not set. */
+    missingEnv: string[];
     target: string | null;
   };
   runs: Array<{ id: string; startedAt: string; status: string; stats: TestRunResult['stats'] | null }>;
@@ -49,6 +67,14 @@ export interface Overview {
     tasksPending: boolean;
   } | null;
   scenarios: ReturnType<typeof loadAllScenarios>;
+  /** Choices for the add/edit scenario form. */
+  authoring: { pages: string[]; viewports: string[]; categories: readonly string[] };
+  /** Approved scenarios whose test is missing or older than the scenario (up-to-date ones are absent). */
+  testStates: Record<string, ScenarioTestState>;
+  /** The test run started from the dashboard that is running now, or the last one. */
+  job: Job | null;
+  /** Bug-fix plan of the selected run: whether it can be made and whether it exists. */
+  plan: ReturnType<typeof planStatus> | null;
 }
 
 export interface TaskLink {
@@ -184,11 +210,20 @@ export async function buildOverview(ctx: QaContext, runId?: string): Promise<Ove
       noun: info.noun,
       configured: info.kind !== null,
       tokenPresent: info.credentialsPresent,
+      missingEnv: info.missingEnv,
       target: info.target,
     },
     runs,
     run,
     scenarios: loadAllScenarios(ctx),
+    authoring: {
+      pages: loadAppModel(ctx)?.pages.map((p) => p.route) ?? [],
+      viewports: Object.keys(ctx.config.viewports),
+      categories: CATEGORIES,
+    },
+    testStates: scenarioTestStates(ctx),
+    job,
+    plan: run ? planStatus(ctx, run.id) : null,
   };
 }
 
@@ -248,10 +283,11 @@ export function adhocIssue(
 ): Issue | undefined {
   const outcome = test.outcomes.find((o) => o.key === key);
   if (!outcome) return undefined;
-  const failure = triage?.failures.find((f) => f.key === key);
+  // The analysis of a test that was run again since describes an earlier failure.
+  const failure = outcome.rerunAt ? undefined : triage?.failures.find((f) => f.key === key);
   const scenario = loadAllScenarios(ctx).find((s) => s.id === outcome.scenarioId);
-  const category =
-    scenario?.category === 'visual' || scenario?.category === 'responsive' ? scenario.category : 'functional';
+  // Scenario categories map onto bug categories one to one, except that there is no "content" scenario.
+  const category = scenario?.category ?? 'functional';
   const bug: BugDraft = failure?.bug ?? {
     title: scenario?.title ?? outcome.title,
     severity: 'medium',
@@ -311,8 +347,224 @@ async function handleFile(ctx: QaContext, body: string): Promise<{ status: numbe
   }
 }
 
-/** Deletions edit spec and scenario files; run them one at a time. */
-let deleting: Promise<unknown> = Promise.resolve();
+/** Saves, deletions and test generation edit scenario and spec files; run them one at a time. */
+let writing: Promise<unknown> = Promise.resolve();
+
+/** A long test run started from the dashboard; the page polls GET /api/job until it is done. */
+export interface Job {
+  kind: 'run-all' | 'run-not-run' | 'run-failed' | 'plan';
+  label: string;
+  status: 'running' | 'done' | 'failed' | 'cancelled';
+  startedAt: string;
+  finishedAt?: string;
+  /** The run the results are in (known once it started). */
+  runId?: string;
+  message?: string;
+  /** For a plan: the project-relative path of the written file. */
+  file?: string;
+}
+
+let job: Job | null = null;
+/** Aborts the running job's processes (Playwright, the AI CLI); see POST /api/job/cancel. */
+let jobAbort: AbortController | null = null;
+
+/** Start a job unless one is running; it runs in the write queue so it never overlaps other edits. */
+function startJob(
+  kind: Job['kind'],
+  label: string,
+  work: (setRun: (runId: string) => void, signal: AbortSignal) => Promise<string>,
+): { status: number; payload: unknown } {
+  if (job?.status === 'running')
+    return { status: 409, payload: { error: `${job.label} is still running.`, job } };
+  const current: Job = { kind, label, status: 'running', startedAt: new Date().toISOString() };
+  const abort = new AbortController();
+  job = current;
+  jobAbort = abort;
+  serially(() => {
+    // Cancelled while waiting in the queue: do not start at all.
+    if (abort.signal.aborted) throw new Cancelled();
+    return work((runId) => (current.runId = runId), abort.signal);
+  })
+    .then((message) => Object.assign(current, { status: 'done', message }))
+    .catch((err: unknown) => {
+      if (err instanceof Cancelled) {
+        log.info(`${label}: cancelled`);
+        Object.assign(current, { status: 'cancelled', message: 'Cancelled. Nothing was changed.' });
+        return;
+      }
+      log.error(`${label}: ${(err as Error).message}`);
+      Object.assign(current, { status: 'failed', message: (err as Error).message });
+    })
+    .finally(() => {
+      current.finishedAt = new Date().toISOString();
+      if (jobAbort === abort) jobAbort = null;
+    });
+  return { status: 202, payload: current };
+}
+
+function handleCancelJob(): { status: number; payload: unknown } {
+  if (job?.status !== 'running' || !jobAbort)
+    return { status: 409, payload: { error: 'No job is running.' } };
+  jobAbort.abort();
+  return { status: 202, payload: job };
+}
+
+const summary = (stats: TestRunResult['stats']): string =>
+  `${stats.passed} passed, ${stats.failed} failed${stats.flaky ? `, ${stats.flaky} flaky` : ''}`;
+
+/** A new run with every test, like `ai-qa-agent test`. */
+function handleRunAll(ctx: QaContext): { status: number; payload: unknown } {
+  return startJob('run-all', 'Running all tests', async (setRun, signal) => {
+    const record = ctx.state.startRun({ command: 'test' });
+    setRun(record.id);
+    try {
+      const res = await runTests(ctx, record.id, {}, undefined, signal);
+      ctx.state.finishRun(record, 'completed');
+      return `All tests ran: ${summary(res.stats)}.`;
+    } catch (err) {
+      ctx.state.finishRun(record, 'failed', (err as Error).message);
+      throw err;
+    }
+  });
+}
+
+/** Approved scenarios that have a test but no result in the run. */
+function notRunIds(ctx: QaContext, runId: string | undefined): string[] {
+  const ran = new Set(
+    (runId ? (loadRun(ctx, runId)?.outcomes ?? []) : []).map((o) => o.scenarioId).filter(Boolean),
+  );
+  return withTests(ctx, (s) => !ran.has(s.id));
+}
+
+/** Approved scenarios whose test failed or was flaky in the run, and that still have a test. */
+function failedIds(ctx: QaContext, runId: string): string[] {
+  const failed = new Set(
+    (loadRun(ctx, runId)?.outcomes ?? [])
+      .filter((o) => o.status === 'failed' || o.status === 'flaky')
+      .map((o) => o.scenarioId)
+      .filter(Boolean),
+  );
+  return withTests(ctx, (s) => failed.has(s.id));
+}
+
+/** Ids of approved scenarios matching `pick` whose page spec has a test for them. */
+function withTests(ctx: QaContext, pick: (s: { id: string; page: string }) => boolean): string[] {
+  const tests = new Map<string, string[]>();
+  return loadAllScenarios(ctx)
+    .filter((s) => {
+      if (!s.approved || !pick(s)) return false;
+      const spec = specPath(ctx, s.page);
+      if (!tests.has(spec))
+        tests.set(spec, fs.existsSync(spec) ? listTestIds(fs.readFileSync(spec, 'utf8')) : []);
+      return tests.get(spec)!.includes(s.id);
+    })
+    .map((s) => s.id);
+}
+
+/** Run these tests again as a job and merge their results into the run (or a new one). */
+function rerunJob(
+  ctx: QaContext,
+  kind: 'run-not-run' | 'run-failed',
+  label: string,
+  ids: string[],
+  runId: string | undefined,
+): { status: number; payload: unknown } {
+  return startJob(kind, label, async (setRun, signal) => {
+    if (runId) setRun(runId);
+    const res = await runScenarioTests(ctx, ids, { runId, signal });
+    setRun(res.runId);
+    const stats = {
+      passed: res.outcomes.filter((o) => o.status === 'passed').length,
+      failed: res.outcomes.filter((o) => o.status === 'failed').length,
+      flaky: res.outcomes.filter((o) => o.status === 'flaky').length,
+      skipped: 0,
+    };
+    return (
+      `Ran ${ids.length - res.missing.length} of ${ids.length} tests: ${summary(stats)}.` +
+      (res.missing.length ? ` No result for ${res.missing.join(', ')}.` : '')
+    );
+  });
+}
+
+function handleRunFailed(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { runId } = JSON.parse(body || '{}') as { runId?: unknown };
+  if (typeof runId !== 'string' || !runId) return { status: 400, payload: { error: 'runId is required' } };
+  const ids = failedIds(ctx, runId);
+  if (ids.length === 0) return { status: 400, payload: { error: 'No failed tests to run in this run.' } };
+  return rerunJob(
+    ctx,
+    'run-failed',
+    `Running ${ids.length} failed test${ids.length === 1 ? '' : 's'}`,
+    ids,
+    runId,
+  );
+}
+
+/** Write the bug-fix plan of a run into the project (same rules as `ai-qa-agent plan`). */
+function handlePlan(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { runId, force } = JSON.parse(body || '{}') as { runId?: unknown; force?: unknown };
+  if (typeof runId !== 'string' || !runId) return { status: 400, payload: { error: 'runId is required' } };
+  const status = planStatus(ctx, runId);
+  if (status.failures === 0)
+    return { status: 409, payload: { error: 'No failed tests to plan in this run.' } };
+  if (status.exists && force !== true) {
+    return { status: 409, payload: { error: `${status.file} already exists.`, exists: true } };
+  }
+  return startJob(
+    'plan',
+    `Writing the fix plan for ${status.failures} failed test${status.failures === 1 ? '' : 's'}`,
+    async (setRun, signal) => {
+      setRun(runId);
+      const res = await writeBugFixPlan(ctx, { runId, force: true, signal });
+      if (job) job.file = res.file ?? undefined;
+      return `Wrote ${res.file} with ${res.bugs} bug${res.bugs === 1 ? '' : 's'}.`;
+    },
+  );
+}
+
+/** The plan file's text for the dashboard viewer (only this file, never other paths). */
+function readPlan(ctx: QaContext, runId: string): { status: number; payload: unknown } {
+  if (!/^[\w-]+$/.test(runId)) return { status: 400, payload: { error: 'invalid run id' } };
+  const file = planFile(ctx, runId);
+  if (!fs.existsSync(file)) return { status: 404, payload: { error: 'No plan for this run yet.' } };
+  return {
+    status: 200,
+    payload: {
+      file: path.relative(ctx.root, file).split(path.sep).join('/'),
+      text: fs.readFileSync(file, 'utf8'),
+    },
+  };
+}
+
+function handleRunNotRun(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { runId } = JSON.parse(body || '{}') as { runId?: unknown };
+  if (runId !== undefined && typeof runId !== 'string')
+    return { status: 400, payload: { error: 'runId must be a string' } };
+  const ids = notRunIds(ctx, runId);
+  if (ids.length === 0)
+    return { status: 400, payload: { error: 'Every test already has a result in this run.' } };
+  return rerunJob(
+    ctx,
+    'run-not-run',
+    `Running ${ids.length} not-run test${ids.length === 1 ? '' : 's'}`,
+    ids,
+    runId,
+  );
+}
+
+/** Tracker checks contact the tracker; reuse the answer for a minute unless a refresh asks. */
+let trackerCache: { at: number; value: TrackerStatus[] } | undefined;
+async function trackerStatus(ctx: QaContext, fresh: boolean): Promise<TrackerStatus[]> {
+  if (!fresh && trackerCache && Date.now() - trackerCache.at < 60_000) return trackerCache.value;
+  trackerCache = { at: Date.now(), value: await trackerStatuses(ctx.config) };
+  return trackerCache.value;
+}
+
+function serially<T>(fn: () => T | Promise<T>): Promise<T> {
+  const task = writing.then(fn);
+  writing = task.catch(() => undefined);
+  return task;
+}
 
 async function handleDeleteScenario(
   ctx: QaContext,
@@ -320,12 +572,10 @@ async function handleDeleteScenario(
 ): Promise<{ status: number; payload: unknown }> {
   const { id, reason } = JSON.parse(body || '{}') as { id?: unknown; reason?: unknown };
   if (typeof id !== 'string' || !id.trim()) return { status: 400, payload: { error: 'id is required' } };
-  const task = deleting.then(() =>
-    removeScenarios(ctx, [id], { reason: typeof reason === 'string' ? reason.trim() : undefined }),
-  );
-  deleting = task.catch(() => undefined);
   try {
-    const [removed] = await task;
+    const [removed] = await serially(() =>
+      removeScenarios(ctx, [id], { reason: typeof reason === 'string' ? reason.trim() : undefined }),
+    );
     return { status: 200, payload: removed };
   } catch (err) {
     const message = (err as Error).message;
@@ -336,13 +586,100 @@ async function handleDeleteScenario(
   }
 }
 
+async function handleSaveScenario(
+  ctx: QaContext,
+  body: string,
+): Promise<{ status: number; payload: unknown }> {
+  const { id, scenario } = JSON.parse(body || '{}') as { id?: unknown; scenario?: unknown };
+  if (id !== undefined && typeof id !== 'string')
+    return { status: 400, payload: { error: 'id must be a string' } };
+  try {
+    return { status: 200, payload: await serially(() => saveScenario(ctx, scenario, id)) };
+  } catch (err) {
+    if (err instanceof ScenarioInputError) return { status: 400, payload: { error: err.message } };
+    throw err;
+  }
+}
+
+async function handleDraftScenario(
+  ctx: QaContext,
+  body: string,
+): Promise<{ status: number; payload: unknown }> {
+  const { page, description } = JSON.parse(body || '{}') as { page?: unknown; description?: unknown };
+  if (typeof page !== 'string' || typeof description !== 'string') {
+    return { status: 400, payload: { error: 'page and description are required' } };
+  }
+  try {
+    return { status: 200, payload: await draftScenario(ctx, { page, description }) };
+  } catch (err) {
+    if (err instanceof ScenarioInputError) return { status: 400, payload: { error: err.message } };
+    return { status: 502, payload: { error: `The AI could not draft it: ${(err as Error).message}` } };
+  }
+}
+
+async function handleWriteTest(ctx: QaContext, body: string): Promise<{ status: number; payload: unknown }> {
+  const { id } = JSON.parse(body || '{}') as { id?: unknown };
+  if (typeof id !== 'string' || !id.trim()) return { status: 400, payload: { error: 'id is required' } };
+  try {
+    return { status: 200, payload: await serially(() => writeScenarioTest(ctx, id)) };
+  } catch (err) {
+    const message = (err as Error).message;
+    return {
+      status: /^Unknown scenario|not approved/.test(message) ? 404 : 500,
+      payload: { error: message },
+    };
+  }
+}
+
+async function handleRunTest(ctx: QaContext, body: string): Promise<{ status: number; payload: unknown }> {
+  const { id, runId } = JSON.parse(body || '{}') as { id?: unknown; runId?: unknown };
+  if (typeof id !== 'string' || !id.trim()) return { status: 400, payload: { error: 'id is required' } };
+  if (runId !== undefined && typeof runId !== 'string') {
+    return { status: 400, payload: { error: 'runId must be a string' } };
+  }
+  try {
+    return { status: 200, payload: await serially(() => runScenarioTest(ctx, id, { runId })) };
+  } catch (err) {
+    const message = (err as Error).message;
+    return {
+      status: /^Unknown scenario|has no test yet/.test(message) ? 404 : 500,
+      payload: { error: message },
+    };
+  }
+}
+
+/**
+ * The dashboard's own files, compiled into dist/ui at package build time: the page (`/`) and its
+ * ES modules (`/client/*.js`). Nothing else under dist is reachable.
+ */
+function serveAsset(urlPath: string, res: http.ServerResponse): void {
+  const uiDir = fileURLToPath(new URL('.', import.meta.url));
+  const clientDir = path.join(uiDir, 'client');
+  const file =
+    urlPath === '/'
+      ? path.join(uiDir, 'index.html')
+      : path.resolve(clientDir, decodeURIComponent(urlPath.slice('/client/'.length)));
+  const allowed = urlPath === '/' || (file.startsWith(clientDir + path.sep) && file.endsWith('.js'));
+  if (!allowed || !fs.existsSync(file)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(
+      urlPath === '/' ? 'Dashboard not built: run `npm run build` in @company/ai-qa-agent' : 'Not found',
+    );
+    return;
+  }
+  res.writeHead(200, {
+    'Content-Type': urlPath === '/' ? 'text/html; charset=utf-8' : 'text/javascript; charset=utf-8',
+    'Cache-Control': 'no-cache',
+  });
+  fs.createReadStream(file).pipe(res);
+}
+
 export function startUi(ctx: QaContext, opts: { port: number; host?: string }): Promise<http.Server> {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     try {
-      if (req.method === 'GET' && url.pathname === '/') {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(PAGE_HTML);
+      if (req.method === 'GET' && (url.pathname === '/' || url.pathname.startsWith('/client/'))) {
+        serveAsset(url.pathname, res);
       } else if (req.method === 'GET' && url.pathname === '/api/overview') {
         json(res, 200, await buildOverview(ctx, url.searchParams.get('run') ?? undefined));
       } else if (req.method === 'GET' && url.pathname === '/api/tasks') {
@@ -357,6 +694,40 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/scenarios/delete') {
         const { status, payload } = await handleDeleteScenario(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/scenarios/save') {
+        const { status, payload } = await handleSaveScenario(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/scenarios/draft') {
+        const { status, payload } = await handleDraftScenario(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'GET' && url.pathname === '/api/trackers') {
+        json(res, 200, { trackers: await trackerStatus(ctx, url.searchParams.has('fresh')) });
+      } else if (req.method === 'GET' && url.pathname === '/api/job') {
+        json(res, 200, { job });
+      } else if (req.method === 'POST' && url.pathname === '/api/plan') {
+        const { status, payload } = handlePlan(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'GET' && url.pathname === '/api/plan') {
+        const { status, payload } = readPlan(ctx, url.searchParams.get('run') ?? '');
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/job/cancel') {
+        const { status, payload } = handleCancelJob();
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/runs/failed') {
+        const { status, payload } = handleRunFailed(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/runs/all') {
+        const { status, payload } = handleRunAll(ctx);
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/runs/not-run') {
+        const { status, payload } = handleRunNotRun(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/scenarios/run') {
+        const { status, payload } = await handleRunTest(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/scenarios/test') {
+        const { status, payload } = await handleWriteTest(ctx, await readBody(req));
         json(res, status, payload);
       } else if (req.method === 'GET' && url.pathname.startsWith('/files/')) {
         serveFile(ctx, url.pathname, res);
