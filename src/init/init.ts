@@ -21,7 +21,7 @@ const FIGMA_MCP = { type: 'http', url: 'https://mcp.figma.com/mcp' } as const;
 const PLAYWRIGHT_MCP = { command: 'npx', args: ['-y', '@playwright/mcp@latest', '--headless', '--isolated'] };
 
 export function renderConfig(info: ProjectInfo, opts: InitOptions): string {
-  const baseUrl = opts.baseUrl ?? `http://localhost:${info.devPort ?? 3000}`;
+  const baseUrl = opts.baseUrl ?? `http://${info.devHost ?? 'localhost'}:${info.devPort ?? 3000}`;
   const include = info.sourceDirs.length ? info.sourceDirs : ['.'];
   const lines: string[] = [];
   lines.push(`import { defineConfig } from '@company/ai-qa';`, '');

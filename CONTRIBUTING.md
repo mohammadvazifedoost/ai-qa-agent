@@ -17,7 +17,8 @@ If a private npm mirror is configured globally and rejects packages, install wit
 
 | Script | Purpose |
 |---|---|
-| `npm run build` | Compile `src/` to `dist/` (the CLI is `dist/cli.js`) |
+| `npm run build` | Compile `src/` to `dist/` (the CLI is `dist/cli.js`) and the dashboard CSS (`dist/ui/styles.css`, Tailwind v4) |
+| `npm run build:css` | Only the dashboard CSS — use while editing `src/ui/page.ts` / `src/ui/tailwind.css` |
 | `npm run typecheck` | `tsc --noEmit` over src and tests |
 | `npm run lint` / `npm run format` | ESLint / Prettier |
 | `npm test` | Vitest unit tests in `test/` |

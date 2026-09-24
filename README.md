@@ -168,6 +168,27 @@ named in `clickup.tokenEnv`; Figma and Claude are authenticated through Claude C
 flows. `.qa/.gitignore` excludes artifacts, reports and state; scenarios, tests, config and rules
 are meant to be committed.
 
+## Using it without Figma or ClickUp (code-only mode)
+
+Both integrations are optional. With no `figma` section the agent works from the source code and
+the running application alone: it still analyzes routes, forms, states and business rules, writes
+functional and responsive scenarios (responsive expectations come from general usability rules —
+no horizontal overflow, reachable navigation, stacking), generates and runs the Playwright tests,
+captures video/screenshots/traces, and triages failures. Visual/design-token scenarios are simply
+not generated, since there is no design to compare against.
+
+With no `clickup` section, confirmed defects stay in the report (`.qa/reports/<run>/bugs/*.md`)
+and in the dashboard, which shows no *Create task* buttons.
+
+```bash
+npm install -D @company/ai-qa @playwright/test && npx playwright install chromium
+npx ai-qa init            # no --figma, no --clickup-list
+npx ai-qa run             # code-only end-to-end QA
+npx ai-qa ui
+```
+
+Add `figma` / `clickup` to `.qa/config.ts` later at any time; the next run picks them up.
+
 ## Figma setup
 
 1. Claude Code must have the official Figma MCP server (`https://mcp.figma.com/mcp`) authorized:

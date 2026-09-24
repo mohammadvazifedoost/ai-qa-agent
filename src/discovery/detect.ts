@@ -21,6 +21,7 @@ export const ProjectInfoSchema = z.object({
   devCommand: z.string().nullable(),
   buildCommand: z.string().nullable(),
   devPort: z.number().nullable(),
+  devHost: z.string().nullable(),
   sourceDirs: z.array(z.string()),
   componentDirs: z.array(z.string()),
   routes: z.array(z.object({ path: z.string(), file: z.string() })),
@@ -88,6 +89,14 @@ const STYLING_DEPS: Record<string, string> = {
 function portFromScript(script: string | undefined): number | null {
   const m = script?.match(/(?:--port[= ]|-p\s+|PORT=)(\d{2,5})/);
   return m ? Number(m[1]) : null;
+}
+
+/** Explicit bind host from the dev script (e.g. `--host 127.0.0.1`), or null. */
+function hostFromScript(script: string | undefined): string | null {
+  const m = script?.match(/(?:--host[= ]|-H\s+|HOST=)([\w.:[\]-]+)/);
+  if (!m) return null;
+  const host = m[1]!;
+  return host === '0.0.0.0' || host === '::' || host === 'true' ? null : host;
 }
 
 function routeFromFile(relFile: string, base: string, style: string): string {
@@ -230,6 +239,7 @@ export function detectProject(root: string): ProjectInfo {
     devCommand: devScript ? `${runPrefix} ${devScript}` : null,
     buildCommand: scripts.build ? `${runPrefix} build` : null,
     devPort,
+    devHost: hostFromScript(devScript ? scripts[devScript] : undefined),
     sourceDirs,
     componentDirs,
     routes,

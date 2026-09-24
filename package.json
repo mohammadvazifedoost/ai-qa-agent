@@ -26,7 +26,7 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tailwindcss -i src/ui/tailwind.css -o dist/ui/styles.css --minify",
     "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
@@ -34,7 +34,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "build:css": "tailwindcss -i src/ui/tailwind.css -o dist/ui/styles.css --minify"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.45"
@@ -50,12 +51,14 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "1.63",
+    "@tailwindcss/cli": "^4.3.3",
     "@types/node": "^26.6.2",
     "@types/pngjs": "^6.0.5",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",
     "prettier": "^3.9.9",
+    "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.1",
     "vitest": "^5.0.1"

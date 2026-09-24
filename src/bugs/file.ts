@@ -240,7 +240,7 @@ export async function recordPendingBugs(run: TestRunResult, triage: TriageResult
   const message =
     fileable.length === 0
       ? 'No confirmed defects'
-      : `${fileable.length} confirmed defect(s) — open \`ai-qa ui\` and use "Log in ClickUp" on the ones you want tracked`;
+      : `${fileable.length} confirmed defect(s) — open \`ai-qa ui\` and click "Create task" on the ones you want tracked`;
   const summary = recordFiling(run, results, fileable.length === 0 ? 'nothing-to-file' : 'pending', message);
   log.info(message);
   return summary;

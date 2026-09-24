@@ -60,6 +60,9 @@ src/
   changes/detect.ts       deterministic code change detection (per-page + shared-file hashes) and
                           opt-in Figma change detection (frame list + page structure hashes)
   ui/server.ts, ui/page.ts local dashboard server (node:http) and its single static page
+  ui/tailwind.css         design tokens + component classes; compiled by the Tailwind CLI during
+                          `npm run build` into dist/ui/styles.css, served at /styles.css (no CDN,
+                          no build step for users of the package)
   design/schema.ts        DesignSystem schema with observed/inferred/unknown certainty
   design/figma.ts         extraction task (read-only Figma tools), reference image download,
                           rate-limit reporting, back-fill of missing references

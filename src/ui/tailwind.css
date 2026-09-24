@@ -1,0 +1,175 @@
+/* Dashboard stylesheet. Compiled by Tailwind at package build time into dist/ui/styles.css and
+   served at /styles.css; the class names live in page.ts. */
+@import 'tailwindcss';
+@source './page.ts';
+
+@theme {
+  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  --color-bg: #f2f5f4;
+  --color-surface: #ffffff;
+  --color-ink: #10231f;
+  --color-muted: #5f6f6b;
+  --color-line: #dce3e0;
+  --color-line-strong: #b9c4c0;
+  --color-accent: #0e6b5c;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #e1f0ec;
+  --color-pass: #2f7d4f;
+  --color-pass-soft: #e4f2e9;
+  --color-fail: #c03a2b;
+  --color-fail-soft: #fae6e2;
+  --color-flaky: #b7791f;
+  --color-flaky-soft: #fbefd9;
+  --color-idle: #9aa7a3;
+  --color-visual: #5b4bb5;
+  --color-visual-soft: #ebe7fb;
+  --color-responsive: #0d6e8f;
+  --color-responsive-soft: #e0f2f8;
+  --color-functional: #4d5b57;
+  --color-functional-soft: #e9edeb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f1614;
+    --color-surface: #161f1c;
+    --color-ink: #e8eeec;
+    --color-muted: #98a6a2;
+    --color-line: #243230;
+    --color-line-strong: #3a4a46;
+    --color-accent: #4fb8a2;
+    --color-accent-ink: #0f1614;
+    --color-accent-soft: #17302b;
+    --color-pass: #5cc58a;
+    --color-pass-soft: #13301f;
+    --color-fail: #f0806f;
+    --color-fail-soft: #3b1c17;
+    --color-flaky: #e3aa4c;
+    --color-flaky-soft: #3a2b10;
+    --color-idle: #6c7a76;
+    --color-visual: #b3a6f5;
+    --color-visual-soft: #2a2450;
+    --color-responsive: #7cc9e6;
+    --color-responsive-soft: #12323f;
+    --color-functional: #aab6b1;
+    --color-functional-soft: #253330;
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-bg text-ink font-sans text-[15px] leading-relaxed;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+  select,
+  input[type='checkbox'] {
+    @apply accent-accent;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-block rounded-lg px-3 py-[7px] font-bold leading-snug no-underline cursor-pointer bg-accent text-accent-ink disabled:opacity-55 disabled:cursor-default;
+  }
+  .btn-ghost {
+    @apply bg-accent-soft text-accent hover:underline;
+  }
+  .chip {
+    @apply inline-block rounded-full px-2 py-px text-xs font-semibold whitespace-nowrap align-[1px];
+  }
+  .chip-functional {
+    @apply bg-functional-soft text-functional;
+  }
+  .chip-visual {
+    @apply bg-visual-soft text-visual;
+  }
+  .chip-responsive {
+    @apply bg-responsive-soft text-responsive;
+  }
+  .chip-bug {
+    @apply bg-fail-soft text-fail;
+  }
+  .chip-other {
+    @apply bg-line text-muted;
+  }
+  .pill {
+    @apply inline-block rounded-full px-2.5 py-[3px] text-xs font-bold;
+  }
+  .pill-passed {
+    @apply bg-pass-soft text-pass;
+  }
+  .pill-failed {
+    @apply bg-fail-soft text-fail;
+  }
+  .pill-flaky {
+    @apply bg-flaky-soft text-flaky;
+  }
+  .pill-none {
+    @apply bg-line text-muted;
+  }
+  .dot {
+    @apply inline-block size-2.5 rounded-full bg-idle;
+  }
+  .dot-passed {
+    @apply bg-pass;
+  }
+  .dot-failed {
+    @apply bg-fail;
+  }
+  .dot-flaky {
+    @apply bg-flaky;
+  }
+  .seg-btn {
+    @apply border-0 bg-transparent px-3 py-[7px] font-semibold text-muted cursor-pointer aria-pressed:bg-ink aria-pressed:text-bg;
+  }
+  .nav-btn {
+    @apply flex w-full items-center justify-between gap-2 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left text-ink cursor-pointer hover:bg-accent-soft aria-[current=true]:bg-surface aria-[current=true]:shadow-[inset_0_0_0_1px_var(--color-line)];
+  }
+  .field {
+    @apply rounded-lg border border-line-strong bg-surface px-2.5 py-[7px] text-ink;
+  }
+  .section-title {
+    @apply mb-2 text-xs font-bold tracking-wide text-muted;
+  }
+  .disclosure > summary {
+    @apply cursor-pointer list-none font-semibold text-accent;
+  }
+  .disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+  .disclosure > summary::before {
+    content: '▸ ';
+    color: var(--color-muted);
+  }
+  .disclosure[open] > summary::before {
+    content: '▾ ';
+  }
+}
+
+dialog::backdrop {
+  background: rgb(16 35 31 / 0.55);
+  backdrop-filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  dialog[open] {
+    animation: pop 0.16s ease-out;
+  }
+  @keyframes pop {
+    from {
+      transform: translateY(8px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+}

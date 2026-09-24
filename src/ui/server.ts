@@ -306,6 +306,16 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'GET' && url.pathname.startsWith('/files/')) {
         serveFile(ctx, url.pathname, res);
+      } else if (req.method === 'GET' && url.pathname === '/styles.css') {
+        // Compiled by Tailwind at package build time (see package.json "build").
+        const css = new URL('./styles.css', import.meta.url);
+        if (!fs.existsSync(css)) {
+          res.writeHead(404);
+          res.end('/* styles.css missing: run `npm run build` in @company/ai-qa */');
+        } else {
+          res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': 'no-cache' });
+          fs.createReadStream(css).pipe(res);
+        }
       } else if (url.pathname === '/favicon.ico') {
         res.writeHead(204);
         res.end();
