@@ -1,0 +1,37 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - link "Demo Shop" [ref=e4] [cursor=pointer]:
+      - /url: /
+    - navigation "Main" [ref=e5]:
+      - link "Home" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - link "Shop all products" [ref=e7] [cursor=pointer]:
+        - /url: /#products
+      - link "Checkout 1 items in cart" [ref=e33] [cursor=pointer]:
+        - /url: /checkout
+        - text: Checkout
+        - generic "1 items in cart" [ref=e34]: "1"
+      - link "Sign in to your account" [ref=e10] [cursor=pointer]:
+        - /url: /login
+  - main [ref=e11]:
+    - generic [ref=e12]:
+      - heading "Everyday goods, made well" [level=1] [ref=e13]
+      - paragraph [ref=e14]: Small-batch essentials for your desk and kitchen.
+    - region [ref=e15]:
+      - heading "Products" [level=2] [ref=e16]
+      - list [ref=e17]:
+        - listitem [ref=e18]:
+          - heading "Ceramic Mug" [level=3] [ref=e19]
+          - paragraph [ref=e20]: Hand-glazed, 350 ml.
+          - paragraph [ref=e21]: $18.00
+          - button "Add Ceramic Mug to cart" [active] [ref=e22] [cursor=pointer]: Add to cart
+        - listitem [ref=e23]:
+          - heading "Canvas Tote" [level=3] [ref=e24]
+          - paragraph [ref=e25]: Heavyweight organic cotton.
+          - paragraph [ref=e26]: $24.00
+          - button "Add Canvas Tote to cart" [ref=e27] [cursor=pointer]: Add to cart
+        - listitem [ref=e28]:
+          - heading "Dot Notebook" [level=3] [ref=e29]
+          - paragraph [ref=e30]: A5, 160 pages, lay-flat.
+          - paragraph [ref=e31]: $12.00
+          - button "Add Dot Notebook to cart" [ref=e32] [cursor=pointer]: Add to cart

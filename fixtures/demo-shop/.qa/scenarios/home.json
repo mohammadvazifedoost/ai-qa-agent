@@ -1,0 +1,402 @@
+{
+  "page": "/",
+  "generatedAt": "2026-09-24T00:18:33.935Z",
+  "inputHash": "6decc68140d33d085e0b046bd1e2166d4e0728595d77dc5509681ce06c06b5f9",
+  "scenarios": [
+    {
+      "id": "HOME-001",
+      "page": "/",
+      "feature": "catalog",
+      "category": "functional",
+      "priority": "high",
+      "title": "Home page shows hero and all three products with correct names, descriptions and prices",
+      "preconditions": [
+        "Fresh load of / (empty in-memory cart)"
+      ],
+      "steps": [
+        "Open /",
+        "Read the h1 and the 'Products' h2",
+        "Read each product card in the grid"
+      ],
+      "expectedResults": [
+        "h1 'Everyday goods, made well' with subtitle 'Small-batch essentials for your desk and kitchen.'",
+        "h2 'Products' is present in section#products",
+        "Exactly 3 cards in order: 'Ceramic Mug' / 'Hand-glazed, 350 ml.' / $18.00; 'Canvas Tote' / 'Heavyweight organic cotton.' / $24.00; 'Dot Notebook' / 'A5, 160 pages, lay-flat.' / $12.00",
+        "Each card has one button 'Add Ceramic Mug to cart' / 'Add Canvas Tote to cart' / 'Add Dot Notebook to cart' with visible text 'Add to cart'",
+        "Header cart badge shows 0 and the link's accessible name contains the badge label"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [
+        "Ceramic Mug $18.00",
+        "Canvas Tote $24.00",
+        "Dot Notebook $12.00"
+      ],
+      "design": null,
+      "rationale": "Baseline content and price formatting for the landing page; everything else depends on it.",
+      "approved": true
+    },
+    {
+      "id": "HOME-002",
+      "page": "/",
+      "feature": "cart",
+      "category": "functional",
+      "priority": "high",
+      "title": "Adding products updates the header cart badge with the total quantity",
+      "preconditions": [
+        "Fresh load of / (cart is in-memory only)"
+      ],
+      "steps": [
+        "Open /",
+        "Click 'Add Ceramic Mug to cart' twice",
+        "Click 'Add Canvas Tote to cart' once",
+        "Click 'Add Dot Notebook to cart' once",
+        "Read the header 'Checkout' link and badge after each click"
+      ],
+      "expectedResults": [
+        "Badge goes 0 -> 1 -> 2 -> 3 -> 4 (sum of quantities across products, not number of distinct products)",
+        "After the Mug and Tote clicks the link's accessible name is 'Checkout 3 items in cart'",
+        "Page stays on / with no navigation or reload"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Mug x2, Tote x1, Notebook x1 => 4"
+      ],
+      "design": null,
+      "rationale": "Core add-to-cart behaviour; the badge is the only feedback the user gets.",
+      "approved": true
+    },
+    {
+      "id": "HOME-003",
+      "page": "/",
+      "feature": "cart",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Cart badge accessible name uses correct singular grammar for one item",
+      "preconditions": [
+        "Fresh load of / (empty cart)"
+      ],
+      "steps": [
+        "Open /",
+        "Click 'Add Dot Notebook to cart' once",
+        "Read the accessible name of the cart badge / 'Checkout' link"
+      ],
+      "expectedResults": [
+        "Badge text is 1",
+        "Accessible name reads 'Checkout 1 item in cart' (singular 'item', not '1 items in cart')"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [],
+      "design": null,
+      "rationale": "Code builds the label as `${count} items in cart` unconditionally, so a screen reader hears '1 items'; a standard accessibility/copy convention expects singular.",
+      "approved": true
+    },
+    {
+      "id": "HOME-004",
+      "page": "/",
+      "feature": "cart",
+      "category": "functional",
+      "priority": "high",
+      "title": "Products added on Home carry to Checkout via client-side navigation, in catalog order",
+      "preconditions": [
+        "Fresh load of / (empty cart)"
+      ],
+      "steps": [
+        "Open /",
+        "Click 'Add Dot Notebook to cart' once",
+        "Click 'Add Ceramic Mug to cart' twice",
+        "Click the header link 'Checkout 3 items in cart' (client-side)",
+        "Read the order lines and summary"
+      ],
+      "expectedResults": [
+        "URL becomes /checkout without a full page reload",
+        "Lines: 'Ceramic Mug × 2' $36.00 and 'Dot Notebook × 1' $12.00",
+        "Subtotal $48.00 and Total $48.00",
+        "Lines follow catalog order (mug before notebook) regardless of add order",
+        "Navigating back to / via the 'Home' link keeps the badge at 3"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Notebook x1 ($12.00), Mug x2 ($36.00) => $48.00"
+      ],
+      "design": null,
+      "rationale": "Verifies cart state and price calculation across the primary user flow.",
+      "approved": true
+    },
+    {
+      "id": "HOME-005",
+      "page": "/",
+      "feature": "navigation",
+      "category": "functional",
+      "priority": "high",
+      "title": "'Shop all products' header link scrolls to the product list without losing the cart",
+      "preconditions": [
+        "Fresh load of / (empty cart)"
+      ],
+      "steps": [
+        "Open /",
+        "Click 'Add Ceramic Mug to cart' once (badge = 1)",
+        "Click the header link 'Shop all products'",
+        "Observe URL, scroll position and badge"
+      ],
+      "expectedResults": [
+        "URL ends with /#products and section#products (h2 'Products') is scrolled into view",
+        "Header cart badge still shows 1 (cart is not lost by a navigation link)",
+        "Link works the same from the Home page and from /checkout or /login"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [],
+      "design": null,
+      "rationale": "The link is a plain <a href=\"/#products\"> that triggers a full page load and silently empties the in-memory cart; users expect a nav link not to destroy their cart.",
+      "approved": true
+    },
+    {
+      "id": "HOME-006",
+      "page": "/",
+      "feature": "design-system",
+      "category": "visual",
+      "priority": "high",
+      "title": "Primary 'Add to cart' buttons match the Figma Button/Primary spec",
+      "preconditions": [
+        "Fresh load of / at desktop viewport"
+      ],
+      "steps": [
+        "Open /",
+        "Inspect the computed styles of the button 'Add Ceramic Mug to cart' (repeat for the Tote and Notebook buttons)",
+        "Compare with the Home / Desktop design"
+      ],
+      "expectedResults": [
+        "Background #2563EB (not purple), label colour #FFFFFF, no visible border",
+        "Border radius 8px (radius/md)",
+        "Height 44px, horizontal padding 20px, label 'Add to cart' Inter 16px / 24px weight 600",
+        "Button is not stretched: about 120px wide, left-aligned inside the card",
+        "All three buttons are identical"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [],
+      "design": {
+        "screen": "Home / Desktop",
+        "tokens": [
+          {
+            "element": "the 'Add Ceramic Mug to cart' button",
+            "properties": {
+              "backgroundColor": "#2563EB",
+              "color": "#FFFFFF",
+              "borderRadius": "8px",
+              "height": "44px",
+              "paddingLeft": "20px",
+              "paddingRight": "20px",
+              "fontFamily": "Inter",
+              "fontSize": "16px",
+              "fontWeight": "600",
+              "lineHeight": "24px"
+            }
+          }
+        ]
+      },
+      "rationale": "Code uses --color-primary #7c3aed and .btn border-radius 2px, which differ from Figma (#2563EB, 8px); the test must catch that drift.",
+      "approved": true
+    },
+    {
+      "id": "HOME-007",
+      "page": "/",
+      "feature": "design-system",
+      "category": "visual",
+      "priority": "medium",
+      "title": "Headings and product grid spacing match Figma typography and layout",
+      "preconditions": [
+        "Fresh load of / at desktop viewport (1440x900)"
+      ],
+      "steps": [
+        "Open /",
+        "Inspect computed styles of the h1, the h2 'Products' and the h3 'Ceramic Mug'",
+        "Measure the horizontal distance between product cards and the container width"
+      ],
+      "expectedResults": [
+        "h1: Inter 40px / 48px, weight 700, colour #0F172A",
+        "h2 'Products': Inter 24px / 32px, weight 600",
+        "h3 product name: Inter 18px / 28px, weight 600",
+        "Product grid has 3 equal columns (about 341px each) with 24px gap; content container max 1120px, centred, with 24px gutters",
+        "Page background #F8FAFC; product descriptions use muted colour #475569"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [],
+      "design": {
+        "screen": "Home / Desktop",
+        "tokens": [
+          {
+            "element": "the h1 'Everyday goods, made well'",
+            "properties": {
+              "fontFamily": "Inter",
+              "fontSize": "40px",
+              "lineHeight": "48px",
+              "fontWeight": "700"
+            }
+          },
+          {
+            "element": "the h2 'Products'",
+            "properties": {
+              "fontSize": "24px",
+              "lineHeight": "32px",
+              "fontWeight": "600"
+            }
+          },
+          {
+            "element": "the h3 'Ceramic Mug'",
+            "properties": {
+              "fontSize": "18px",
+              "lineHeight": "28px",
+              "fontWeight": "600"
+            }
+          },
+          {
+            "element": "the product grid",
+            "properties": {
+              "gap": "24px",
+              "gridTemplateColumns": "3 equal columns"
+            }
+          }
+        ]
+      },
+      "rationale": "Locks typography and layout tokens observed in Figma for the home page.",
+      "approved": true
+    },
+    {
+      "id": "HOME-008",
+      "page": "/",
+      "feature": "navigation",
+      "category": "responsive",
+      "priority": "high",
+      "title": "On a 390px mobile viewport the nav collapses behind a menu button that opens and closes correctly",
+      "preconditions": [
+        "Fresh load of / at mobile viewport (390x844)"
+      ],
+      "steps": [
+        "Open /",
+        "Check the header: logo 'Demo Shop', the 'Open menu' button and the main nav",
+        "Click 'Open menu'",
+        "Check nav links and the button's aria-expanded / accessible name",
+        "Click the menu button again"
+      ],
+      "expectedResults": [
+        "Header shows 'Demo Shop' and a 40x40 menu button at the right (24px gutter); nav links are hidden and nothing overflows the 390px width (matches Figma Home / Mobile)",
+        "After clicking, nav 'Main' opens as a vertical dropdown under the 64px header listing 'Home', 'Shop all products', 'Checkout N items in cart', 'Sign in to your account'; aria-expanded is true",
+        "Button's accessible name changes to 'Close menu' while open (not 'Open menu')",
+        "Second click closes the menu and aria-expanded returns to false"
+      ],
+      "viewport": "mobile",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [],
+      "design": {
+        "screen": null,
+        "tokens": []
+      },
+      "rationale": "Code only collapses the nav at <=320px, so at 390px the full nav is shown and the design's menu button is missing; also the toggle's aria-label never changes when opened.",
+      "approved": true
+    },
+    {
+      "id": "HOME-009",
+      "page": "/",
+      "feature": "catalog",
+      "category": "responsive",
+      "priority": "high",
+      "title": "Mobile layout stacks hero and product cards in one column without horizontal scroll",
+      "preconditions": [
+        "Fresh load of / at mobile viewport (390x844)"
+      ],
+      "steps": [
+        "Open /",
+        "Compare document scrollWidth with the viewport width",
+        "Read the position and size of the three product cards and their buttons",
+        "Tap 'Add Canvas Tote to cart'"
+      ],
+      "expectedResults": [
+        "No horizontal scrollbar; scrollWidth <= 390",
+        "h1 wraps to 2 lines (about 96px high) and content has 24px side gutters (content about 342px wide)",
+        "3 cards stacked in 1 column, each about 342px wide with 24px vertical gap, in order Mug, Tote, Notebook",
+        "Each 'Add ... to cart' button is at least 44px high, fully visible and tappable",
+        "Tapping the button increments the header badge to 1"
+      ],
+      "viewport": "mobile",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [],
+      "design": {
+        "screen": null,
+        "tokens": [
+          {
+            "element": "a product card",
+            "properties": {
+              "width": "342px",
+              "gap": "24px"
+            }
+          }
+        ]
+      },
+      "rationale": "Home / Mobile frame defines the single-column layout; overflow from the header nav is a likely regression at 390px.",
+      "approved": true
+    },
+    {
+      "id": "HOME-010",
+      "page": "/",
+      "feature": "navigation",
+      "category": "responsive",
+      "priority": "medium",
+      "title": "Tablet viewport (834px) shows a usable header and product grid without overflow",
+      "preconditions": [
+        "Fresh load of / at tablet viewport (834x1112, touch)"
+      ],
+      "steps": [
+        "Open /",
+        "Check the header nav items and the product grid",
+        "Tap 'Add Ceramic Mug to cart'"
+      ],
+      "expectedResults": [
+        "No horizontal scrolling; header logo and nav links ('Home', 'Shop all products', 'Checkout', 'Sign in to your account') are all visible on one row without overlapping or clipping",
+        "Product cards are fully readable (no truncated text) and every button is at least 44px high",
+        "Tapping the button increments the badge to 1"
+      ],
+      "viewport": "tablet",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [],
+      "design": null,
+      "rationale": "No tablet design exists; general usability expectations cover the breakpoint between the 3-column desktop and 1-column mobile grids.",
+      "approved": true
+    }
+  ]
+}

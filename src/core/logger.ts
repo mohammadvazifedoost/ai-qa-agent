@@ -19,8 +19,9 @@ export function setLogLevel(level: Level): void {
 }
 
 function write(level: Level, scope: string, msg: string, data?: unknown): void {
+  const json = data === undefined ? '' : JSON.stringify(data);
   const line = `${new Date().toISOString()} ${level.toUpperCase()} [${scope}] ${msg}${
-    data === undefined ? '' : ' ' + JSON.stringify(data)
+    json ? ' ' + (json.length > 2000 ? json.slice(0, 2000) + '…(truncated)' : json) : ''
   }`;
   if (logFile) fs.appendFileSync(logFile, line + '\n');
   if (ORDER[level] < ORDER[minLevel]) return;

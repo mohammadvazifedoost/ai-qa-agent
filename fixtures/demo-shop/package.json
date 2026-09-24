@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Fixture app for validating @company/ai-qa. Contains intentional bugs.",
   "scripts": {
-    "dev": "vite --port 5173 --strictPort",
+    "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 5173"
   },

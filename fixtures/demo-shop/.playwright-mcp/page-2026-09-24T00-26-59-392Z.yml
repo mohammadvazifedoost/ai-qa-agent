@@ -1,0 +1,37 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - link "Demo Shop" [ref=e4] [cursor=pointer]:
+      - /url: /
+    - navigation "Main" [ref=e5]:
+      - link "Home" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - link "Shop all products" [ref=e7] [cursor=pointer]:
+        - /url: /#products
+      - link "Checkout 1 items in cart" [active] [ref=e33] [cursor=pointer]:
+        - /url: /checkout
+        - text: Checkout
+        - generic "1 items in cart" [ref=e34]: "1"
+      - link "Sign in to your account" [ref=e10] [cursor=pointer]:
+        - /url: /login
+  - main [ref=e11]:
+    - generic [ref=e35]:
+      - heading "Checkout" [level=1] [ref=e36]
+      - list "Order items" [ref=e37]:
+        - listitem [ref=e38]:
+          - generic [ref=e39]: Ceramic Mug × 1
+          - generic [ref=e40]: $18.00
+          - button "Remove Ceramic Mug" [ref=e41] [cursor=pointer]: Remove
+      - generic [ref=e42]:
+        - generic [ref=e43]: Coupon code
+        - generic [ref=e44]:
+          - textbox "Coupon code" [ref=e45]:
+            - /placeholder: e.g. SAVE10
+          - button "Apply" [ref=e46] [cursor=pointer]
+      - generic [ref=e47]:
+        - generic [ref=e48]:
+          - term [ref=e49]: Subtotal
+          - definition [ref=e50]: $18.00
+        - generic [ref=e51]:
+          - term [ref=e52]: Total
+          - definition [ref=e53]: $18.00
+      - button "Place order" [ref=e54] [cursor=pointer]

@@ -94,6 +94,9 @@ const ResultEvent = z.looseObject({
  * (e.g. a Claude Max subscription login); this tool never reads or stores credentials.
  */
 export class ClaudeRunner {
+  /** Total spend of all tasks run through this instance (USD, as reported by Claude Code). */
+  totalCostUsd = 0;
+
   constructor(private readonly settings: AiSettings) {}
 
   async run<T extends z.ZodType>(task: AiTask<T>): Promise<AiResult<z.output<T>>> {
@@ -220,6 +223,7 @@ export class ClaudeRunner {
         );
       }
       const costUsd = result.total_cost_usd ?? 0;
+      this.totalCostUsd += costUsd;
       const durationMs = Date.now() - started;
       log.info(
         `AI task "${task.name}" done in ${(durationMs / 1000).toFixed(0)}s, ${result.num_turns ?? '?'} turns, $${costUsd.toFixed(3)}`,

@@ -8,6 +8,36 @@ import { initProject } from './init/init.js';
 import { createContext } from './pipeline/context.js';
 import { extractDesign } from './design/figma.js';
 import { analyzeApp } from './analyze/app.js';
+import { generateScenarios, normalizePageArg, pageSlug } from './scenarios/generate.js';
+import { generateTests } from './generate/playwright.js';
+import { runTests, type TestFilter } from './runner/run.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { readJson } from './core/fs.js';
+import { runDir } from './core/paths.js';
+import type { QaContext } from './pipeline/context.js';
+import { runPipeline } from './pipeline/run.js';
+import { TestRunResultSchema, type TestRunResult } from './runner/results.js';
+import { triageRun } from './triage/triage.js';
+import { TriageResultSchema } from './triage/schema.js';
+import { writeReport } from './report/report.js';
+import { FilingSummarySchema } from './bugs/file.js';
+
+interface Scope {
+  page?: string;
+  category?: string;
+  feature?: string;
+  grep?: string[];
+}
+
+function scopeToFilter(o: Scope): TestFilter {
+  const tags = [o.category, o.feature].filter((t): t is string => !!t).map((t) => `@${t}`);
+  return {
+    files: o.page ? [`${pageSlug(normalizePageArg(o.page))}.spec.ts`] : undefined,
+    tags: tags.length ? tags : undefined,
+    scenarioIds: o.grep,
+  };
+}
 
 const log = logger('cli');
 const program = new Command();
@@ -69,6 +99,112 @@ program
     const ctx = await createContext(root());
     await analyzeApp(ctx, { force: o.refresh });
     if (!o.skipDesign) await extractDesign(ctx, { force: o.refresh });
+  });
+
+program
+  .command('scenarios')
+  .description('generate or update test scenarios in .qa/scenarios/')
+  .option('--page <route>', 'only this page (route or name)')
+  .option('--force', 'regenerate even if inputs did not change')
+  .option('--max <n>', 'maximum scenarios per page', (v) => Number(v), 10)
+  .action(async (o: { page?: string; force?: boolean; max: number }) => {
+    const ctx = await createContext(root());
+    const all = await generateScenarios(ctx, { page: o.page, force: o.force, maxPerPage: o.max });
+    const by = (k: 'category' | 'priority') =>
+      Object.entries(Object.groupBy(all, (s) => s[k]))
+        .map(([n, l]) => `${n}=${l?.length}`)
+        .join(' ');
+    console.log(`${all.length} scenarios (${by('category')}; ${by('priority')})`);
+  });
+
+program
+  .command('generate')
+  .description('generate Playwright tests in .qa/tests/ from approved scenarios')
+  .option('--page <route>', 'only this page (route or name)')
+  .option('--force', 'regenerate even if scenarios did not change')
+  .action(async (o: { page?: string; force?: boolean }) => {
+    const ctx = await createContext(root());
+    const files = await generateTests(ctx, o);
+    for (const f of files) console.log(`  ${pc.green('generated')} ${rel(ctx.root, f)}`);
+  });
+
+program
+  .command('test')
+  .description('run the generated Playwright tests and collect evidence (no AI)')
+  .option('--page <route>', 'only this page (route or name)')
+  .option('--category <category>', 'functional | visual | responsive')
+  .option('--feature <feature>', 'feature tag, e.g. auth')
+  .option('--grep <ids...>', 'scenario ids')
+  .action(async (o: { page?: string; category?: string; feature?: string; grep?: string[] }) => {
+    const ctx = await createContext(root());
+    const run = ctx.state.startRun({ command: 'test' });
+    const res = await runTests(ctx, run.id, scopeToFilter(o));
+    ctx.state.finishRun(run, 'completed');
+    if (res.stats.failed > 0 || res.globalErrors.length) process.exitCode = 1;
+  });
+
+function loadRun(ctx: QaContext, runId?: string): TestRunResult {
+  const id =
+    runId ??
+    [...ctx.state.data.runs]
+      .reverse()
+      .find((r) => fs.existsSync(path.join(runDir(ctx.paths, r.id), 'results.json')))?.id;
+  if (!id) throw new Error('No test run with results found. Run `ai-qa test` first.');
+  const res = readJson(path.join(runDir(ctx.paths, id), 'results.json'), TestRunResultSchema);
+  if (!res) throw new Error(`Run ${id} has no results.json`);
+  return res;
+}
+
+program
+  .command('triage')
+  .description('analyze failures of a test run and classify them (no filing)')
+  .option('--run <id>', 'run id (default: latest run with results)')
+  .action(async (o: { run?: string }) => {
+    const ctx = await createContext(root());
+    const test = loadRun(ctx, o.run);
+    const triage = await triageRun(ctx, test);
+    const report = writeReport(ctx, test, triage, null, ctx.ai.totalCostUsd);
+    console.log(`Report: ${rel(ctx.root, report.markdown)}`);
+  });
+
+program
+  .command('report')
+  .description('(re)build the report for a run from its stored results')
+  .option('--run <id>', 'run id (default: latest run with results)')
+  .action(async (o: { run?: string }) => {
+    const ctx = await createContext(root());
+    const test = loadRun(ctx, o.run);
+    const dir = runDir(ctx.paths, test.runId);
+    const triage = readJson(path.join(dir, 'triage.json'), TriageResultSchema) ?? null;
+    const filing = readJson(path.join(dir, 'filing.json'), FilingSummarySchema) ?? null;
+    const report = writeReport(ctx, test, triage, filing, triage?.costUsd ?? 0);
+    console.log(`Report: ${rel(ctx.root, report.markdown)}`);
+  });
+
+program
+  .command('run')
+  .description('full pipeline: analyze → scenarios → generate → test → triage → file bugs → report')
+  .option('--page <route>', 'only this page (route or name)')
+  .option('--category <category>', 'only run tests of this category: functional | visual | responsive')
+  .option('--feature <feature>', 'only run tests of this feature tag, e.g. auth')
+  .option('--resume', 'continue the last unfinished run')
+  .option('--refresh', 'ignore caches and re-analyze code and design')
+  .option('--no-file', 'do not create ClickUp tasks')
+  .action(async (o: Scope & { resume?: boolean; refresh?: boolean; file: boolean }) => {
+    const ctx = await createContext(root());
+    const res = await runPipeline(ctx, {
+      page: o.page,
+      filter: scopeToFilter(o),
+      resume: o.resume,
+      refresh: o.refresh,
+      file: o.file,
+    });
+    const s = res.test.stats;
+    console.log(
+      `\n${pc.bold('Result')}: ${s.passed} passed, ${s.failed} failed · ${res.triage.issues.length} defect(s) · ${res.filing.message}\n` +
+        `Report: ${rel(ctx.root, res.report.markdown)}`,
+    );
+    if (res.triage.issues.length) process.exitCode = 1;
   });
 
 program.parseAsync().catch((err: unknown) => {

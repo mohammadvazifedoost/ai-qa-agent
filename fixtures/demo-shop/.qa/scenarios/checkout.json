@@ -1,0 +1,392 @@
+{
+  "page": "/checkout",
+  "generatedAt": "2026-09-24T00:19:27.507Z",
+  "inputHash": "923e706a8de44592c10785f8302caf987aa9a1adfbc2db3a553faf979afed29e",
+  "scenarios": [
+    {
+      "id": "CHECKOUT-001",
+      "page": "/checkout",
+      "feature": "cart",
+      "category": "functional",
+      "priority": "high",
+      "title": "Checkout lists cart lines with correct line prices, subtotal and total",
+      "preconditions": [
+        "Fresh session on / (cart is in memory, so do not load /checkout directly)"
+      ],
+      "steps": [
+        "Open /",
+        "Click 'Add Ceramic Mug to cart' twice and 'Add Canvas Tote to cart' once",
+        "Click the header nav link 'Checkout' (client-side navigation, not a URL load)",
+        "Read the 'Order items' list and the summary"
+      ],
+      "expectedResults": [
+        "h1 reads 'Checkout'",
+        "'Order items' list has 'Ceramic Mug × 2' with $36.00 and 'Canvas Tote × 1' with $24.00, each with a 'Remove' button",
+        "Subtotal (data-testid=subtotal) is $60.00",
+        "Total (data-testid=total) is $60.00",
+        "No Discount row is shown when no coupon is applied"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Ceramic Mug $18.00 x2",
+        "Canvas Tote $24.00 x1"
+      ],
+      "design": null,
+      "rationale": "Core happy path and line and subtotal arithmetic.",
+      "approved": true
+    },
+    {
+      "id": "CHECKOUT-002",
+      "page": "/checkout",
+      "feature": "checkout",
+      "category": "functional",
+      "priority": "high",
+      "title": "Valid coupon SAVE10 is applied and the discount is subtracted from the Total",
+      "preconditions": [
+        "Add 'Ceramic Mug' once on /, then go to /checkout via the 'Checkout' nav link"
+      ],
+      "steps": [
+        "Type 'save10' (lowercase) in the 'Coupon code' textbox",
+        "Click 'Apply'",
+        "Wait for the status message",
+        "Read Subtotal, Discount and Total"
+      ],
+      "expectedResults": [
+        "Status message 'Coupon SAVE10 applied: 10% off' is shown",
+        "Subtotal is $18.00",
+        "Discount row (data-testid=discount) shows −$1.80 (U+2212 minus)",
+        "Total is $16.20 (subtotal minus discount). A Total that stays $18.00 is a defect: the code sets totalCents = subtotalCents so the discount is never subtracted"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Coupon: save10 (case-insensitive) => 10%",
+        "Ceramic Mug $18.00"
+      ],
+      "design": null,
+      "rationale": "Covers the flagged business-rule bug (discount shown but not deducted from Total) and case-insensitive coupon handling.",
+      "approved": true
+    },
+    {
+      "id": "CHECKOUT-003",
+      "page": "/checkout",
+      "feature": "checkout",
+      "category": "functional",
+      "priority": "high",
+      "title": "WELCOME20 on a mixed cart and rounding on a single item give correct discount and Total",
+      "preconditions": [
+        "Add Ceramic Mug, Canvas Tote and Dot Notebook once each on /, then go to /checkout via the 'Checkout' nav link"
+      ],
+      "steps": [
+        "Type 'WELCOME20' (with surrounding spaces, e.g. ' WELCOME20 ') in 'Coupon code' and click 'Apply'",
+        "Read the status, Subtotal, Discount and Total",
+        "Click 'Remove Ceramic Mug' and 'Remove Canvas Tote' so only Dot Notebook remains",
+        "Read Subtotal, Discount and Total again"
+      ],
+      "expectedResults": [
+        "Status 'Coupon WELCOME20 applied: 20% off' is shown (code trimmed and uppercased)",
+        "With all three items: Subtotal $54.00, Discount −$10.80, Total $43.20",
+        "After removal only Dot Notebook is left: the coupon stays applied and the discount is recalculated from the current subtotal: Subtotal $12.00, Discount −$2.40, Total $9.60"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Coupon WELCOME20 => 20%",
+        "Mug $18.00 + Tote $24.00 + Notebook $12.00 = $54.00"
+      ],
+      "design": null,
+      "rationale": "Checks the second coupon, input trimming, discount recalculation when the cart changes, and Total arithmetic.",
+      "approved": true
+    },
+    {
+      "id": "CHECKOUT-004",
+      "page": "/checkout",
+      "feature": "checkout",
+      "category": "functional",
+      "priority": "high",
+      "title": "Coupon validation errors: empty, whitespace-only and unknown codes",
+      "preconditions": [
+        "Add 'Ceramic Mug' once on /, then go to /checkout via the 'Checkout' nav link"
+      ],
+      "steps": [
+        "With the 'Coupon code' field empty, click 'Apply'",
+        "Type only spaces and click 'Apply'",
+        "Type 'BOGUS' and click 'Apply'",
+        "Type 'SAVE10' and click 'Apply' and wait for success",
+        "Clear the field, type 'BOGUS' and click 'Apply' again"
+      ],
+      "expectedResults": [
+        "Empty and whitespace-only submit show the alert 'Enter a coupon code' with no Discount row",
+        "'BOGUS' shows the alert 'Invalid coupon code' with no Discount row",
+        "After a valid SAVE10, submitting 'BOGUS' replaces the success status with the alert 'Invalid coupon code' and the Discount row disappears",
+        "Total equals Subtotal ($18.00) whenever no coupon is active"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Invalid: BOGUS",
+        "Valid: SAVE10"
+      ],
+      "design": null,
+      "rationale": "Covers form validation and error-state transitions, including replacing a previously applied coupon.",
+      "approved": true
+    },
+    {
+      "id": "CHECKOUT-005",
+      "page": "/checkout",
+      "feature": "checkout",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Apply button shows a loading state while the coupon is validated",
+      "preconditions": [
+        "Add 'Dot Notebook' on /, then go to /checkout via the 'Checkout' nav link"
+      ],
+      "steps": [
+        "Type 'SAVE10' in 'Coupon code'",
+        "Click 'Apply' and immediately inspect the button",
+        "Wait about 300ms and inspect the button again"
+      ],
+      "expectedResults": [
+        "During validation the button text is 'Applying…' and it is disabled (repeat clicks have no effect)",
+        "After validation the button returns to 'Apply' and is enabled",
+        "The success status 'Coupon SAVE10 applied: 10% off' appears once"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Coupon: SAVE10"
+      ],
+      "design": null,
+      "rationale": "Loading-state coverage; prevents duplicate submissions.",
+      "approved": true
+    },
+    {
+      "id": "CHECKOUT-006",
+      "page": "/checkout",
+      "feature": "cart",
+      "category": "functional",
+      "priority": "high",
+      "title": "Removing lines updates totals and leads to the empty state with a way back",
+      "preconditions": [
+        "Add 'Ceramic Mug' twice and 'Canvas Tote' once on /, then go to /checkout via the 'Checkout' nav link"
+      ],
+      "steps": [
+        "Click 'Remove Ceramic Mug'",
+        "Read the list and totals",
+        "Click 'Remove Canvas Tote'",
+        "Click the 'Browse products' link"
+      ],
+      "expectedResults": [
+        "After the first removal the whole Ceramic Mug line (both units) is gone, only 'Canvas Tote × 1' $24.00 remains, and Subtotal and Total are $24.00",
+        "After removing the last line, h1 'Your cart is empty', the text 'Add a product to start checking out.' and the link 'Browse products' are shown, and the coupon form and summary are not shown",
+        "Clicking 'Browse products' navigates to / (products list)",
+        "The header cart badge no longer counts the removed items"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "Ceramic Mug x2",
+        "Canvas Tote x1"
+      ],
+      "design": null,
+      "rationale": "Removal flow, cart badge sync and empty-state navigation.",
+      "approved": true
+    },
+    {
+      "id": "CHECKOUT-007",
+      "page": "/checkout",
+      "feature": "checkout",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Direct load of /checkout shows the empty cart state",
+      "preconditions": [
+        "No items added in the current session"
+      ],
+      "steps": [
+        "Load /checkout directly by URL",
+        "Read the page content",
+        "Click 'Browse products'"
+      ],
+      "expectedResults": [
+        "h1 'Your cart is empty' and text 'Add a product to start checking out.' are shown",
+        "There is no coupon form, order summary or 'Place order' button",
+        "'Browse products' navigates to /"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [],
+      "design": null,
+      "rationale": "Empty state for a fresh session; the cart lives in memory so a direct load is always empty.",
+      "approved": true
+    },
+    {
+      "id": "CHECKOUT-008",
+      "page": "/checkout",
+      "feature": "checkout",
+      "category": "functional",
+      "priority": "medium",
+      "title": "'Place order' gives user feedback and completes the order",
+      "preconditions": [
+        "Add 'Ceramic Mug' on /, then go to /checkout via the 'Checkout' nav link"
+      ],
+      "steps": [
+        "Click the full-width 'Place order' button",
+        "Observe the page and URL"
+      ],
+      "expectedResults": [
+        "The click performs an action: an order confirmation is shown or the user moves to a confirmation view, and the cart is cleared or the button shows a processing state",
+        "Silence is a defect. Source review shows 'Place order' has no onClick handler and is not inside a form, so nothing happens"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [],
+      "design": null,
+      "rationale": "The primary call to action is a no-op; the test should catch this dead end in the checkout flow.",
+      "approved": true
+    },
+    {
+      "id": "CHECKOUT-009",
+      "page": "/checkout",
+      "feature": "checkout",
+      "category": "visual",
+      "priority": "medium",
+      "title": "Checkout heading, coupon controls and Place order button match Figma tokens",
+      "preconditions": [
+        "Add 'Ceramic Mug' and 'Canvas Tote' on /, then go to /checkout via the 'Checkout' nav link"
+      ],
+      "steps": [
+        "At desktop 1440x900, inspect h1 'Checkout'",
+        "Inspect the 'Coupon code' textbox and the 'Apply' button",
+        "Inspect the 'Place order' button",
+        "Measure the width of the checkout column"
+      ],
+      "expectedResults": [
+        "h1 uses Heading/H1: Inter 700, 40px, line-height 48px",
+        "'Apply' is the Secondary button: white background, #0F172A text, 1px solid #E2E8F0 border, 8px radius, 44px height, 120px wide, Inter 600 16px",
+        "'Coupon code' textbox is 44px high",
+        "'Place order' is the Primary button: #2563EB background, #FFFFFF text, 8px radius, 44px height, no border, full width (560px)",
+        "Checkout column is 560px wide"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": true,
+        "code": false
+      },
+      "testData": [],
+      "design": {
+        "screen": null,
+        "tokens": [
+          {
+            "element": "the 'Checkout' h1",
+            "properties": {
+              "fontFamily": "Inter",
+              "fontWeight": "700",
+              "fontSize": "40px",
+              "lineHeight": "48px"
+            }
+          },
+          {
+            "element": "the 'Apply' button",
+            "properties": {
+              "backgroundColor": "#FFFFFF",
+              "color": "#0F172A",
+              "borderColor": "#E2E8F0",
+              "borderWidth": "1px",
+              "borderStyle": "solid",
+              "borderRadius": "8px",
+              "height": "44px",
+              "width": "120px",
+              "fontFamily": "Inter",
+              "fontSize": "16px",
+              "fontWeight": "600",
+              "lineHeight": "24px"
+            }
+          },
+          {
+            "element": "the 'Coupon code' textbox",
+            "properties": {
+              "height": "44px"
+            }
+          },
+          {
+            "element": "the 'Place order' button",
+            "properties": {
+              "backgroundColor": "#2563EB",
+              "color": "#FFFFFF",
+              "borderRadius": "8px",
+              "height": "44px",
+              "width": "560px",
+              "fontFamily": "Inter",
+              "fontSize": "16px",
+              "fontWeight": "600"
+            }
+          }
+        ]
+      },
+      "rationale": "The Figma reference image for the Checkout screen was not rendered, so only observed Button, control-height, H1 and column-width tokens are checked.",
+      "approved": true
+    },
+    {
+      "id": "CHECKOUT-010",
+      "page": "/checkout",
+      "feature": "checkout",
+      "category": "responsive",
+      "priority": "medium",
+      "title": "Checkout fits a 390px mobile viewport without horizontal overflow",
+      "preconditions": [
+        "Mobile viewport 390x844",
+        "Add 'Ceramic Mug' twice and 'Canvas Tote' once on /, then reach /checkout through the 'Checkout' link (use the header menu button if the nav is collapsed)"
+      ],
+      "steps": [
+        "Open /checkout as described",
+        "Check the page for horizontal scrolling",
+        "Inspect the order lines, coupon row, summary rows and 'Place order' button",
+        "Apply 'SAVE10' and check the layout again"
+      ],
+      "expectedResults": [
+        "The document has no horizontal scroll (scrollWidth <= 390)",
+        "Each order line shows its name, price and 'Remove' button without overlap or clipping",
+        "The 'Coupon code' textbox and 'Apply' button are visible and usable, with 44px control height, and stay within the viewport",
+        "Summary labels and right-aligned values are readable and not clipped, including the Discount row",
+        "'Place order' spans the content width, stays within the viewport and has a 44px tap height",
+        "Content keeps the 24px side gutters where the layout allows"
+      ],
+      "viewport": "mobile",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [
+        "Coupon: SAVE10"
+      ],
+      "design": null,
+      "rationale": "The design has no Checkout mobile frame, only Home mobile with 24px gutters and 44px controls. This checks that the 560px column and the grid rows (1fr auto auto) collapse well on small screens.",
+      "approved": true
+    }
+  ]
+}

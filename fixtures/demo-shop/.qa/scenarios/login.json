@@ -1,0 +1,394 @@
+{
+  "page": "/login",
+  "generatedAt": "2026-09-24T00:20:22.593Z",
+  "inputHash": "4c03c52fc2ebff8e2688311fd1284f4e3717a8440f68d0c33be8973b6cff7461",
+  "scenarios": [
+    {
+      "id": "LOGIN-001",
+      "page": "/login",
+      "feature": "auth",
+      "category": "functional",
+      "priority": "high",
+      "title": "Valid credentials sign the user in and show the welcome heading",
+      "preconditions": [
+        "Public page, no setup required"
+      ],
+      "steps": [
+        "Open /login",
+        "Type 'demo@shop.test' into the 'Email' field",
+        "Type 'password123' into the 'Password' field (use getByLabel)",
+        "Click the 'Sign in' button",
+        "Wait for the h1 to change"
+      ],
+      "expectedResults": [
+        "The h1 'Welcome back, Demo User' is visible",
+        "The form 'Sign in' (email, password fields and submit button) is no longer in the page",
+        "No 'Invalid email or password' alert and no field errors are shown",
+        "The URL stays /login and the header is unchanged"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "demo@shop.test / password123"
+      ],
+      "design": null,
+      "rationale": "Core happy path of the only auth flow; verifies the success state replaces the form.",
+      "approved": true
+    },
+    {
+      "id": "LOGIN-002",
+      "page": "/login",
+      "feature": "auth",
+      "category": "functional",
+      "priority": "high",
+      "title": "Submitting the empty form shows both field errors at once",
+      "preconditions": [
+        "Public page, fields empty"
+      ],
+      "steps": [
+        "Open /login",
+        "Click the 'Sign in' button without typing anything"
+      ],
+      "expectedResults": [
+        "'Enter a valid email address' is shown under the Email field",
+        "'Password must be at least 8 characters' is shown under the Password field, both at the same time",
+        "Email input has aria-invalid=true and aria-describedby pointing to the element containing the email error; the same for Password",
+        "The 'Invalid email or password' alert is not shown",
+        "The button still reads 'Sign in' and is enabled (no login request was made, no 500ms loading state)",
+        "The h1 remains 'Sign in'"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [],
+      "design": null,
+      "rationale": "Client-side validation must block the API call and report all problems at once.",
+      "approved": true
+    },
+    {
+      "id": "LOGIN-003",
+      "page": "/login",
+      "feature": "auth",
+      "category": "functional",
+      "priority": "high",
+      "title": "Wrong credentials show a form-level alert, keep the form usable, and replace field errors",
+      "preconditions": [
+        "Public page"
+      ],
+      "steps": [
+        "Open /login",
+        "Click 'Sign in' with empty fields so both field errors appear",
+        "Type 'wrong@shop.test' into 'Email' and 'wrongpass1' into 'Password'",
+        "Click 'Sign in'",
+        "Wait for the button to return to 'Sign in'",
+        "Type 'password123' over the password and 'demo@shop.test' over the email, then click 'Sign in'"
+      ],
+      "expectedResults": [
+        "After the wrong attempt, an alert (role=alert) with 'Invalid email or password' is shown",
+        "The two field-level errors are no longer shown (form-level and field-level errors are not displayed together)",
+        "The button is enabled again with label 'Sign in'; the entered email and password values are still in the fields",
+        "The h1 stays 'Sign in' and no welcome heading appears after the wrong attempt",
+        "The corrected credentials then sign in successfully with h1 'Welcome back, Demo User'"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "wrong@shop.test / wrongpass1",
+        "demo@shop.test / password123"
+      ],
+      "design": null,
+      "rationale": "Covers the failure path, recovery, and the mutual exclusivity of field and form errors.",
+      "approved": true
+    },
+    {
+      "id": "LOGIN-004",
+      "page": "/login",
+      "feature": "auth",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Malformed email addresses are rejected with the email error only",
+      "preconditions": [
+        "Public page"
+      ],
+      "steps": [
+        "Open /login",
+        "Type 'demo@shop' (no domain suffix) into 'Email' and 'password123' into 'Password', click 'Sign in'",
+        "Replace the email with 'demoshop.test' (no @), click 'Sign in'",
+        "Replace the email with 'demo @shop.test' (contains a space), click 'Sign in'"
+      ],
+      "expectedResults": [
+        "After each attempt 'Enter a valid email address' is shown and the email input has aria-invalid=true",
+        "'Password must be at least 8 characters' is not shown because the password is valid",
+        "No login request is made: the button never shows 'Signing in…' and no 'Invalid email or password' alert appears",
+        "The user is not signed in (h1 remains 'Sign in')"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "demo@shop",
+        "demoshop.test",
+        "demo @shop.test",
+        "password123"
+      ],
+      "design": null,
+      "rationale": "Email validation boundaries; noValidate means the browser does not help, so the app rules must hold.",
+      "approved": true
+    },
+    {
+      "id": "LOGIN-005",
+      "page": "/login",
+      "feature": "auth",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Password shorter than 8 characters is rejected; exactly 8 characters is accepted for validation",
+      "preconditions": [
+        "Public page"
+      ],
+      "steps": [
+        "Open /login",
+        "Type 'demo@shop.test' into 'Email' and 'pass123' (7 characters) into 'Password', click 'Sign in'",
+        "Replace the password with 'wrongpas' (8 characters), click 'Sign in'"
+      ],
+      "expectedResults": [
+        "With 7 characters, 'Password must be at least 8 characters' is shown and the email error is not shown; password input has aria-invalid=true; no loading state occurs",
+        "With 8 characters the password length error disappears and the login is attempted (button shows 'Signing in…'), ending with the alert 'Invalid email or password' because the credentials are wrong"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "pass123",
+        "wrongpas"
+      ],
+      "design": null,
+      "rationale": "Boundary test for the 8-character password rule.",
+      "approved": true
+    },
+    {
+      "id": "LOGIN-006",
+      "page": "/login",
+      "feature": "auth",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Submit button shows loading state while signing in",
+      "preconditions": [
+        "Public page"
+      ],
+      "steps": [
+        "Open /login",
+        "Fill 'Email' with 'demo@shop.test' and 'Password' with 'password123'",
+        "Click 'Sign in' and immediately inspect the button",
+        "Try to click the button again while it is loading"
+      ],
+      "expectedResults": [
+        "For about 500ms the button reads 'Signing in…' and is disabled (looks dimmed, not-allowed cursor)",
+        "The second click does nothing; only one submission occurs",
+        "After the delay the h1 'Welcome back, Demo User' is shown"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "demo@shop.test / password123"
+      ],
+      "design": null,
+      "rationale": "Loading state prevents duplicate submissions and gives user feedback.",
+      "approved": true
+    },
+    {
+      "id": "LOGIN-007",
+      "page": "/login",
+      "feature": "auth",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Email is case-insensitive but password is case-sensitive",
+      "preconditions": [
+        "Public page"
+      ],
+      "steps": [
+        "Open /login",
+        "Type 'DEMO@SHOP.TEST' into 'Email' and 'password123' into 'Password', click 'Sign in'",
+        "Reload /login",
+        "Type 'demo@shop.test' into 'Email' and 'Password123' into 'Password', click 'Sign in'"
+      ],
+      "expectedResults": [
+        "The first attempt signs in: h1 'Welcome back, Demo User' is shown",
+        "After reload the sign-in form is shown again (login is not persisted)",
+        "The second attempt shows the alert 'Invalid email or password' and no welcome heading"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "DEMO@SHOP.TEST / password123",
+        "demo@shop.test / Password123"
+      ],
+      "design": null,
+      "rationale": "Business rule on credential comparison; also confirms nothing is persisted across reloads.",
+      "approved": true
+    },
+    {
+      "id": "LOGIN-008",
+      "page": "/login",
+      "feature": "navigation",
+      "category": "functional",
+      "priority": "medium",
+      "title": "Header link opens the sign-in page and the form resets after navigating away",
+      "preconditions": [
+        "Start on / (Home)"
+      ],
+      "steps": [
+        "Open /",
+        "Click the header link 'Sign in to your account'",
+        "Verify the page, then sign in with 'demo@shop.test' / 'password123'",
+        "Click the header link 'Home', then click 'Sign in to your account' again"
+      ],
+      "expectedResults": [
+        "The URL is /login and the h1 'Sign in' with labelled 'Email' and 'Password' fields and a 'Sign in' button is visible",
+        "After signing in, h1 'Welcome back, Demo User' is shown",
+        "After navigating away and back, the sign-in form (h1 'Sign in', empty fields) is shown again, not the welcome heading"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": false,
+        "code": true
+      },
+      "testData": [
+        "demo@shop.test / password123"
+      ],
+      "design": null,
+      "rationale": "Checks entry from the nav and that login state is intentionally not shared or persisted.",
+      "approved": true
+    },
+    {
+      "id": "LOGIN-009",
+      "page": "/login",
+      "feature": "auth",
+      "category": "visual",
+      "priority": "medium",
+      "title": "Login form matches the Figma design tokens on desktop",
+      "preconditions": [
+        "Public page, viewport 1440x900"
+      ],
+      "steps": [
+        "Open /login at 1440x900",
+        "Inspect the h1 'Sign in'",
+        "Inspect the 'Email' and 'Password' inputs",
+        "Inspect the 'Sign in' submit button and the form width"
+      ],
+      "expectedResults": [
+        "h1 'Sign in' uses Inter 700, 40px, line-height 48px",
+        "Email and Password inputs are 44px high",
+        "The 'Sign in' submit button has background #2563EB, text #FFFFFF, border-radius 8px, height 44px, Inter 16px weight 600, line-height 24px, no border",
+        "The form is 400px wide and left-aligned inside the page container, starting 32px below the 64px header"
+      ],
+      "viewport": "desktop",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [],
+      "design": {
+        "screen": null,
+        "tokens": [
+          {
+            "element": "the h1 'Sign in'",
+            "properties": {
+              "fontFamily": "Inter",
+              "fontWeight": "700",
+              "fontSize": "40px",
+              "lineHeight": "48px"
+            }
+          },
+          {
+            "element": "the 'Email' input",
+            "properties": {
+              "height": "44px"
+            }
+          },
+          {
+            "element": "the 'Password' input",
+            "properties": {
+              "height": "44px"
+            }
+          },
+          {
+            "element": "the 'Sign in' submit button",
+            "properties": {
+              "backgroundColor": "#2563EB",
+              "color": "#FFFFFF",
+              "borderRadius": "8px",
+              "height": "44px",
+              "width": "400px",
+              "fontFamily": "Inter",
+              "fontSize": "16px",
+              "fontWeight": "600",
+              "lineHeight": "24px"
+            }
+          },
+          {
+            "element": "the 'Sign in' form",
+            "properties": {
+              "width": "400px"
+            }
+          }
+        ]
+      },
+      "rationale": "Design fidelity for the Login / Desktop frame (3:53); no reference image, so tokens are checked directly.",
+      "approved": true
+    },
+    {
+      "id": "LOGIN-010",
+      "page": "/login",
+      "feature": "auth",
+      "category": "responsive",
+      "priority": "medium",
+      "title": "Login page fits a 390px mobile viewport and header nav collapses",
+      "preconditions": [
+        "Public page, viewport 390x844 (mobile)"
+      ],
+      "steps": [
+        "Open /login at 390x844",
+        "Check the header and the page for horizontal scrolling",
+        "Check the width of the 'Email' and 'Password' fields and the 'Sign in' button",
+        "Submit the empty form",
+        "Sign in with 'demo@shop.test' / 'password123'"
+      ],
+      "expectedResults": [
+        "The header shows a menu toggle button on the right and the nav links are collapsed, as in the Figma mobile header",
+        "There is no horizontal scrollbar; document scroll width equals 390px",
+        "The inputs and the 'Sign in' button fit within the viewport with the 24px side gutter, stacked vertically, with 44px tall controls",
+        "Both validation messages are fully visible and not clipped",
+        "The welcome heading 'Welcome back, Demo User' is fully visible without overflow"
+      ],
+      "viewport": "mobile",
+      "source": {
+        "figma": true,
+        "code": true
+      },
+      "testData": [
+        "demo@shop.test / password123"
+      ],
+      "design": null,
+      "rationale": "Mobile usability and header collapse; the page model states the toggle only appears at 320px, which may not match the 390px mobile design (Home / Mobile frame).",
+      "approved": true
+    }
+  ]
+}
