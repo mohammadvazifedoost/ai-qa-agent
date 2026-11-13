@@ -34,6 +34,7 @@ generated files, all in one `.qa/` folder. The agent **never edits your applicat
 - [Dashboard](#dashboard-ai-qa-agent-ui)
 - [Running in CI](#running-in-ci)
 - [Generated files](#generated-files)
+- [Writing apps the agent tests well](#writing-apps-the-agent-tests-well)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
@@ -779,6 +780,152 @@ Stages are cached on content hashes: analysis reruns only when source files chan
 when a page's model/design changed, tests only when scenarios changed. Runs are checkpointed in
 `.qa/state.json`; `ai-qa-agent run --resume` continues an interrupted run from the last completed stage
 using the stored results. `--refresh` forces re-analysis.
+
+## Writing apps the agent tests well
+
+The agent understands your app the way a screen reader does. The analysis step reads the source
+and records each page's headings, the accessible names of buttons, links and inputs (from visible
+text, `<label htmlFor>` and `aria-label`), forms with their exact validation messages, and the
+loading, empty and error states ([`src/analyze/app.ts`](./src/analyze/app.ts)). The test generator
+is then told to prefer `getByRole` / `getByLabel` / `getByText` with exact accessible names, to use
+`getByTestId` only where the page model lists a `data-testid`, and to avoid CSS/XPath selectors
+([`src/generate/playwright.ts`](./src/generate/playwright.ts)). In the demo shop's generated tests
+that is 90 `getByRole`, 46 `getByText`, 7 `getByLabel` and 5 `getByTestId` calls. So an app that is
+accessible is also an app the agent finds its way around, and a missing or vague name usually ends
+up as a `TEST_BUG` or a wrong scenario rather than a useful finding.
+
+**Use the copy-paste rules:** [`docs/AGENTS.qa-guidelines.md`](./docs/AGENTS.qa-guidelines.md)
+holds the same guidelines as short MUST/SHOULD rules for an AI coding agent. Paste its content into
+your app's `AGENTS.md` (or `CLAUDE.md`, `.cursor/rules`, ...) so new code follows them. It is not
+shipped in the npm package; copy it from the repository.
+
+### Checklist
+
+1. **Semantic HTML first.** Real `<button>`, `<a href>`, `<form>`, `<label>`, `<ul>/<li>`,
+   `<table>`; one `<h1>` per page and a logical heading order; landmarks (`<header>`, `<nav>`,
+   `<main>`, `<footer>`). No clickable `<div>`s.
+2. **Every control has a short, unique, visible name.** Use `aria-label` / `aria-labelledby` only
+   when there is no visible text (icon buttons), and make repeated controls distinct
+   (`Remove Ceramic Mug`, not five `Remove` buttons).
+3. **Inputs are labelled** with `<label htmlFor>` (or a wrapping `<label>`); placeholders are not
+   labels.
+4. **Validation messages are tied to their fields** with `aria-describedby` and `aria-invalid`;
+   form-level errors use `role="alert"`, confirmations `role="status"`.
+5. **Loading, empty and error states are explicit**: `aria-busy` on the region that loads, visible
+   text such as `Applying…` or `Your cart is empty`, and a real message on error.
+6. **`data-testid` only where a role and name cannot identify the element** (a price in a `<dd>`,
+   a chart, a canvas), following the naming convention below.
+7. **Deterministic rendering**: no generated ids or class names as identifiers, stable list order
+   and keys, mockable time and randomness, animations that respect `prefers-reduced-motion`.
+8. **Routes are declared literally** so they can be found in the source (see below).
+9. **Test data is seedable and documented** in `.qa/rules.md`.
+10. **No console errors or failing requests in normal use.** Tests capture both as evidence, and
+    the triage step reads them.
+
+### Roles and accessible names
+
+```tsx
+// Bad: no role, no name, the agent can only guess a CSS selector
+<div className="btn-x7f2" onClick={addToCart}><CartIcon /></div>
+
+// Good: a real button with a name that says what it does to which item
+<button type="button" onClick={addToCart} aria-label={`Add ${product.name} to cart`}>
+  <CartIcon aria-hidden="true" />
+</button>
+// → page.getByRole('button', { name: 'Add Ceramic Mug to cart' })
+```
+
+Prefer visible text over `aria-label`: the name the user reads is the name the scenario uses.
+Name regions that repeat (`<nav aria-label="Main">`, `<ul aria-label="Order items">`,
+`<section aria-labelledby="products-heading">`) so a test can scope to one of them.
+
+### Forms and validation
+
+```tsx
+<form onSubmit={submit} noValidate aria-label="Sign in">
+  <label htmlFor="login-email">Email</label>
+  <input
+    id="login-email"
+    type="email"
+    aria-invalid={!!errors.email}
+    aria-describedby={errors.email ? 'login-email-error' : undefined}
+  />
+  {errors.email && <p id="login-email-error">Enter a valid email address</p>}
+
+  {formError && <p role="alert">{formError}</p>}
+  <button type="submit" disabled={submitting} aria-busy={submitting}>
+    {submitting ? 'Signing in…' : 'Sign in'}
+  </button>
+</form>
+```
+
+Keep validation messages as literal strings in the code (or one messages file): the analyzer copies
+them into the page model, and the tests assert them exactly.
+
+### Ids and test ids
+
+Tests use Playwright's default test-id attribute, `data-testid` (`getByTestId`); the agent does not
+change `testIdAttribute`. Use this convention for both `data-testid` and `id`:
+
+- **kebab-case `<page>-<component>-<element>`**, e.g. `checkout-summary-total`,
+  `login-email`, `login-email-error`; drop the component part when the page has only one, as in
+  `login-email`.
+- **Stable across renders and builds**: never from `useId()`, `Math.random()`, a CSS-module hash
+  or an array index.
+- **List items carry the item's domain key**, e.g. `checkout-line-${product.sku}`, and the same value
+  as the React `key`.
+- **Unique within the page**, and never reused for a different element after a refactor.
+
+```tsx
+// Bad: index-based, changes when the list is reordered
+<li data-testid={`item-${i}`}>…</li>
+// Good: tied to the data
+<li key={line.sku} data-testid={`checkout-line-${line.sku}`}>…</li>
+
+// A value with no role or name of its own
+<dt>Total</dt>
+<dd data-testid="checkout-summary-total">{formatPrice(totalCents)}</dd>
+```
+
+Element ids also show up in failure output: `qa.expectNoHorizontalOverflow()` names offenders as
+`tag#id.class`, so a meaningful id makes the report readable.
+
+### Routes, state and test data
+
+- **Declare routes as string literals.** Detection reads file-based routes (Next.js `app/` and
+  `pages/`, SvelteKit, Remix, Nuxt, Astro) and, for config routers, `<Route path="/x">` or
+  `path: '/x'` ([`src/discovery/detect.ts`](./src/discovery/detect.ts)). Routes built at runtime
+  from variables are invisible until the AI analysis finds them.
+- **Reach every page through visible navigation.** Tests build preconditions through the UI (add a
+  product, then go to checkout); in-memory state only survives client-side navigation, so link to
+  the pages a flow needs.
+- **Make test data reproducible.** Provide a seed script or fixed fixtures, a test account, and a
+  stubbed or sandboxed payment/email provider, and write them in `.qa/rules.md`, which is included
+  in every AI prompt:
+
+  ```md
+  ## Test data
+
+  - Log in with qa@example.com / password from env QA_PASSWORD (created by `npm run db:seed`).
+  - Coupon SAVE10 gives 10% off; EXPIRED is an expired coupon.
+  ```
+
+- **Remove nondeterminism the tests cannot control.** Let tests freeze time (read the clock in one
+  place), seed or inject randomness, avoid A/B flags and rotating content in the test environment,
+  and disable or shorten animations under `prefers-reduced-motion: reduce`. A test that passes only
+  on retry is reported as flaky and never filed.
+- **Start the app with one command** (`app.startCommand`) on a fixed host and port, with test
+  configuration from environment variables, not from code edits.
+
+### Accessibility
+
+Accessibility scenarios run axe-core (WCAG 2.1 A/AA) and fail on **serious** and **critical**
+violations (see [Accessibility checks](#accessibility-checks)). Beyond the points above: images have
+`alt` (empty for decoration), text meets contrast ratios, everything is reachable and operable with
+the keyboard with a visible focus, dialogs use `<dialog>` or `role="dialog"` with a name and manage
+focus, and toggles expose `aria-expanded` / `aria-pressed`. If you use design tokens, keep them as
+CSS custom properties with the values from Figma: the analyzer records them, and visual tests
+compare computed styles against the design.
 
 ## Troubleshooting
 
