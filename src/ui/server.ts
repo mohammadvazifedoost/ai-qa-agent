@@ -21,11 +21,12 @@ import { readJson, sha256, slugify } from '../core/fs.js';
 import type { TestOutcome } from '../runner/results.js';
 import type { BugDraft, Issue } from '../triage/schema.js';
 import { logger } from '../core/logger.js';
-import { runDir } from '../core/paths.js';
+import { isInside, runDir } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
 import { TestRunResultSchema, type TestRunResult } from '../runner/results.js';
 import { scenarioTestStates, writeScenarioTest, type ScenarioTestState } from '../generate/scenario-test.js';
 import { loadAppModel } from '../analyze/app.js';
+import { deleteMedia, MediaDeleteError } from '../runner/media.js';
 import { runScenarioTest, runScenarioTests } from '../runner/rerun.js';
 import { Cancelled } from '../core/process.js';
 import { runTests } from '../runner/run.js';
@@ -253,8 +254,8 @@ async function readBody(req: http.IncomingMessage): Promise<string> {
 function serveFile(ctx: QaContext, urlPath: string, res: http.ServerResponse): void {
   const relative = decodeURIComponent(urlPath.replace(/^\/files\//, ''));
   const abs = path.resolve(ctx.root, relative);
-  const allowed = [ctx.paths.artifactsDir, path.join(ctx.paths.qaDir, 'design')].some(
-    (dir) => abs === dir || abs.startsWith(dir + path.sep),
+  const allowed = [ctx.paths.artifactsDir, path.join(ctx.paths.qaDir, 'design')].some((dir) =>
+    isInside(dir, abs),
   );
   if (!allowed || !fs.existsSync(abs) || fs.statSync(abs).isDirectory()) {
     res.writeHead(404);
@@ -586,6 +587,17 @@ async function handleDeleteScenario(
   }
 }
 
+/** Delete one screenshot/video of a result, or all of them, and drop them from results.json. */
+function handleDeleteMedia(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { runId, key, file } = JSON.parse(body || '{}') as { runId?: unknown; key?: unknown; file?: unknown };
+  try {
+    return { status: 200, payload: deleteMedia(ctx, { runId, key, file }) };
+  } catch (err) {
+    if (err instanceof MediaDeleteError) return { status: err.status, payload: { error: err.message } };
+    throw err;
+  }
+}
+
 async function handleSaveScenario(
   ctx: QaContext,
   body: string,
@@ -694,6 +706,9 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/scenarios/delete') {
         const { status, payload } = await handleDeleteScenario(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/media/delete') {
+        const { status, payload } = handleDeleteMedia(ctx, await readBody(req));
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/scenarios/save') {
         const { status, payload } = await handleSaveScenario(ctx, await readBody(req));

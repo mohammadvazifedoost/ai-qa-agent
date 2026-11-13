@@ -11,9 +11,13 @@ import { cancelJob, createPlan, refreshAll, startJob } from './jobs.js';
 import type { View } from './logic.js';
 import {
   askDelete,
+  askMediaDelete,
   cancelDelete,
+  cancelMediaDelete,
   confirmDelete,
+  confirmMediaDelete,
   fileBug,
+  type MediaTarget,
   openModal,
   runTest,
   viewPlan,
@@ -23,6 +27,14 @@ import { render } from './render.js';
 import { state } from './state.js';
 
 const modal = (): HTMLDialogElement => $<HTMLDialogElement>('#modal');
+
+/** The media a delete control acts on, from its `data-*` attributes (see mediaButton in modal.ts). */
+const mediaTarget = (el: HTMLElement): MediaTarget => ({
+  id: el.dataset.id ?? '',
+  key: el.dataset.key ?? '',
+  what: (el.dataset.what ?? 'all') as MediaTarget['what'],
+  file: el.dataset.file ?? '',
+});
 
 document.addEventListener('click', (e) => {
   const el = (e.target as Element).closest<HTMLElement>('[data-action]');
@@ -63,6 +75,12 @@ document.addEventListener('click', (e) => {
       return cancelDelete(id);
     case 'confirm-delete':
       return void confirmDelete(id);
+    case 'ask-media-delete':
+      return askMediaDelete(el, mediaTarget(el));
+    case 'cancel-media-delete':
+      return cancelMediaDelete(el, mediaTarget(el));
+    case 'confirm-media-delete':
+      return void confirmMediaDelete(el as HTMLButtonElement, mediaTarget(el));
     case 'refresh':
       return void refreshAll(el as HTMLButtonElement);
     case 'start-job':

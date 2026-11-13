@@ -48,3 +48,8 @@ export function runDir(paths: QaPaths, runId: string): string {
 export function rel(from: string, to: string): string {
   return path.relative(from, to).split(path.sep).join('/');
 }
+
+/** True when `abs` is `dir` itself or a path below it (both absolute and resolved). */
+export function isInside(dir: string, abs: string): boolean {
+  return abs === dir || abs.startsWith(dir + path.sep);
+}
