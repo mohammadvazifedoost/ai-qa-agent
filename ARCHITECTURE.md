@@ -35,12 +35,13 @@ init ──► analyze ──► design ──► scenarios ──► generate �
 | analyze | `analyze/app.ts` | source files, project.json, rules | `app-model.json` (pages, forms, states, rules, test data, per-page and shared-file hashes) | all-source hash for the fast path; otherwise only new/changed pages are re-analyzed and merged |
 | design | `design/figma.ts` | Figma MCP (metadata, variables, design context, screenshots) | `design-system.json`, `design/refs/*.png` | figma config + viewports |
 | scenarios | `scenarios/generate.ts` | page model, flows, design subset, viewports | `scenarios/<page>.json` | per page: page files hash + model + design |
+| (critical flows) | `scenarios/critical.ts` | app outline (pages, flows, test data, auth); `--critical` on `scenarios`/`generate`/`test`/`run` | a few cross-page happy-path journeys with `critical: true`, stored in the scenario file of their start page; tests tagged `@critical`, selected by scenario id | `state.criticalInputs` |
 | generate | `generate/playwright.ts` | approved scenarios, page model, Playwright MCP (to confirm locators on the live app) | `tests/<page>.spec.ts`, validated with `playwright test --list`; up to 3 fix rounds | per spec: scenarios + model |
 | test | `runner/*` | specs, generated `playwright.config.ts` | `artifacts/runs/<id>/` evidence + `results.json` | — |
 | triage | `triage/*` | outcomes + evidence + scenario + source + design | `triage.json` (per-failure verdicts, consolidated issues) | — |
 | file | `bugs/file.ts` | confirmed issues | `filing.json` marking them *pending* — the pipeline never creates tasks | — |
 | (dashboard button) | `bugs/file.ts` `fileIssues`, `integrations/clickup.ts` | one issue or one failure, on a person's click | ClickUp task + attachments (or a comment on the task filed earlier), `filing.json`, `state.bugs` | fingerprint of scenario ids, root-cause files |
-| ui | `ui/server.ts`, `ui/page.ts` | scenarios, run results, triage, filing | local dashboard (`/api/overview`, `/files/*`, `POST /api/file` to log one issue, `POST /api/scenarios/delete` to remove a scenario) | — |
+| ui | `ui/server.ts`, `ui/page.ts` | scenarios, run results, triage, filing | local dashboard (`/api/overview`, `/files/*`, `POST /api/file` to log one issue, `POST /api/scenarios/delete` to remove a scenario, `POST /api/media/delete` to delete a result's screenshots/video, `POST /api/runs/critical` to run only critical flows) | — |
 | (remove / restore) | `scenarios/manage.ts`, `scenarios/spec-edit.ts` | scenario ids from the CLI or the dashboard | scenario moved to `removed` in `scenarios/<page>.json`; its test cut from the spec (validated with `--list`, rolled back on failure); `generatedSpecs` kept fresh | — |
 | report | `report/report.ts` | everything above | `reports/<id>/report.md|html`, `bugs/*.md` | — |
 
@@ -75,6 +76,7 @@ src/
                           rate-limit reporting, back-fill of missing references
   scenarios/              Scenario schema, generation per page (respects removed scenarios), page
                           selection helpers
+  scenarios/critical.ts   critical-flow (smoke) generation, merge into page files, test selection
   scenarios/manage.ts     list/remove/restore scenarios; removal tombstones and spec cache upkeep
   scenarios/spec-edit.ts  lexer-based removal of one test('<ID>: …') block from a spec (no AI)
   generate/playwright.ts  test generation + validation loop

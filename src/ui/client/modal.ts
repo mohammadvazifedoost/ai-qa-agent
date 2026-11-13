@@ -124,8 +124,7 @@ export function openModal(id: string, notice?: string): void {
           '</pre></details>',
       );
     const a = o.artifacts;
-    const slot = String(outs.indexOf(o));
-    const media = (what: MediaWhat, file = ''): string => mediaArea({ id, key: o.key, what, file }, slot);
+    const media = (what: MediaWhat, file = ''): string => mediaArea({ id, key: o.key, what, file });
     if (a.screenshots[0] || a.video) {
       right += section(
         'Evidence' + (outs.length > 1 ? ' · ' + esc(o.project) : ''),
@@ -424,10 +423,13 @@ function mediaButton(t: MediaTarget): string {
   );
 }
 
-function mediaArea(t: MediaTarget, slot: string): string {
+/** Stable id from the result key (e.g. `A-001@chromium-desktop` → `a-001-chromium-desktop`), never a list index. */
+const mediaSlug = (key: string): string => key.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+function mediaArea(t: MediaTarget): string {
   return (
     '<div id="media-del-' +
-    slot +
+    mediaSlug(t.key) +
     '-' +
     t.what +
     '" class="mt-1.5 flex flex-wrap items-center gap-2">' +
