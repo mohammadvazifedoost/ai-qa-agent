@@ -11,8 +11,10 @@ import {
   human,
   isFailing,
   issueFor,
+  mediaDeleteLabel,
   outcomesFor,
   statusOf,
+  type MediaWhat,
   type ScenarioView,
 } from './logic.js';
 import { action, typeChip } from './render.js';
@@ -122,6 +124,8 @@ export function openModal(id: string, notice?: string): void {
           '</pre></details>',
       );
     const a = o.artifacts;
+    const slot = String(outs.indexOf(o));
+    const media = (what: MediaWhat, file = ''): string => mediaArea({ id, key: o.key, what, file }, slot);
     if (a.screenshots[0] || a.video) {
       right += section(
         'Evidence' + (outs.length > 1 ? ' · ' + esc(o.project) : ''),
@@ -132,13 +136,16 @@ export function openModal(id: string, notice?: string): void {
             fileUrl(a.screenshots[0]) +
             '" alt="Final screenshot of ' +
             esc(o.key) +
-            '"></a>'
+            '"></a>' +
+            media('screenshot', a.screenshots[0])
           : '') +
           (a.video
             ? '<video class="mt-3 block w-full rounded-[10px] bg-black" controls preload="metadata" src="' +
               fileUrl(a.video) +
-              '"></video>'
+              '"></video>' +
+              media('video', a.video)
             : '') +
+          (a.screenshots.length + (a.video ? 1 : 0) > 1 ? media('all') : '') +
           '<div class="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">' +
           link(a.trace, 'Trace') +
           link(a.logs, 'Console & network', true) +
@@ -388,6 +395,102 @@ export async function confirmDelete(id: string): Promise<void> {
       '. Undo: ai-qa-agent scenarios restore ' +
       id,
   );
+}
+
+/* ---------- delete a result's screenshot / video (inline confirm next to it) ---------- */
+export interface MediaTarget {
+  /** The scenario the modal shows. */
+  id: string;
+  /** The result (outcome key) the media belongs to. */
+  key: string;
+  what: MediaWhat;
+  /** Project-relative path of the file; empty for `all`. */
+  file: string;
+}
+
+const mediaArgs = (t: MediaTarget): Record<string, string> => ({ ...t });
+
+function mediaButton(t: MediaTarget): string {
+  return (
+    '<button type="button" class="btn-quiet btn-quiet-danger" data-testid="media-delete-' +
+    t.what +
+    '" aria-label="' +
+    esc(mediaDeleteLabel(t.what, t.key)) +
+    '" ' +
+    act('ask-media-delete', mediaArgs(t)) +
+    '>' +
+    (t.what === 'all' ? 'Delete all media' : 'Delete ' + t.what) +
+    '</button>'
+  );
+}
+
+function mediaArea(t: MediaTarget, slot: string): string {
+  return (
+    '<div id="media-del-' +
+    slot +
+    '-' +
+    t.what +
+    '" class="mt-1.5 flex flex-wrap items-center gap-2">' +
+    mediaButton(t) +
+    '</div>'
+  );
+}
+
+const mediaAreaOf = (el: HTMLElement): HTMLElement | null => el.closest<HTMLElement>('[id^="media-del-"]');
+
+export function askMediaDelete(el: HTMLElement, t: MediaTarget): void {
+  const area = mediaAreaOf(el);
+  if (!area) return;
+  area.innerHTML =
+    '<span class="text-[13px] text-muted">Delete ' +
+    (t.what === 'all' ? 'all screenshots and the video' : 'this ' + t.what) +
+    '? This cannot be undone.</span>' +
+    '<button type="button" class="btn-quiet" data-testid="media-delete-cancel" ' +
+    act('cancel-media-delete', mediaArgs(t)) +
+    '>Cancel</button>' +
+    '<button type="button" class="btn btn-danger" data-testid="media-delete-confirm" aria-label="' +
+    esc('Confirm: ' + mediaDeleteLabel(t.what, t.key)) +
+    '" ' +
+    act('confirm-media-delete', mediaArgs(t)) +
+    '>Delete</button>' +
+    '<p class="m-0 w-full text-[13px] text-fail" role="alert"></p>';
+  $<HTMLButtonElement>('[data-action="cancel-media-delete"]', area).focus();
+}
+
+export function cancelMediaDelete(el: HTMLElement, t: MediaTarget): void {
+  const area = mediaAreaOf(el);
+  if (area) area.innerHTML = mediaButton(t);
+}
+
+export async function confirmMediaDelete(btn: HTMLButtonElement, t: MediaTarget): Promise<void> {
+  const runId = state.data.run?.id;
+  if (btn.disabled || !runId) return;
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  const { ok, out } = await postJson<{ removed: string[] }>('/api/media/delete', {
+    runId,
+    key: t.key,
+    file: t.what === 'all' ? undefined : t.file,
+  });
+  if (!ok) {
+    const msg = 'Could not delete: ' + (out.error || 'unknown error');
+    const alertEl = btn.isConnected ? mediaAreaOf(btn)?.querySelector('[role="alert"]') : null;
+    if (alertEl) {
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+      alertEl.textContent = msg;
+    } else toast(msg);
+    return;
+  }
+  const done =
+    (t.what === 'all' ? 'Deleted ' + out.removed.length + ' media files' : 'Deleted the ' + t.what) +
+    ' of ' +
+    t.key +
+    '.';
+  const stillHere = showing(t.id);
+  await load(runId);
+  if (stillHere) openModal(t.id, done);
+  else toast(done);
 }
 
 /* ---------- bug-fix plan viewer ---------- */

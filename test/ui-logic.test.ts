@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { esc, fmtRun, lines, listModel, statusOf, type Data, type View } from '../src/ui/client/logic.js';
+import {
+  esc,
+  fmtRun,
+  lines,
+  listModel,
+  mediaDeleteLabel,
+  statusOf,
+  type Data,
+  type View,
+} from '../src/ui/client/logic.js';
 
 const view = (extra: Partial<View> = {}): View => ({
   page: '',
@@ -104,5 +113,15 @@ describe('listModel', () => {
     const m = listModel(data({ run: null }), view());
     expect(m.rows).toHaveLength(5);
     expect(m.notRun).toBe(0);
+  });
+});
+
+describe('mediaDeleteLabel', () => {
+  it('names what is deleted and whose result it is', () => {
+    expect(mediaDeleteLabel('screenshot', 'A-001@chromium-desktop')).toBe(
+      'Delete final screenshot of A-001@chromium-desktop',
+    );
+    expect(mediaDeleteLabel('video', 'A-001@x')).toBe('Delete video of A-001@x');
+    expect(mediaDeleteLabel('all', 'A-001@x')).toBe('Delete all screenshots and the video of A-001@x');
   });
 });

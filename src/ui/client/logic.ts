@@ -8,6 +8,16 @@ export type Data = Overview;
 export type ScenarioView = Overview['scenarios'][number];
 export type Outcome = NonNullable<Overview['run']>['outcomes'][number];
 export type Status = 'passed' | 'failed' | 'flaky' | 'none';
+/** Which media of a result a delete control removes. */
+export type MediaWhat = 'screenshot' | 'video' | 'all';
+
+/** Accessible name of the control that deletes a result's media. */
+export const mediaDeleteLabel = (what: MediaWhat, key: string): string =>
+  what === 'all'
+    ? 'Delete all screenshots and the video of ' + key
+    : what === 'screenshot'
+      ? 'Delete final screenshot of ' + key
+      : 'Delete video of ' + key;
 
 export interface View {
   page: string;

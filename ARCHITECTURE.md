@@ -84,6 +84,7 @@ src/
   runner/playwright-config.ts  renders playwright.config.ts (project per browser × viewport)
   runner/results.ts       Playwright JSON report → normalized TestOutcome + evidence copying
   runner/run.ts           executes Playwright with filters (files, tags, scenario ids)
+  runner/media.ts         delete a result's screenshots/video and drop them from results.json
   triage/rules.ts         deterministic classifications
   triage/triage.ts        AI verdict per failure (3 in parallel), consolidation into issues
   bugs/report.ts          bug markdown, environment, evidence selection

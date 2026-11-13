@@ -624,6 +624,9 @@ pipeline writes. There is no database and no external service.
   Passing, type (functional, visual, responsive, accessibility), search, and page.
 - *Delete scenario* in the modal footer removes a scenario and its test after an inline
   confirmation (optional reason); see [Removing scenarios](#removing-scenarios).
+- *Delete screenshot* / *Delete video* (and *Delete all media* when there are several) under the
+  evidence in the modal delete those files from the run after an inline confirmation and remove
+  them from its `results.json`. Traces and logs are kept.
 - The tracker credentials must be in the environment of the shell that started the UI
   (`CLICKUP_API_TOKEN=... npx ai-qa-agent ui`, or `JIRA_API_TOKEN` + `JIRA_EMAIL`). Filing results
   are written back to the run so the report and the dashboard stay consistent.
