@@ -52,6 +52,8 @@ export const QaStateSchema = z.object({
   stages: z.partialRecord(z.enum(STAGES), StageRecordSchema).default({}),
   /** Per-page hash of the inputs used when that page's scenarios were generated. */
   scenarioInputs: z.record(z.string(), z.string()).default({}),
+  /** Hash of the inputs used when the critical flows were last generated (`scenarios --critical`). */
+  criticalInputs: z.string().optional(),
   /** Per-spec-file hash of the scenarios used to generate it. */
   generatedSpecs: z.record(z.string(), z.string()).default({}),
   /** Per scenario id: fingerprint of the scenario when its test was last written (whole file or alone). */

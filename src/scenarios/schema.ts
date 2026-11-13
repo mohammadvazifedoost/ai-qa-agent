@@ -39,13 +39,23 @@ export const ScenarioSchema = z.object({
   origin: z.enum(['ai', 'person']).optional(),
   /** When a person last added or edited it (ISO timestamp). */
   editedAt: z.string().optional(),
+  /**
+   * A critical flow: one of the app's core end-to-end journeys (log in, checkout...) that make up the
+   * smoke tests. Set by `scenarios --critical`; missing means a regular scenario.
+   */
+  critical: z.boolean().optional(),
 });
 export type Scenario = z.infer<typeof ScenarioSchema>;
 
-/** What the AI returns: it cannot claim a scenario was written by a person. */
-export const AiScenarioSchema = ScenarioSchema.omit({ origin: true, editedAt: true });
+/**
+ * What the AI returns: it cannot claim a scenario was written by a person, and only the critical
+ * flows generation marks scenarios critical.
+ */
+export const AiScenarioSchema = ScenarioSchema.omit({ origin: true, editedAt: true, critical: true });
 
 export const isPersonScenario = (s: Pick<Scenario, 'origin'>): boolean => s.origin === 'person';
+
+export const isCriticalScenario = (s: Pick<Scenario, 'critical'>): boolean => s.critical === true;
 
 /** A scenario a person deleted. Kept so regeneration does not bring it back, and for `restore`. */
 export const RemovedScenarioSchema = z.object({

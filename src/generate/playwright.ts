@@ -78,7 +78,7 @@ export function designSummary(ctx: QaContext, route: string): unknown {
 /** How every generated test must be written; shared by whole-file and single-test generation. */
 export function testRules(ctx: QaContext): string {
   const viewports = Object.keys(ctx.config.viewports);
-  return `- Tag every test: { tag: ['@<category>', '@<feature>', '@<viewport>', '@<priority>'] } where viewport is one of ${viewports.map((v) => `@${v}`).join(', ')} — the tag selects the browser viewport the test runs in. Use the scenario's own values.
+  return `- Tag every test: { tag: ['@<category>', '@<feature>', '@<viewport>', '@<priority>'] } where viewport is one of ${viewports.map((v) => `@${v}`).join(', ')} — the tag selects the browser viewport the test runs in. Use the scenario's own values. When the scenario has "critical": true, also add '@critical' (a smoke test of a core journey).
 - Encode the scenario's expectedResults as assertions. They describe CORRECT behaviour; never weaken them to match what the code currently does. A failing test is how bugs are found.
 - Locators: prefer getByRole / getByLabel / getByText with exact accessible names; use getByTestId only where the page model lists a data-testid. No CSS/XPath selectors unless nothing else identifies the element.
 - No page.waitForTimeout / arbitrary sleeps. Rely on auto-waiting assertions (toBeVisible, toHaveText, toHaveURL...). To observe a transient loading state, assert it right after the action that triggers it.
@@ -166,14 +166,16 @@ export interface GenerateScope {
   /** Limit to these routes (used by `run --changed`). */
   pages?: string[];
   force?: boolean;
+  /** Only write tests for these scenarios (e.g. the critical flows on a page without a spec yet). */
+  only?: (s: Scenario) => boolean;
 }
 
 /** Per page: its approved scenarios and whether its spec is up to date with them. */
-function specTasks(ctx: QaContext, pages: PageModel[]) {
+function specTasks(ctx: QaContext, pages: PageModel[], only: (s: Scenario) => boolean = () => true) {
   return pages.map((page) => {
     const scenarios = (
       readJson(scenarioFilePath(ctx, page.route), ScenarioFileSchema)?.scenarios ?? []
-    ).filter((s) => s.approved);
+    ).filter((s) => s.approved && only(s));
     const file = specPath(ctx, page.route);
     const hash = specHash(ctx, page, scenarios);
     const key = specKey(ctx, file);
@@ -204,7 +206,7 @@ export async function generateTests(ctx: QaContext, scope: GenerateScope = {}): 
   const pages = selectPages(app.pages, scope.page).filter(
     (p) => !scope.pages || scope.pages.includes(p.route),
   );
-  const todo = specTasks(ctx, pages).filter((t) => {
+  const todo = specTasks(ctx, pages, scope.only).filter((t) => {
     if (t.scenarios.length === 0)
       log.warn(`No approved scenarios for ${t.page.route}; run \`ai-qa-agent scenarios\``);
     else if (t.fresh && !scope.force) log.info(`${t.key} is up to date`);
