@@ -30,8 +30,6 @@ import {
 
 const log = logger('scenarios');
 
-export const DEFAULT_MAX_CRITICAL = 5;
-
 const normalizeTitle = (t: string): string => t.toLowerCase().replace(/\s+/g, ' ').trim();
 
 /** Everything the critical flows are derived from; a change makes `scenarios --critical` ask the AI again. */
@@ -65,7 +63,8 @@ export function buildCriticalPrompt(
   ctx: QaContext,
   app: AppModelFile,
   existing: { ai: readonly Scenario[]; person: readonly Scenario[]; removed: ScenarioFile['removed'] },
-  max: number,
+  /** Undefined means no limit. */
+  max: number | undefined,
 ): string {
   const viewport = Object.keys(ctx.config.viewports)[0];
   return `Identify the CRITICAL user journeys of this application and write one end-to-end test scenario for each.
@@ -88,7 +87,7 @@ ${JSON.stringify(app.testData)}
 
 ${existing.ai.length ? `## Existing critical flows (keep ids stable for journeys that still apply; keep "approved" values)\n${JSON.stringify(existing.ai, null, 2)}\n` : ''}${personSection(existing.person)}${removedSection(existing.removed)}
 ## Instructions
-- Return at most ${max} scenarios, one per critical journey. Fewer is better: only journeys whose failure would make the app unusable or block its main purpose. No secondary features, edge cases, validation errors, visual, responsive or accessibility checks.
+- Return ${max ? `at most ${max} scenarios, one per critical journey` : 'one scenario for every critical journey the app has'}. Only journeys whose failure would make the app unusable or block its main purpose. No secondary features, edge cases, validation errors, visual, responsive or accessibility checks.
 - Every scenario is category "functional", priority "high", and the happy path, completed end to end. A journey may span several pages: "page" is the route where it starts, and the steps move through the following pages with visible links and buttons.
 - Steps must be concrete and use visible text / accessible names from the pages above. Include the preconditions and test data the journey needs (e.g. credentials found in code).
 - Expected results describe CORRECT, INTENDED behaviour, including the final outcome of the journey (e.g. the order confirmation is shown), not whatever the code happens to do.
@@ -176,7 +175,7 @@ export function mergeCriticalScenarios(
 
 export interface CriticalScope {
   force?: boolean;
-  /** Maximum number of critical flows (default 5). */
+  /** Overrides `scenarios.maxCritical` from the config; neither set means no limit. */
   max?: number;
 }
 
@@ -207,7 +206,7 @@ export async function generateCriticalScenarios(
     name: 'scenarios-critical',
     cwd: ctx.root,
     system: BASE_SYSTEM,
-    prompt: buildCriticalPrompt(ctx, app, existing, scope.max ?? DEFAULT_MAX_CRITICAL),
+    prompt: buildCriticalPrompt(ctx, app, existing, scope.max ?? ctx.config.scenarios.maxCritical),
     schema: z.object({ scenarios: z.array(AiScenarioSchema) }),
     tools: ['Read', 'Glob', 'Grep'],
   });

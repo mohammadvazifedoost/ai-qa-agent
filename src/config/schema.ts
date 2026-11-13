@@ -112,6 +112,14 @@ export const QaConfigSchema = z
         verifyRetries: z.number().int().min(0).max(3).default(1),
       })
       .default({ timeoutMs: 30_000, workers: 2, verifyRetries: 1 }),
+    scenarios: z
+      .object({
+        /** Cap on scenarios generated per page. Omit for no limit: the AI covers what the page needs. */
+        maxPerPage: z.number().int().positive().optional(),
+        /** Cap on critical flows (`scenarios --critical`). Omit for no limit: one per critical journey. */
+        maxCritical: z.number().int().positive().optional(),
+      })
+      .default({}),
     visual: z
       .object({
         /** Per-pixel colour distance threshold passed to pixelmatch (0..1). */

@@ -98,6 +98,7 @@ function setup(checkoutScenarios: Scenario[], extra: Record<string, string | obj
       viewports: { desktop: { width: 1440, height: 900 }, mobile: { width: 390, height: 844 } },
       app: { baseUrl: 'http://127.0.0.1:5173' },
       ai: { mcpServers: {} },
+      scenarios: {},
     },
   } as unknown as QaContext;
   const read = (slug: string) =>
@@ -221,6 +222,23 @@ describe('mergeCriticalScenarios', () => {
       viewports,
     );
     expect(out.size).toBe(0);
+  });
+});
+
+describe('critical flow limit', () => {
+  it('has no limit by default, uses scenarios.maxCritical from the config, and --max overrides it', async () => {
+    const { ctx } = setup([]);
+    const prompts = fakeAi(ctx, []);
+    await generateCriticalScenarios(ctx, { force: true });
+    expect(prompts[0]).toContain('one scenario for every critical journey the app has');
+    expect(prompts[0]).not.toContain('at most');
+
+    (ctx.config as { scenarios: { maxCritical?: number } }).scenarios.maxCritical = 4;
+    await generateCriticalScenarios(ctx, { force: true });
+    expect(prompts[1]).toContain('at most 4 scenarios');
+
+    await generateCriticalScenarios(ctx, { force: true, max: 2 });
+    expect(prompts[2]).toContain('at most 2 scenarios');
   });
 });
 

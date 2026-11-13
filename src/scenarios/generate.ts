@@ -83,6 +83,7 @@ export interface ScenarioScope {
   /** Limit to these routes (used by `run --changed`). */
   pages?: string[];
   force?: boolean;
+  /** Overrides `scenarios.maxPerPage` from the config; neither set means no limit. */
   maxPerPage?: number;
 }
 
@@ -103,7 +104,14 @@ export async function generateScenarios(ctx: QaContext, scope: ScenarioScope = {
       continue;
     }
     if (existing) log.info(`Inputs for ${page.route} changed — updating scenarios`);
-    const scenarios = await generateForPage(ctx, app, page, design, existing, scope.maxPerPage ?? 10);
+    const scenarios = await generateForPage(
+      ctx,
+      app,
+      page,
+      design,
+      existing,
+      scope.maxPerPage ?? ctx.config.scenarios.maxPerPage,
+    );
     writeJson(file, {
       page: page.route,
       generatedAt: new Date().toISOString(),
@@ -209,7 +217,8 @@ async function generateForPage(
   page: PageModel,
   design: DesignSystemFile | undefined,
   existing: ScenarioFile | undefined,
-  max: number,
+  /** Undefined means no limit. */
+  max: number | undefined,
 ): Promise<Scenario[]> {
   const prefix = scenarioIdPrefix(page.route);
   const person = existing?.scenarios.filter(isPersonScenario) ?? [];
@@ -240,7 +249,7 @@ ${JSON.stringify(ctx.config.viewports)}
 
 ${aiExisting.length ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(aiExisting, null, 2)}\n` : ''}${personSection(person)}${criticalSection(critical)}${removedSection(existing?.removed ?? [])}
 ## Instructions
-- Produce at most ${max} high-value scenarios for this page across categories: functional, visual, responsive, accessibility. Quality over quantity: no trivial duplicates.
+- Produce ${max ? `at most ${max} high-value scenarios` : 'as many high-value scenarios as the page needs for full coverage'} for this page across categories: functional, visual, responsive, accessibility. Quality over quantity: no trivial duplicates.
 - functional: happy paths, validation, empty/error/loading states, navigation, and business rules (calculations!).
 - visual: compare against Figma. Use design.tokens with EXACT values from the Figma data above (e.g. a primary button's backgroundColor/borderRadius/height). Only reference a Figma screen in design.screen if it has hasReferenceImage=true. If no Figma data exists, do not create visual scenarios.
 - responsive: behaviour at tablet/mobile viewports (navigation collapse, no horizontal overflow, stacking), based on the design's mobile screens when available and general usability expectations.

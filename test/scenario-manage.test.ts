@@ -109,6 +109,7 @@ function setup(
       viewports: { desktop: { width: 1440, height: 900 } },
       app: { baseUrl: 'http://127.0.0.1:5173' },
       ai: { mcpServers: {} },
+      scenarios: {},
     },
   } as unknown as QaContext;
   // The spec is up to date with the current approved scenarios.
@@ -334,6 +335,27 @@ describe('scenario generation with tombstones', () => {
     expect(prompt).toContain('- CHECKOUT-002: Two (reason: flaky by design)');
     expect(read().scenarios.map((s) => s.id)).toEqual(['CHECKOUT-001', 'CHECKOUT-004']);
     expect(read().removed.map((r) => r.id)).toEqual(['CHECKOUT-002']);
+  });
+
+  it('has no per-page limit by default, uses scenarios.maxPerPage from the config, and --max overrides it', async () => {
+    const { ctx } = setup([scenario('CHECKOUT-001', 'One')]);
+    const prompts: string[] = [];
+    (ctx as { ai: unknown }).ai = {
+      run: async (task: { prompt: string }) => {
+        prompts.push(task.prompt);
+        return { output: { scenarios: [scenario('CHECKOUT-001', 'One')] } };
+      },
+    };
+    await generateScenarios(ctx, { force: true });
+    expect(prompts[0]).toContain('as many high-value scenarios as the page needs for full coverage');
+    expect(prompts[0]).not.toContain('at most');
+
+    (ctx.config as { scenarios: { maxPerPage?: number } }).scenarios.maxPerPage = 12;
+    await generateScenarios(ctx, { force: true });
+    expect(prompts[1]).toContain('at most 12 high-value scenarios');
+
+    await generateScenarios(ctx, { force: true, maxPerPage: 3 });
+    expect(prompts[2]).toContain('at most 3 high-value scenarios');
   });
 
   it('adds no prompt section when nothing was removed', () => {

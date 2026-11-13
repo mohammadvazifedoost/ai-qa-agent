@@ -333,7 +333,7 @@ ai-qa-agent run --feature auth           # by feature tag
 ai-qa-agent run --resume                 # continue an interrupted run
 ai-qa-agent run --refresh                # ignore caches; re-read code and Figma
 ai-qa-agent test --grep CHECKOUT-002     # specific scenario ids
-ai-qa-agent scenarios --page login --force --max 8
+ai-qa-agent scenarios --page login --force --max 8   # cap this run; default: scenarios.maxPerPage or no limit
 ai-qa-agent scenarios list --page checkout
 ai-qa-agent scenarios remove CHECKOUT-008 --reason "order placement is out of scope"
 ai-qa-agent ui --port 4310
@@ -380,7 +380,7 @@ app's critical flows: the few core journeys users must be able to complete, such
 main purchase or checkout flow, or the primary create/submit action.
 
 ```bash
-npx ai-qa-agent scenarios --critical         # ask the AI for at most 5 journeys (--max 3, --force)
+npx ai-qa-agent scenarios --critical         # ask the AI for every critical journey (--max 3, --force)
 npx ai-qa-agent generate --critical          # write only their tests
 npx ai-qa-agent test --critical              # run only them (no AI)
 npx ai-qa-agent run --critical               # all of the above, then triage and report
@@ -394,6 +394,9 @@ npx ai-qa-agent run --critical               # all of the above, then triage and
   regenerating a page (`ai-qa-agent scenarios`) leaves the critical flows that start on it alone.
   It is cached: the AI is asked again only when the app model changes, or with `--force`. Remove a
   flow you do not want with `scenarios remove <id>` so it is not suggested again.
+- There is no limit on how many flows (or, for regular generation, scenarios per page) the AI
+  returns. To cap them, set `scenarios: { maxCritical, maxPerPage }` in `.qa/config.ts`; `--max`
+  overrides the config for one run.
 - `generate --critical` writes only the missing or outdated critical tests. A page without a spec
   gets one with just those tests; a later full `generate` adds the rest. Generated tests carry the
   `@critical` tag, so `npx playwright test --grep @critical` works too.
@@ -509,6 +512,10 @@ export default defineConfig({
     mobile: { width: 390, height: 844, isMobile: true, hasTouch: true },
   },
   tests: { timeoutMs: 30_000, workers: 2, verifyRetries: 1 },
+  scenarios: {
+    maxPerPage: 15,                  // optional cap per page; omit for no limit (default)
+    maxCritical: 5,                  // optional cap on critical flows; omit for no limit (default)
+  },
   visual: { pixelThreshold: 0.1, acceptableDiffRatio: 0.02 },
   ai: {
     provider: 'claude-code',         // claude-code | codex | opencode

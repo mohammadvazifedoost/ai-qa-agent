@@ -11,7 +11,7 @@ import { analyzeApp } from './analyze/app.js';
 import { generateScenarios, normalizePageArg, pageSlug } from './scenarios/generate.js';
 import { generateTests } from './generate/playwright.js';
 import { generateCriticalTests } from './generate/scenario-test.js';
-import { criticalTestFilter, DEFAULT_MAX_CRITICAL, generateCriticalScenarios } from './scenarios/critical.js';
+import { criticalTestFilter, generateCriticalScenarios } from './scenarios/critical.js';
 import {
   formatScenarioTable,
   listScenarioRows,
@@ -190,7 +190,7 @@ const scenarios = program
   .option('--force', 'regenerate even if inputs did not change')
   .option(
     '--max <n>',
-    `maximum scenarios per page (default 10); with --critical, maximum critical flows (default ${DEFAULT_MAX_CRITICAL})`,
+    'maximum scenarios per page; with --critical, maximum critical flows (default: scenarios.maxPerPage / scenarios.maxCritical in the config, or no limit)',
     (v) => Number(v),
   )
   .option('--critical', 'only the critical flows: a few end-to-end core journeys used as smoke tests')
@@ -203,7 +203,7 @@ const scenarios = program
       for (const s of flows) console.log(`  ${s.id}  ${pc.dim(s.page)}  ${s.title}`);
       return;
     }
-    const all = await generateScenarios(ctx, { page: o.page, force: o.force, maxPerPage: o.max ?? 10 });
+    const all = await generateScenarios(ctx, { page: o.page, force: o.force, maxPerPage: o.max });
     const by = (k: 'category' | 'priority') =>
       Object.entries(Object.groupBy(all, (s) => s[k]))
         .map(([n, l]) => `${n}=${l?.length}`)
