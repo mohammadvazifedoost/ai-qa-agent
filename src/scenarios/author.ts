@@ -131,6 +131,8 @@ export function saveScenario(ctx: QaContext, raw: unknown, id?: string): Scenari
     approved: true,
     origin: 'person',
     editedAt: new Date().toISOString(),
+    // Editing a critical flow keeps it in the smoke tests.
+    critical: existing?.critical,
   } satisfies Scenario);
 
   const data = file!;

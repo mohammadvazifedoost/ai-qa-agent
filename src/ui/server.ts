@@ -35,7 +35,7 @@ import { specPath } from '../generate/playwright.js';
 import { draftScenario, saveScenario, ScenarioInputError } from '../scenarios/author.js';
 import { loadAllScenarios } from '../scenarios/generate.js';
 import { removeScenarios } from '../scenarios/manage.js';
-import { CATEGORIES } from '../scenarios/schema.js';
+import { CATEGORIES, isCriticalScenario } from '../scenarios/schema.js';
 import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
 import { planFile, planStatus, writeBugFixPlan } from '../plan/plan.js';
 
@@ -353,7 +353,7 @@ let writing: Promise<unknown> = Promise.resolve();
 
 /** A long test run started from the dashboard; the page polls GET /api/job until it is done. */
 export interface Job {
-  kind: 'run-all' | 'run-not-run' | 'run-failed' | 'plan';
+  kind: 'run-all' | 'run-critical' | 'run-not-run' | 'run-failed' | 'plan';
   label: string;
   status: 'running' | 'done' | 'failed' | 'cancelled';
   startedAt: string;
@@ -422,6 +422,34 @@ function handleRunAll(ctx: QaContext): { status: number; payload: unknown } {
       const res = await runTests(ctx, record.id, {}, undefined, signal);
       ctx.state.finishRun(record, 'completed');
       return `All tests ran: ${summary(res.stats)}.`;
+    } catch (err) {
+      ctx.state.finishRun(record, 'failed', (err as Error).message);
+      throw err;
+    }
+  });
+}
+
+/** A new run with only the critical flows' tests, like `ai-qa-agent test --critical`. */
+function handleRunCritical(ctx: QaContext): { status: number; payload: unknown } {
+  const critical = new Set(
+    loadAllScenarios(ctx)
+      .filter(isCriticalScenario)
+      .map((s) => s.id),
+  );
+  const ids = withTests(ctx, (s) => critical.has(s.id));
+  if (ids.length === 0) {
+    return {
+      status: 400,
+      payload: { error: 'No critical flow has a test yet. Run ai-qa-agent generate --critical.' },
+    };
+  }
+  return startJob('run-critical', 'Running critical flows', async (setRun, signal) => {
+    const record = ctx.state.startRun({ command: 'test', critical: 'true' });
+    setRun(record.id);
+    try {
+      const res = await runTests(ctx, record.id, { scenarioIds: ids }, undefined, signal);
+      ctx.state.finishRun(record, 'completed');
+      return `Critical flows ran: ${summary(res.stats)}.`;
     } catch (err) {
       ctx.state.finishRun(record, 'failed', (err as Error).message);
       throw err;
@@ -675,7 +703,9 @@ function serveAsset(urlPath: string, res: http.ServerResponse): void {
   if (!allowed || !fs.existsSync(file)) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end(
-      urlPath === '/' ? 'Dashboard not built: run `npm run build` in @mohammadvazifedoost/ai-qa-agent' : 'Not found',
+      urlPath === '/'
+        ? 'Dashboard not built: run `npm run build` in @mohammadvazifedoost/ai-qa-agent'
+        : 'Not found',
     );
     return;
   }
@@ -734,6 +764,9 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/runs/all') {
         const { status, payload } = handleRunAll(ctx);
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/runs/critical') {
+        const { status, payload } = handleRunCritical(ctx);
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/runs/not-run') {
         const { status, payload } = handleRunNotRun(ctx, await readBody(req));

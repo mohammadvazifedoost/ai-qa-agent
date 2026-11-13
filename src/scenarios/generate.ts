@@ -9,6 +9,7 @@ import type { DesignSystemFile } from '../design/schema.js';
 import type { QaContext } from '../pipeline/context.js';
 import {
   AiScenarioSchema,
+  isCriticalScenario,
   isPersonScenario,
   ScenarioFileSchema,
   type RemovedScenario,
@@ -178,6 +179,15 @@ ${person.map((s) => `- ${s.id}: ${s.title}`).join('\n')}
 `;
 }
 
+/** Prompt section listing the critical flows that start on a page, which page generation keeps. */
+export function criticalSection(critical: readonly Scenario[]): string {
+  if (critical.length === 0) return '';
+  return `## Critical flows starting on this page — keep as they are
+These end-to-end smoke journeys are maintained by \`ai-qa-agent scenarios --critical\`. Do not return them, do not return scenarios that test the same journey, and do not reuse their ids.
+${critical.map((s) => `- ${s.id}: ${s.title}`).join('\n')}
+`;
+}
+
 /**
  * Merge the AI's scenarios with the ones a person owns: person scenarios win on id and title,
  * and the result is ordered by id.
@@ -203,7 +213,9 @@ async function generateForPage(
 ): Promise<Scenario[]> {
   const prefix = scenarioIdPrefix(page.route);
   const person = existing?.scenarios.filter(isPersonScenario) ?? [];
-  const aiExisting = existing?.scenarios.filter((s) => !isPersonScenario(s)) ?? [];
+  // Critical flows belong to `scenarios --critical`: page regeneration keeps them as they are.
+  const critical = existing?.scenarios.filter((s) => isCriticalScenario(s) && !isPersonScenario(s)) ?? [];
+  const aiExisting = existing?.scenarios.filter((s) => !isPersonScenario(s) && !isCriticalScenario(s)) ?? [];
   const flows = app.flows.filter((f) => f.routes.includes(page.route));
   const res = await ctx.ai.run({
     name: `scenarios-${pageSlug(page.route)}`,
@@ -226,7 +238,7 @@ ${JSON.stringify(designForPage(design, page.route), null, 2)}
 ## Viewports available
 ${JSON.stringify(ctx.config.viewports)}
 
-${aiExisting.length ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(aiExisting, null, 2)}\n` : ''}${personSection(person)}${removedSection(existing?.removed ?? [])}
+${aiExisting.length ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(aiExisting, null, 2)}\n` : ''}${personSection(person)}${criticalSection(critical)}${removedSection(existing?.removed ?? [])}
 ## Instructions
 - Produce at most ${max} high-value scenarios for this page across categories: functional, visual, responsive, accessibility. Quality over quantity: no trivial duplicates.
 - functional: happy paths, validation, empty/error/loading states, navigation, and business rules (calculations!).
@@ -243,7 +255,9 @@ ${aiExisting.length ? `## Existing scenarios (keep ids stable for scenarios that
   });
   const viewports = Object.keys(ctx.config.viewports);
   // Strip ownership fields in case an engine returns them anyway: only a person sets them.
-  const fromAi = res.output.scenarios.map(({ origin: _o, editedAt: _e, ...s }: Scenario): Scenario => s);
+  const fromAi = res.output.scenarios.map(
+    ({ origin: _o, editedAt: _e, critical: _c, ...s }: Scenario): Scenario => s,
+  );
   const ai = dropRemoved(fromAi, existing?.removed ?? []).map((s) => {
     if (!viewports.includes(s.viewport)) {
       log.warn(`Scenario ${s.id} uses unknown viewport "${s.viewport}", using "${viewports[0]}"`);
@@ -251,5 +265,5 @@ ${aiExisting.length ? `## Existing scenarios (keep ids stable for scenarios that
     }
     return s;
   });
-  return mergePersonScenarios(ai, person);
+  return mergePersonScenarios(ai, [...person, ...critical]);
 }

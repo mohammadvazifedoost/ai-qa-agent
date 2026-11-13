@@ -306,16 +306,16 @@ Run every command with `npx ai-qa-agent …` in a project where it is installed 
 | `ai-qa-agent init` | Detect the project and create `.qa/config.ts`, `.qa/rules.md`, `.qa/.gitignore` |
 | `ai-qa-agent doctor` | Verify the AI CLI, Playwright, the app URL, Figma and ClickUp/Jira configuration |
 | `ai-qa-agent analyze` | Analyze the source code (`.qa/app-model.json`) and the Figma file (`.qa/design-system.json`) |
-| `ai-qa-agent scenarios` | Generate/refresh test scenarios per page (`.qa/scenarios/*.json`) |
+| `ai-qa-agent scenarios` | Generate/refresh test scenarios per page (`.qa/scenarios/*.json`); `--critical` for only the [critical flows](#critical-flows-smoke-tests) |
 | `ai-qa-agent scenarios list` | List scenarios (id, type, page, latest status, title); `--page`, `--removed` |
 | `ai-qa-agent scenarios remove <id...>` | Delete unnecessary/unusable scenarios and their tests; they are not regenerated (`--reason "<text>"`) |
 | `ai-qa-agent scenarios restore <id...>` | Undo a removal; the test comes back on the next `generate` |
-| `ai-qa-agent generate` | Generate Playwright tests from approved scenarios (`.qa/tests/*.spec.ts`) |
-| `ai-qa-agent test` | Run the tests and collect evidence (no AI involved) |
+| `ai-qa-agent generate` | Generate Playwright tests from approved scenarios (`.qa/tests/*.spec.ts`); `--critical` for only the critical flows' tests |
+| `ai-qa-agent test` | Run the tests and collect evidence (no AI involved); `--critical` for only the critical flows |
 | `ai-qa-agent triage` | Classify the failures of the latest run and write a report |
 | `ai-qa-agent report` | Rebuild the report of a run from stored results |
 | `ai-qa-agent plan` | Write a plan for fixing the bugs behind a run's failed tests into the project (`docs/bug-fix-plan/<run>-plan.md`); `--run`, `--dir`, `--force` |
-| `ai-qa-agent run` | The full pipeline: analyze → scenarios → generate → test → triage → report |
+| `ai-qa-agent run` | The full pipeline: analyze → scenarios → generate → test → triage → report; `--critical` for a smoke run of the critical flows only |
 | `ai-qa-agent changes` | Show what changed since the last analysis: new/changed/removed pages, changed shared files, and with `--design` new/changed Figma frames |
 | `ai-qa-agent ui` | Local dashboard: every scenario with its result, screenshots, videos, traces, analysis, and a button to log confirmed bugs in ClickUp or Jira |
 
@@ -372,6 +372,36 @@ Nothing is regenerated from scratch on every run:
 
 Typical flow after adding a feature: `ai-qa-agent changes` → `ai-qa-agent run --changed` → review in
 `ai-qa-agent ui` → log the confirmed bugs from the dashboard.
+
+### Critical flows (smoke tests)
+
+For a quick "is the app basically working?" check without a full suite, generate and run only the
+app's critical flows: the few core journeys users must be able to complete, such as logging in, the
+main purchase or checkout flow, or the primary create/submit action.
+
+```bash
+npx ai-qa-agent scenarios --critical         # ask the AI for at most 5 journeys (--max 3, --force)
+npx ai-qa-agent generate --critical          # write only their tests
+npx ai-qa-agent test --critical              # run only them (no AI)
+npx ai-qa-agent run --critical               # all of the above, then triage and report
+```
+
+- A critical flow is an ordinary scenario with `"critical": true`: functional, high priority, the
+  happy path end to end. A journey can span several pages; it is stored with the page where it
+  starts and gets that page's id (e.g. `CHECKOUT-004`). Scenario files without the field stay valid.
+- `scenarios --critical` looks at the whole app and only replaces the AI's critical flows. Other
+  scenarios, scenarios written by a person and removed scenarios are kept as they are, and
+  regenerating a page (`ai-qa-agent scenarios`) leaves the critical flows that start on it alone.
+  It is cached: the AI is asked again only when the app model changes, or with `--force`. Remove a
+  flow you do not want with `scenarios remove <id>` so it is not suggested again.
+- `generate --critical` writes only the missing or outdated critical tests. A page without a spec
+  gets one with just those tests; a later full `generate` adds the rest. Generated tests carry the
+  `@critical` tag, so `npx playwright test --grep @critical` works too.
+- `test --critical` and `run --critical` select the tests by scenario id, and combine with `--page`,
+  `--feature` and `--grep`. `run --critical` skips the Figma extraction and cannot be combined with
+  `--changed`.
+- In the dashboard, critical flows show a *critical* chip, and **Run critical flows** starts a new
+  run with only their tests.
 
 ### Removing scenarios
 

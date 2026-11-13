@@ -10,6 +10,8 @@ import { extractDesign } from './design/figma.js';
 import { analyzeApp } from './analyze/app.js';
 import { generateScenarios, normalizePageArg, pageSlug } from './scenarios/generate.js';
 import { generateTests } from './generate/playwright.js';
+import { generateCriticalTests } from './generate/scenario-test.js';
+import { criticalTestFilter, DEFAULT_MAX_CRITICAL, generateCriticalScenarios } from './scenarios/critical.js';
 import {
   formatScenarioTable,
   listScenarioRows,
@@ -45,6 +47,7 @@ interface Scope {
   category?: string;
   feature?: string;
   grep?: string[];
+  critical?: boolean;
 }
 
 function scopeToFilter(o: Scope): TestFilter {
@@ -185,15 +188,30 @@ const scenarios = program
   .description('generate or update test scenarios in .qa/scenarios/ (subcommands: list, remove, restore)')
   .option('--page <route>', 'only this page (route or name)')
   .option('--force', 'regenerate even if inputs did not change')
-  .option('--max <n>', 'maximum scenarios per page', (v) => Number(v), 10)
-  .action(async (o: { page?: string; force?: boolean; max: number }) => {
+  .option(
+    '--max <n>',
+    `maximum scenarios per page (default 10); with --critical, maximum critical flows (default ${DEFAULT_MAX_CRITICAL})`,
+    (v) => Number(v),
+  )
+  .option('--critical', 'only the critical flows: a few end-to-end core journeys used as smoke tests')
+  .action(async (o: { page?: string; force?: boolean; max?: number; critical?: boolean }) => {
     const ctx = await createContext(root());
-    const all = await generateScenarios(ctx, { page: o.page, force: o.force, maxPerPage: o.max });
+    if (o.critical) {
+      if (o.page) throw new Error('--critical covers the whole app; it cannot be combined with --page');
+      const flows = await generateCriticalScenarios(ctx, { force: o.force, max: o.max });
+      console.log(`${flows.length} critical flow${flows.length === 1 ? '' : 's'}`);
+      for (const s of flows) console.log(`  ${s.id}  ${pc.dim(s.page)}  ${s.title}`);
+      return;
+    }
+    const all = await generateScenarios(ctx, { page: o.page, force: o.force, maxPerPage: o.max ?? 10 });
     const by = (k: 'category' | 'priority') =>
       Object.entries(Object.groupBy(all, (s) => s[k]))
         .map(([n, l]) => `${n}=${l?.length}`)
         .join(' ');
-    console.log(`${all.length} scenarios (${by('category')}; ${by('priority')})`);
+    const critical = all.filter((s) => s.critical).length;
+    console.log(
+      `${all.length} scenarios (${by('category')}; ${by('priority')}${critical ? `; critical=${critical}` : ''})`,
+    );
   });
 
 scenarios
@@ -251,9 +269,10 @@ program
   .description('generate Playwright tests in .qa/tests/ from approved scenarios')
   .option('--page <route>', 'only this page (route or name)')
   .option('--force', 'regenerate even if scenarios did not change')
-  .action(async (o: { page?: string; force?: boolean }) => {
+  .option('--critical', 'only the tests of the critical flows (other tests are left as they are)')
+  .action(async (o: { page?: string; force?: boolean; critical?: boolean }) => {
     const ctx = await createContext(root());
-    const files = await generateTests(ctx, o);
+    const files = o.critical ? await generateCriticalTests(ctx, o) : await generateTests(ctx, o);
     for (const f of files) console.log(`  ${pc.green('generated')} ${rel(ctx.root, f)}`);
   });
 
@@ -264,10 +283,12 @@ program
   .option('--category <category>', 'functional | visual | responsive')
   .option('--feature <feature>', 'feature tag, e.g. auth')
   .option('--grep <ids...>', 'scenario ids')
-  .action(async (o: { page?: string; category?: string; feature?: string; grep?: string[] }) => {
+  .option('--critical', 'only the critical flows (smoke tests)')
+  .action(async (o: Scope) => {
     const ctx = await createContext(root());
-    const run = ctx.state.startRun({ command: 'test' });
-    const res = await runTests(ctx, run.id, scopeToFilter(o));
+    const filter = o.critical ? criticalTestFilter(ctx, scopeToFilter(o)) : scopeToFilter(o);
+    const run = ctx.state.startRun(o.critical ? { command: 'test', critical: 'true' } : { command: 'test' });
+    const res = await runTests(ctx, run.id, filter);
     ctx.state.finishRun(run, 'completed');
     if (res.stats.failed > 0 || res.globalErrors.length) process.exitCode = 1;
   });
@@ -339,16 +360,22 @@ program
   .option('--page <route>', 'only this page (route or name)')
   .option('--category <category>', 'only run tests of this category: functional | visual | responsive')
   .option('--feature <feature>', 'only run tests of this feature tag, e.g. auth')
+  .option(
+    '--critical',
+    'smoke mode: only the critical flows (generated when missing), their tests and results',
+  )
   .option('--changed', 'only new or changed pages (see `ai-qa-agent changes`)')
   .option('--design', 'with --changed: also inspect Figma for new/changed frames (uses Figma MCP calls)')
   .option('--resume', 'continue the last unfinished run')
   .option('--refresh', 'ignore caches and re-analyze code and design')
   .action(async (o: Scope & { changed?: boolean; design?: boolean; resume?: boolean; refresh?: boolean }) => {
+    if (o.critical && o.changed) throw new Error('--critical cannot be combined with --changed');
     const ctx = await createContext(root());
     // Bugs are never filed here: the dashboard's Create task / Create issue button is the only way.
     const res = await runPipeline(ctx, {
       page: o.page,
       filter: scopeToFilter(o),
+      critical: o.critical,
       changed: o.changed,
       design: o.design,
       resume: o.resume,

@@ -12,9 +12,11 @@ import { logger } from '../core/logger.js';
 import { rel, runDir } from '../core/paths.js';
 import { extractDesign } from '../design/figma.js';
 import { generateTests } from '../generate/playwright.js';
+import { generateCriticalTests } from '../generate/scenario-test.js';
 import { writeReport } from '../report/report.js';
 import { TestRunResultSchema, type TestRunResult } from '../runner/results.js';
 import { runTests, type TestFilter } from '../runner/run.js';
+import { criticalTestFilter, generateCriticalScenarios } from '../scenarios/critical.js';
 import { generateScenarios, loadDesign, pageSlug } from '../scenarios/generate.js';
 import type { RunRecord, Stage } from '../state/state.js';
 import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
@@ -32,6 +34,8 @@ export interface RunOptions {
   changed?: boolean;
   /** Inspect Figma for changes as part of `changed` (costs Figma MCP calls). */
   design?: boolean;
+  /** Smoke mode: only the critical flows, their tests and their results (no design extraction). */
+  critical?: boolean;
 }
 
 export interface PipelineResult {
@@ -85,7 +89,9 @@ export async function runPipeline(ctx: QaContext, opts: RunOptions): Promise<Pip
   if (opts.page) scope.page = opts.page;
   if (pages) scope.pages = pages.join(',');
   if (opts.filter.tags) scope.tags = opts.filter.tags.join(',');
+  if (opts.critical) scope.critical = 'true';
   const run = resumable ?? ctx.state.startRun(scope);
+  const critical = run.scope.critical === 'true';
   if (resumable) {
     log.info(`Resuming run ${run.id} (completed: ${run.completedStages.join(', ') || 'none'})`);
     if (run.scope.pages) pages = run.scope.pages.split(',');
@@ -109,12 +115,19 @@ export async function runPipeline(ctx: QaContext, opts: RunOptions): Promise<Pip
 
   try {
     await stage('analyze', () => analyzeApp(ctx, { force: opts.refresh, routes: pages }));
-    await stage('design', () => extractDesign(ctx, { force: opts.refresh || designChanged }));
-    await stage('scenarios', () => generateScenarios(ctx, { page: opts.page, pages }));
-    await stage('generate', () => generateTests(ctx, { page: opts.page, pages }));
+    // Critical flows are functional journeys: they need no Figma design.
+    if (!critical) await stage('design', () => extractDesign(ctx, { force: opts.refresh || designChanged }));
+    await stage('scenarios', () =>
+      critical ? generateCriticalScenarios(ctx) : generateScenarios(ctx, { page: opts.page, pages }),
+    );
+    await stage('generate', () =>
+      critical
+        ? generateCriticalTests(ctx, { page: opts.page })
+        : generateTests(ctx, { page: opts.page, pages }),
+    );
     const test = await stage(
       'test',
-      () => runTests(ctx, run.id, filter),
+      () => runTests(ctx, run.id, critical ? criticalTestFilter(ctx, filter) : filter),
       () => readJson(path.join(dir, 'results.json'), TestRunResultSchema),
     );
     const triage = await stage(

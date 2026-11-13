@@ -136,6 +136,9 @@
   .chip-todo {
     @apply bg-flaky-soft text-flaky;
   }
+  .chip-critical {
+    @apply bg-ink text-surface;
+  }
   .pill {
     @apply inline-block rounded-full px-2.5 py-[3px] text-xs font-bold;
   }

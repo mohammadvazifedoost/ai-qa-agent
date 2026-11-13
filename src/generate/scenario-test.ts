@@ -9,8 +9,13 @@ import { rel } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
 import { ensureApp } from '../runner/server.js';
 import { normalizeId, playwrightValidator, type SpecValidator } from '../scenarios/manage.js';
-import { loadAllScenarios, scenarioFilePath } from '../scenarios/generate.js';
-import { isPersonScenario, ScenarioFileSchema, type Scenario } from '../scenarios/schema.js';
+import { loadAllScenarios, scenarioFilePath, selectPages } from '../scenarios/generate.js';
+import {
+  isCriticalScenario,
+  isPersonScenario,
+  ScenarioFileSchema,
+  type Scenario,
+} from '../scenarios/schema.js';
 import { listTestIds, upsertTestBlock } from '../scenarios/spec-edit.js';
 import {
   BROWSER_TOOLS,
@@ -191,4 +196,50 @@ export async function writeScenarioTest(
   ctx.state.save();
   log.info(`${action === 'added' ? 'Added' : 'Rewrote'} the test for ${id} in ${rel(ctx.root, file)}`);
   return { id, page: page.route, file: rel(ctx.root, file), action };
+}
+
+/**
+ * Write the tests of the approved critical flows only (`generate --critical`). A page without a spec
+ * gets one holding just its critical tests (a later full `generate` adds the rest); on a page with a
+ * spec, each missing or outdated critical test is spliced in, leaving the other tests untouched.
+ * Returns the absolute paths of the spec files written.
+ */
+export async function generateCriticalTests(
+  ctx: QaContext,
+  scope: { page?: string; force?: boolean } = {},
+): Promise<string[]> {
+  const app = loadAppModel(ctx);
+  if (!app) throw new Error('No .qa/app-model.json. Run `ai-qa-agent analyze` first.');
+  const pages = selectPages(app.pages, scope.page).filter((p) =>
+    approvedOn(ctx, p.route).some(isCriticalScenario),
+  );
+  if (pages.length === 0) {
+    log.warn('No approved critical flows; run `ai-qa-agent scenarios --critical`');
+    return [];
+  }
+  const fresh = pages.filter((p) => !fs.existsSync(specPath(ctx, p.route)));
+  const written = fresh.length
+    ? await generateTests(ctx, { pages: fresh.map((p) => p.route), force: true, only: isCriticalScenario })
+    : [];
+
+  const states = scenarioTestStates(ctx);
+  const todo = pages
+    .filter((p) => !fresh.includes(p))
+    .flatMap((p) => approvedOn(ctx, p.route).filter(isCriticalScenario))
+    .filter((s) => scope.force || states[s.id]);
+  if (todo.length === 0) {
+    if (written.length === 0) log.info('Critical flow tests are up to date');
+    return written;
+  }
+  // Start the app once for every test instead of once per test.
+  const server = await ensureApp(ctx.root, ctx.config, path.join(ctx.paths.logsDir, 'app-server.log'));
+  try {
+    for (const s of todo) {
+      const res = await writeScenarioTest(ctx, s.id, { startApp: false });
+      written.push(path.resolve(ctx.root, res.file));
+    }
+  } finally {
+    server.stop();
+  }
+  return [...new Set(written)];
 }

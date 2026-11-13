@@ -34,7 +34,7 @@ async function pollJob(): Promise<void> {
     // After a cancel or failure nothing changed, so the current run stays.
     await load(
       j.status === 'done'
-        ? j.kind === 'run-all'
+        ? j.kind === 'run-all' || j.kind === 'run-critical'
           ? j.runId
           : (j.runId ?? state.data.run?.id)
         : state.data.run?.id,

@@ -24,6 +24,9 @@ export const typeChip = (sc: ScenarioView): string =>
   '</span>' +
   (sc.origin === 'person'
     ? ' <span class="chip chip-person" title="Written or edited by a person; the AI will not change or remove it">yours</span>'
+    : '') +
+  (sc.critical
+    ? ' <span class="chip chip-critical" title="Critical flow: a core journey in the smoke tests (ai-qa-agent test --critical)">critical</span>'
     : '');
 
 const TEST_STATE = { missing: 'no test yet', outdated: 'test out of date' } as const;
@@ -98,6 +101,9 @@ function toolbar(notRunWithTest: number, failed: number): string {
   const { data } = state;
   const busy = data.job?.status === 'running';
   const dis = busy ? ' disabled title="' + esc(data.job!.label) + '…"' : '';
+  const critical = data.scenarios.filter(
+    (sc) => sc.critical && sc.approved && data.testStates[sc.id] !== 'missing',
+  ).length;
   return (
     '<div class="flex flex-wrap items-center gap-2">' +
     '<button class="btn-quiet" ' +
@@ -126,6 +132,15 @@ function toolbar(notRunWithTest: number, failed: number): string {
     ' ' +
     act('start-job', { url: '/api/runs/all' }) +
     ' title="Start a new run with every test, like ai-qa-agent test">Run all tests</button>' +
+    (critical
+      ? '<button id="run-critical" class="btn btn-ghost" aria-label="Run critical flows"' +
+        dis +
+        ' ' +
+        act('start-job', { url: '/api/runs/critical' }) +
+        ' title="Start a new run with only the critical flows, like ai-qa-agent test --critical">Run critical flows (' +
+        critical +
+        ')</button>'
+      : '') +
     planButtons(busy) +
     addButton() +
     '</div>'
