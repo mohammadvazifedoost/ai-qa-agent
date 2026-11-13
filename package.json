@@ -1,10 +1,36 @@
 {
-  "name": "@company/ai-qa-agent",
+  "name": "@mohammadvazifedoost/ai-qa-agent",
   "version": "0.1.0",
-  "description": "AI QA Agent: Figma + source analysis, scenario and Playwright test generation, failure triage and ClickUp bug reports.",
+  "description": "AI QA agent for web apps: Figma + source analysis, Playwright test generation, failure triage, and ClickUp/Jira bug reports.",
+  "keywords": [
+    "qa",
+    "testing",
+    "playwright",
+    "e2e",
+    "ai",
+    "figma",
+    "accessibility",
+    "visual-testing",
+    "clickup",
+    "jira",
+    "claude-code",
+    "codex",
+    "opencode"
+  ],
+  "author": "mohammadvazifedoost",
+  "license": "MIT",
+  "homepage": "https://github.com/mohammadvazifedoost/ai-qa-agent#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohammadvazifedoost/ai-qa-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mohammadvazifedoost/ai-qa-agent/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
-  "license": "UNLICENSED",
-  "private": true,
   "bin": {
     "ai-qa-agent": "dist/cli.js"
   },
@@ -20,13 +46,14 @@
   },
   "files": [
     "dist",
-    "templates"
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22.12"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node -e \"require('fs').copyFileSync('src/ui/index.html','dist/ui/index.html')\" && tailwindcss -i src/ui/tailwind.css -o dist/ui/styles.css --minify",
+    "prepare": "npm run build",
     "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",

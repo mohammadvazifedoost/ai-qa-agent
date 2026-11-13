@@ -34,7 +34,7 @@ export const BROWSER_TOOLS = [
 
 export const HELPER_API = `
 Import ONLY from the helper package (it re-exports Playwright's test/expect with QA fixtures):
-  import { test, expect, type Page, type Locator } from '@company/ai-qa-agent/playwright';
+  import { test, expect, type Page, type Locator } from '@mohammadvazifedoost/ai-qa-agent/playwright';
 Never import from '@playwright/test' directly (not even types).
 
 Fixtures available in every test: { page, qa } (plus all standard Playwright fixtures).

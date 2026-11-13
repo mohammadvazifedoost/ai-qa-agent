@@ -1,4 +1,4 @@
-import { defineConfig } from '@company/ai-qa-agent';
+import { defineConfig } from '@mohammadvazifedoost/ai-qa-agent';
 
 export default defineConfig({
   project: {

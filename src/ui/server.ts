@@ -663,7 +663,7 @@ function serveAsset(urlPath: string, res: http.ServerResponse): void {
   if (!allowed || !fs.existsSync(file)) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end(
-      urlPath === '/' ? 'Dashboard not built: run `npm run build` in @company/ai-qa-agent' : 'Not found',
+      urlPath === '/' ? 'Dashboard not built: run `npm run build` in @mohammadvazifedoost/ai-qa-agent' : 'Not found',
     );
     return;
   }
@@ -736,7 +736,7 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         const css = new URL('./styles.css', import.meta.url);
         if (!fs.existsSync(css)) {
           res.writeHead(404);
-          res.end('/* styles.css missing: run `npm run build` in @company/ai-qa-agent */');
+          res.end('/* styles.css missing: run `npm run build` in @mohammadvazifedoost/ai-qa-agent */');
         } else {
           res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': 'no-cache' });
           fs.createReadStream(css).pipe(res);

@@ -62,7 +62,7 @@ leaves results.json untouched; `writeBugFixPlan` with an aborted AI call writes 
 
 - New scenario category `accessibility` (added to `CATEGORIES`, the scenario generator prompt,
   the add/edit form, the type chip colours, and the "By test type" bars).
-- New helper `qa.expectAccessible(options?)` in `@company/ai-qa-agent/playwright`: runs
+- New helper `qa.expectAccessible(options?)` in `@mohammadvazifedoost/ai-qa-agent/playwright`: runs
   `axe-core` in the page with the WCAG 2.0/2.1 A and AA rule tags, fails the test when there are
   `serious` or `critical` violations, and attaches every violation (all impacts) as a JSON
   attachment and a readable test annotation (rule, impact, help text, target selectors). Options:

@@ -39,7 +39,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the module map. Rules of thumb:
 
 `fixtures/demo-shop` is a small Vite + React app with planted defects, documented in
 `fixtures/README.md` (kept outside the app so the agent cannot read the answers). The fixture is
-linked to the engine via `"@company/ai-qa-agent": "file:../.."`.
+linked to the engine via `"@mohammadvazifedoost/ai-qa-agent": "file:../.."`.
 
 ```bash
 npm run build

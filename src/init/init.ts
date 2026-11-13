@@ -30,7 +30,7 @@ export function renderConfig(info: ProjectInfo, opts: InitOptions): string {
   const baseUrl = opts.baseUrl ?? `http://${info.devHost ?? 'localhost'}:${info.devPort ?? 3000}`;
   const include = info.sourceDirs.length ? info.sourceDirs : ['.'];
   const lines: string[] = [];
-  lines.push(`import { defineConfig } from '@company/ai-qa-agent';`, '');
+  lines.push(`import { defineConfig } from '@mohammadvazifedoost/ai-qa-agent';`, '');
   lines.push(`export default defineConfig({`);
   lines.push(`  project: {`);
   lines.push(`    name: ${JSON.stringify(info.name)},`);
