@@ -1,8 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { BASE_SYSTEM, projectRules } from '../ai/context.js';
-import { loadAppModel, type AppModelFile, type PageModel } from '../analyze/app.js';
+import { projectRules, systemPrompt } from '../ai/context.js';
+import { EXPECTATION_RULES, LOW_VALUE_RULES, PRIORITY_RUBRIC, STEP_RULES } from '../ai/prompts.js';
+import {
+  rankedFlows,
+  requireAppModel,
+  type AppModelFile,
+  type Flow,
+  type PageModel,
+} from '../analyze/app.js';
 import { listFiles, readJson, sha256, slugify, writeJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import type { DesignSystemFile } from '../design/schema.js';
@@ -15,6 +22,7 @@ import {
   type RemovedScenario,
   type Scenario,
   type ScenarioFile,
+  withKnownRoutes,
 } from './schema.js';
 
 const log = logger('scenarios');
@@ -61,6 +69,11 @@ function designForPage(design: DesignSystemFile | undefined, route: string): unk
   };
 }
 
+/** The journeys that go through a page, most important first. */
+export function flowsThrough(app: Pick<AppModelFile, 'flows'>, route: string): Flow[] {
+  return rankedFlows(app).filter((f) => f.routes.includes(route));
+}
+
 function inputHashFor(
   ctx: QaContext,
   app: AppModelFile,
@@ -71,6 +84,7 @@ function inputHashFor(
     JSON.stringify({
       page: app.pageHashes[page.route],
       model: page,
+      flows: flowsThrough(app, page.route),
       design: designForPage(design, page.route),
       viewports: ctx.config.viewports,
       rules: projectRules(ctx),
@@ -88,8 +102,7 @@ export interface ScenarioScope {
 }
 
 export async function generateScenarios(ctx: QaContext, scope: ScenarioScope = {}): Promise<Scenario[]> {
-  const app = loadAppModel(ctx);
-  if (!app) throw new Error('No .qa/app-model.json yet. Run `ai-qa-agent analyze` first.');
+  const app = requireAppModel(ctx);
   const design = loadDesign(ctx);
   const pages = selectPages(app.pages, scope.page).filter(
     (p) => !scope.pages || scope.pages.includes(p.route),
@@ -225,18 +238,31 @@ async function generateForPage(
   // Critical flows belong to `scenarios --critical`: page regeneration keeps them as they are.
   const critical = existing?.scenarios.filter((s) => isCriticalScenario(s) && !isPersonScenario(s)) ?? [];
   const aiExisting = existing?.scenarios.filter((s) => !isPersonScenario(s) && !isCriticalScenario(s)) ?? [];
-  const flows = app.flows.filter((f) => f.routes.includes(page.route));
+  const flows = flowsThrough(app, page.route);
+  const otherPages = app.pages
+    .filter((p) => p.route !== page.route)
+    .map((p) => ({ route: p.route, name: p.name, purpose: p.purpose, preconditions: p.preconditions }));
   const res = await ctx.ai.run({
     name: `scenarios-${pageSlug(page.route)}`,
     cwd: ctx.root,
-    system: BASE_SYSTEM,
-    prompt: `Design end-to-end test scenarios for the page ${page.route} ("${page.name}").
+    system: systemPrompt('scenario-designer'),
+    prompt: `## Task
+Design the end-to-end test scenarios for the page ${page.route} ("${page.name}"). The whole application has already been analyzed; the model below is your source. Read source files only to confirm a detail the model leaves open.
 
-## Page model (from source analysis)
+## Application
+${app.summary}
+
+Authentication: ${app.auth ?? 'none'}
+State: ${app.stateManagement}
+
+## Page model (from the application analysis)
 ${JSON.stringify(page, null, 2)}
 
-## User flows touching this page
+## Journeys through this page (ranked by the application analysis, most important first)
 ${JSON.stringify(flows, null, 2)}
+
+## Other pages (for steps that start or continue elsewhere)
+${JSON.stringify(otherPages, null, 2)}
 
 ## Test data found in code
 ${JSON.stringify(app.testData)}
@@ -247,15 +273,40 @@ ${JSON.stringify(designForPage(design, page.route), null, 2)}
 ## Viewports available
 ${JSON.stringify(ctx.config.viewports)}
 
-${aiExisting.length ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)\n${JSON.stringify(aiExisting, null, 2)}\n` : ''}${personSection(person)}${criticalSection(critical)}${removedSection(existing?.removed ?? [])}
-## Instructions
-- Produce ${max ? `at most ${max} high-value scenarios` : 'as many high-value scenarios as the page needs for full coverage'} for this page across categories: functional, visual, responsive, accessibility. Quality over quantity: no trivial duplicates.
-- functional: happy paths, validation, empty/error/loading states, navigation, and business rules (calculations!).
-- visual: compare against Figma. Use design.tokens with EXACT values from the Figma data above (e.g. a primary button's backgroundColor/borderRadius/height). Only reference a Figma screen in design.screen if it has hasReferenceImage=true. If no Figma data exists, do not create visual scenarios.
-- responsive: behaviour at tablet/mobile viewports (navigation collapse, no horizontal overflow, stacking), based on the design's mobile screens when available and general usability expectations.
+${
+  aiExisting.length
+    ? `## Existing scenarios (keep ids stable for scenarios that still apply; keep "approved" values)
+${JSON.stringify(aiExisting, null, 2)}
+`
+    : ''
+}${personSection(person)}${criticalSection(critical)}${removedSection(existing?.removed ?? [])}
+## Procedure
+1. List what a user can do on this page and what the page must get right: its part in each journey above, its forms, its business rules and calculations, and the states (empty, error, loading) a user really reaches.
+2. Rank every candidate with the priority scale below, and discard the ones the value rules exclude.
+3. Cover first, in this order: this page's part in every critical and important journey; every business rule and calculation, with values worked out from the test data; each form's successful submission and its most important validation failures; then the remaining states and navigation.
+4. Add visual, responsive and accessibility scenarios only as described under Categories.
+5. Write each scenario following the step and expectation rules.
+6. Review the set before answering: every scenario has an action and an outcome that proves something; no two scenarios would fail for the same defect; nothing important in step 1 is left without a scenario.
+
+## How many
+${max ? `Return at most ${max} high-value scenarios: the ${max} that matter most by the priority scale.` : 'Return what the page really needs and no more. Each scenario must earn its place; a simple page may need only two or three, a page with forms and calculations more.'}
+
+## Priority
+${PRIORITY_RUBRIC}
+
+## Value
+${LOW_VALUE_RULES}
+
+## Categories
+- functional: journeys, business rules, form submission and validation, states, navigation. This is where most of the value is.
+- visual: only when Figma data exists. Compare against Figma with design.tokens holding EXACT values from the Figma data above (e.g. a primary button's backgroundColor / borderRadius / height). Set design.screen only to a screen with hasReferenceImage=true. One scenario per designed state, not one per element.
+- responsive: behaviour that changes at tablet/mobile viewports according to the page model or the design (navigation collapse, stacking, no horizontal overflow). Skip it when nothing on the page changes with the viewport.
 - accessibility: one or two per page, checking WCAG 2.1 A/AA with an automated audit in the states that matter (the page loaded, a form showing its validation errors, an open dialog or menu). Steps reach the state; expected results name what must be accessible (labels, alt text, contrast, headings, keyboard-reachable controls).
-- EXPECTED RESULTS MUST DESCRIBE CORRECT, INTENDED BEHAVIOUR — derived from the design, the UI copy and standard product conventions — NOT whatever the code happens to do. The page model flags suspicious logic; if code looks wrong (e.g. a discount shown but not subtracted from the total), the expected result must state the correct behaviour so the test can catch the bug.
-- Steps must be concrete and use visible text / accessible names from the page model, and include the preconditions needed (e.g. add products on / first, since the cart is in-memory).
+
+## Writing rules
+${STEP_RULES}
+${EXPECTATION_RULES}
+- "rationale" names the functionality the scenario protects and what users lose if it breaks.
 - ids: "${prefix}-001", "${prefix}-002", ... (reuse existing ids when updating).
 - source.figma = the expectation comes from Figma data; source.code = derived from reading code.
 - Set approved: true for new scenarios.${projectRules(ctx)}`,
@@ -267,7 +318,10 @@ ${aiExisting.length ? `## Existing scenarios (keep ids stable for scenarios that
   const fromAi = res.output.scenarios.map(
     ({ origin: _o, editedAt: _e, critical: _c, ...s }: Scenario): Scenario => s,
   );
-  const ai = dropRemoved(fromAi, existing?.removed ?? []).map((s) => {
+  const known = app.pages.map((p) => p.route);
+  const ai = dropRemoved(fromAi, existing?.removed ?? []).map((raw) => {
+    // A scenario belongs to the page it was designed for, whatever the AI wrote.
+    const s = withKnownRoutes({ ...raw, page: page.route }, known);
     if (!viewports.includes(s.viewport)) {
       log.warn(`Scenario ${s.id} uses unknown viewport "${s.viewport}", using "${viewports[0]}"`);
       return { ...s, viewport: viewports[0]! };

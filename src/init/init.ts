@@ -4,6 +4,7 @@ import { detectProject, type ProjectInfo } from '../discovery/detect.js';
 import { ensureDir, writeJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import { qaPaths } from '../core/paths.js';
+import { detectProductionCommands } from '../runner/production.js';
 
 const log = logger('init');
 
@@ -39,7 +40,26 @@ export function renderConfig(info: ProjectInfo, opts: InitOptions): string {
   lines.push(`  },`);
   lines.push(`  app: {`);
   lines.push(`    baseUrl: ${JSON.stringify(baseUrl)},`);
-  if (info.devCommand) lines.push(`    startCommand: ${JSON.stringify(info.devCommand)},`);
+  const prod = detectProductionCommands(info);
+  if (prod.startCommand && prod.buildCommand) {
+    lines.push(
+      `    // Tests run against a production build: "${prod.buildCommand}", then "${prod.startCommand}" on a free port.`,
+      `    // Override with production: { buildCommand, startCommand, baseUrl } when your project needs something else.`,
+    );
+  } else {
+    lines.push(
+      `    // Tests run against a production build, but it could not be worked out for this project:`,
+      `    // ${prod.startCommand ? 'package.json has no "build" script' : prod.reason}.`,
+      `    // Fill this in ({port} and {host} are replaced; PORT and HOST are also set):`,
+      `    // production: { buildCommand: ${JSON.stringify(prod.buildCommand ?? 'npm run build')}, startCommand: 'npx serve -s dist -l {port}' },`,
+    );
+  }
+  if (info.devCommand) {
+    lines.push(
+      `    // The dev server. It is only used when you set mode: 'development' (results are then not production-validated).`,
+      `    startCommand: ${JSON.stringify(info.devCommand)},`,
+    );
+  }
   lines.push(`  },`);
   lines.push(`  source: {`);
   lines.push(`    include: ${JSON.stringify(include)},`);

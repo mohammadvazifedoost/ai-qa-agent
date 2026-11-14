@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import type { ToolCallRecord } from '../ai/claude.js';
-import { BASE_SYSTEM, figmaFileKey, projectInfoJson, projectRules } from '../ai/context.js';
+import { figmaFileKey, projectInfoJson, projectRules, systemPrompt } from '../ai/context.js';
 import { ensureDir, sha256, slugify, writeJson } from '../core/fs.js';
 import { pageStructureHashes } from '../changes/detect.js';
 import { logger } from '../core/logger.js';
@@ -33,7 +33,8 @@ function buildPrompt(ctx: QaContext, fileKey: string): string {
   const pinned = figma.frames.length
     ? `The project pins these frames (use them as screens with the given route/viewport):\n${JSON.stringify(figma.frames, null, 2)}`
     : 'No frames are pinned; discover the screens yourself.';
-  return `Extract the design system and screen inventory from this Figma file.
+  return `## Task
+Extract the design system and screen inventory from this Figma file, exactly as the file defines them. The values you return are compared with the running app, so a wrong value becomes a false bug report.
 
 Figma file key: ${fileKey}
 File URL: ${figma.fileUrl}
@@ -46,7 +47,7 @@ ${projectInfoJson(ctx)}
 
 ${pinned}
 
-Procedure:
+## Procedure
 1. Call get_metadata WITHOUT a nodeId to list pages. Then call get_metadata for each page id to see frames, components and their sizes.
 2. Identify top-level SCREEN frames (full pages) and COMPONENTS / COMPONENT SETS.
 3. Call get_variable_defs on each screen and component to collect the variables (colors, spacing, radius, sizes) actually used.
@@ -54,7 +55,7 @@ Procedure:
 5. REQUIRED: for EVERY screen frame call get_screenshot with maxDimension equal to max(width, height) of that frame, so the image is rendered at 1x. Use the default response (no base64) — the tool host downloads the image. Only set enableBase64Response when you need to look at a screen to describe its key elements.
 6. Map each screen to an app route when the name or content makes it clear (certainty "inferred"), otherwise route null / certainty "unknown". Map its width to the closest configured viewport.
 
-Output rules:
+## Output rules
 - Values must come from Figma data. Colors as uppercase hex (#RRGGBB), sizes in px, font weights as numbers.
 - certainty "observed" = read directly from variables/styles/node properties; "inferred" = derived; never invent tokens.
 - Components: list variants and, per variant, CSS-like properties (backgroundColor, color, borderRadius, height, paddingLeft, fontSize, fontWeight, borderColor...).
@@ -145,7 +146,7 @@ export async function extractDesign(
   const res = await ctx.ai.run({
     name: 'design-extract',
     cwd: ctx.root,
-    system: BASE_SYSTEM,
+    system: systemPrompt('design-analyst'),
     prompt: buildPrompt(ctx, fileKey),
     schema: DesignSystemSchema,
     tools: ['Read'],
@@ -215,7 +216,7 @@ async function fetchMissingReferences(
   const res = await ctx.ai.run({
     name: 'design-refs',
     cwd: ctx.root,
-    system: BASE_SYSTEM,
+    system: systemPrompt('design-analyst'),
     prompt: `For each node below, call ${ctx.ai.toolRef('figma', 'get_screenshot')} exactly once with fileKey "${fileKey}", the nodeId, and maxDimension set to the given value. Use the default response (no base64). Do not call any other tool. Report which node ids returned an image.
 
 ${missing.map((s) => `- nodeId ${s.nodeId} ("${s.name}"), maxDimension ${Math.max(s.width, s.height)}`).join('\n')}`,

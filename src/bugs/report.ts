@@ -3,10 +3,13 @@ import path from 'node:path';
 import fs from 'node:fs';
 import type { QaContext } from '../pipeline/context.js';
 import type { TestOutcome, TestRunResult } from '../runner/results.js';
+import { describeTarget, type AppTarget } from '../runner/server.js';
 import type { Issue } from '../triage/schema.js';
 
 export interface BugEnvironment {
   baseUrl: string;
+  /** What the failing tests ran against (production build or dev server), when the run recorded it. */
+  testedAgainst?: string;
   browsers: string[];
   os: string;
   node: string;
@@ -14,9 +17,10 @@ export interface BugEnvironment {
   runId: string;
 }
 
-export function environment(ctx: QaContext, runId: string): BugEnvironment {
+export function environment(ctx: QaContext, runId: string, target?: AppTarget): BugEnvironment {
   return {
     baseUrl: ctx.config.app.baseUrl,
+    testedAgainst: target ? describeTarget(target) : undefined,
     browsers: ctx.config.browsers,
     os: `${os.type()} ${os.release()}`,
     node: process.version,
@@ -90,6 +94,7 @@ export function renderBugMarkdown(issue: Issue, env: BugEnvironment, evidence: E
     '',
     '## Environment',
     `- App URL: ${env.baseUrl}`,
+    ...(env.testedAgainst ? [`- Tested against: ${env.testedAgainst}`] : []),
     `- Browser / viewport: ${[...new Set(evidence.map((e) => e.project))].join(', ') || env.browsers.join(', ')}`,
     `- OS: ${env.os}, Node ${env.node}`,
     `- Commit: ${env.commit ?? 'unknown'}`,

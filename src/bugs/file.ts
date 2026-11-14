@@ -115,7 +115,7 @@ export async function fileIssues(
 ): Promise<FilingResult[]> {
   const tracker = createTracker(ctx.config, process.env, opts.fetchImpl);
   log.info(`Filing ${issues.length} defect(s) into ${tracker.name} ${await tracker.describeTarget()}`);
-  const env = environment(ctx, run.runId);
+  const env = environment(ctx, run.runId, run.app);
   const results: FilingResult[] = [];
   backfillBugRecords(ctx);
   for (const issue of issues) {

@@ -17,6 +17,11 @@ export const ScenarioSchema = z.object({
   steps: z.array(z.string()).min(1),
   expectedResults: z.array(z.string()).min(1),
   viewport: z.string().describe('Name of a configured viewport'),
+  /**
+   * Every route the scenario visits, in order, starting with `page`. Stored only for scenarios that
+   * cross pages; the test author and the triager get the page model of each route.
+   */
+  routes: z.array(z.string()).optional(),
   source: z.object({ figma: z.boolean(), code: z.boolean() }),
   testData: z.array(z.string()),
   /** For visual/design checks: which Figma screen and which exact token values to assert. */
@@ -51,7 +56,35 @@ export type Scenario = z.infer<typeof ScenarioSchema>;
  * What the AI returns: it cannot claim a scenario was written by a person, and only the critical
  * flows generation marks scenarios critical.
  */
-export const AiScenarioSchema = ScenarioSchema.omit({ origin: true, editedAt: true, critical: true });
+export const AiScenarioSchema = ScenarioSchema.omit({ origin: true, editedAt: true, critical: true }).extend({
+  routes: z
+    .array(z.string())
+    .default([])
+    .describe('Every route the scenario visits, in order, starting with its page'),
+  rationale: z
+    .string()
+    .describe(
+      'The functionality this scenario protects and what users lose if it breaks (one or two sentences)',
+    ),
+});
+
+/** The routes whose page models a scenario needs: its own page first, then the others it visits. */
+export function scenarioRoutes(s: Pick<Scenario, 'page' | 'routes'>): string[] {
+  return [...new Set([s.page, ...(s.routes ?? [])])];
+}
+
+/**
+ * Keep `routes` only when the scenario really crosses pages, and only routes the app has. A
+ * single-page scenario stores nothing, so scenarios written before the field existed stay unchanged.
+ */
+export function withKnownRoutes<T extends Pick<Scenario, 'page' | 'routes'>>(
+  s: T,
+  known: readonly string[],
+): T {
+  const routes = scenarioRoutes(s).filter((r) => r === s.page || known.includes(r));
+  const { routes: _r, ...rest } = s;
+  return (routes.length > 1 ? { ...rest, routes } : rest) as T;
+}
 
 export const isPersonScenario = (s: Pick<Scenario, 'origin'>): boolean => s.origin === 'person';
 

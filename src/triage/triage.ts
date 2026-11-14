@@ -1,14 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { BASE_SYSTEM, projectRules } from '../ai/context.js';
+import { projectRules, systemPrompt } from '../ai/context.js';
 import { loadAppModel } from '../analyze/app.js';
 import { sha256, writeJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import { rel } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
 import type { TestOutcome, TestRunResult } from '../runner/results.js';
+import { describeTarget } from '../runner/server.js';
 import { loadAllScenarios } from '../scenarios/generate.js';
+import { scenarioRoutes, type Scenario } from '../scenarios/schema.js';
 import { classifyByRules } from './rules.js';
 import {
   AiVerdictSchema,
@@ -33,20 +35,28 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out;
 }
 
-const TRIAGE_SYSTEM = `${BASE_SYSTEM}
+const TRIAGE_SYSTEM = `${systemPrompt('failure-triager')}
 
-You are triaging a failed end-to-end test. Classify the ROOT CAUSE of the failure:
+Classify the ROOT CAUSE of the failure:
 - PRODUCT_BUG: the application behaves incorrectly (wrong result, broken interaction, broken responsive layout, missing feedback). The test's expectation is legitimate.
 - DESIGN_MISMATCH: the application works but its visual appearance deviates from the Figma design beyond normal rendering noise (wrong color, radius, size, typography, missing/extra UI element compared to the design).
-- TEST_BUG: the test is wrong: bad locator, wrong assumption about the page, expectation not supported by the design or product conventions, timing problem in the test, measuring the wrong element.
-- ENVIRONMENT_FAILURE: app not reachable, dev server error, missing test data or configuration.
+- TEST_BUG: the test is wrong: bad locator, wrong assumption about the page, expectation not supported by the scenario, the design or product conventions, timing problem in the test, measuring the wrong element.
+- ENVIRONMENT_FAILURE: app not reachable, server error on start, missing test data or configuration.
 - INFRASTRUCTURE_FAILURE: browser/runner crashed, resource exhaustion.
 - UNKNOWN: evidence is insufficient to decide.
-Judge the expectation itself too: an expectation that only restates an arbitrary guess (e.g. an exact pixel width that the design does not define) makes it a TEST_BUG, not a product bug.
-Anti-aliasing, font hinting and sub-pixel differences are acceptable rendering differences, not design mismatches.
-Be conservative: only PRODUCT_BUG / DESIGN_MISMATCH with evidence you actually inspected. Do not exaggerate severity.`;
 
-function scenarioFor(ctx: QaContext, id: string | null): unknown {
+How to decide between PRODUCT_BUG and TEST_BUG:
+- First establish that the test did what the scenario says: every earlier step really happened on the page (check the snapshot and screenshot), and the failing locator points at the element the scenario means. A step that silently did nothing, or a locator that matches another element, is a TEST_BUG even when the assertion looks like a product failure.
+- Then judge the expectation. It is legitimate when it follows from the scenario and from what the UI promises. An expectation that only restates an arbitrary guess (an exact pixel width the design does not define, a text or URL that neither the scenario nor the app contains) is a TEST_BUG.
+- Behaviour the app does not implement at all (a button without a handler, no confirmation after submitting) is a PRODUCT_BUG when the control exists and promises that behaviour, and the test asserted it in a generic way. It is a TEST_BUG when the test demands a specific text, route or element that nothing defines.
+- Then find the cause in the application source. A PRODUCT_BUG names the file and line that produce the wrong behaviour, or says "unknown" when the code does not show it.
+
+Other rules:
+- Anti-aliasing, font hinting and sub-pixel differences are acceptable rendering differences, not design mismatches.
+- Be conservative: PRODUCT_BUG / DESIGN_MISMATCH only with evidence you actually inspected. Confidence reflects that evidence: below 0.7 when you could not confirm the cause in the code or on the page.
+- Severity follows what users lose, not how the failure looks. A failed critical flow (the scenario has "critical": true) that is a product bug is at least high.`;
+
+function scenarioFor(ctx: QaContext, id: string | null): Scenario | null {
   if (!id) return null;
   return loadAllScenarios(ctx).find((s) => s.id === id) ?? null;
 }
@@ -63,17 +73,30 @@ function designExcerpt(ctx: QaContext): unknown {
   };
 }
 
-function buildPrompt(ctx: QaContext, o: TestOutcome): string {
-  const scenario = scenarioFor(ctx, o.scenarioId) as { page?: string } | null;
-  const page = loadAppModel(ctx)?.pages.find((p) => p.route === scenario?.page);
+/** A design check, or a failure the design helpers reported: only then is the Figma data relevant. */
+function isDesignRelated(o: TestOutcome, scenario: Scenario | null): boolean {
+  return (
+    scenario?.category === 'visual' ||
+    scenario?.category === 'responsive' ||
+    o.artifacts.design.length > 0 ||
+    o.annotations.some((x) => /design/i.test(x.type))
+  );
+}
+
+export function buildTriagePrompt(ctx: QaContext, o: TestOutcome, target?: string): string {
+  const scenario = scenarioFor(ctx, o.scenarioId);
+  // A scenario that crosses pages can fail on any of them: give the model of each.
+  const routes = scenario ? scenarioRoutes(scenario) : [];
+  const pages = (loadAppModel(ctx)?.pages ?? []).filter((p) => routes.includes(p.route));
   const a = o.artifacts;
-  return `Triage this failed Playwright test.
+  return `## Task
+Triage this failed Playwright test: find the root cause and classify it.
 
 ## Test
 - Title: ${o.title}
 - Project (browser-viewport): ${o.project}
 - Spec: ${o.file}:${o.line}
-- Attempts: ${o.attempts} (failed every time: ${o.status === 'failed'})
+- Attempts: ${o.attempts} (failed every time: ${o.status === 'failed'})${target ? `\n- Ran against: ${target}` : ''}
 
 ## Error
 ${o.error?.message ?? 'n/a'}
@@ -94,20 +117,27 @@ ${JSON.stringify(scenario, null, 2)}
 - Video: ${a.video ?? 'none'} (binary; not readable, referenced in the bug)
 - Trace: ${a.trace ?? 'none'} (binary; not readable, referenced in the bug)
 
-## Source analysis of the page (the app's source code is in this repository; read files to confirm)
-${JSON.stringify(page ?? null, null, 2)}
+## Application model of the page(s) the scenario visits (from the application analysis; the source code is in this repository, read files to confirm)
+${JSON.stringify(pages.length ? pages : null, null, 2)}
 
 ## Figma design data
-${JSON.stringify(designExcerpt(ctx))}
+${isDesignRelated(o, scenario) ? JSON.stringify(designExcerpt(ctx)) : '(not included: this failure is not a design check)'}
 
-## What to do
-1. Read the test code around ${o.file}:${o.line} to see exactly what it asserts.
-2. Look at the screenshot and the DOM snapshot to see the real state of the page.
-3. Read the relevant application source to find the cause.
-4. Decide the classification. For PRODUCT_BUG / DESIGN_MISMATCH fill "bug" (steps a human can follow, expected vs actual with concrete values, suspected root cause with file:line). For TEST_BUG explain the test problem in "testProblem".${projectRules(ctx)}`;
+## Procedure
+1. Read the whole test in ${o.file} (it starts near line ${o.line}) and the helpers it calls, to see what it did before the failure and exactly what it asserts.
+2. Look at the screenshot and the DOM snapshot to see the real state of the page at the failure, and at the console/network log for errors.
+3. Check that the test did what the scenario describes and that its locators point at the intended elements.
+4. Judge whether the failing expectation is legitimate.
+5. Read the relevant application source to find the cause.
+6. Classify. For PRODUCT_BUG / DESIGN_MISMATCH fill "bug": steps a human can follow, expected vs actual with concrete values, suspected root cause with file:line. For TEST_BUG explain in "testProblem" what is wrong in the test and how to fix it. List in "evidenceReviewed" only what you actually opened.${projectRules(ctx)}`;
 }
 
-async function triageOne(ctx: QaContext, o: TestOutcome, cost: { usd: number }): Promise<TriagedFailure> {
+async function triageOne(
+  ctx: QaContext,
+  o: TestOutcome,
+  cost: { usd: number },
+  target?: string,
+): Promise<TriagedFailure> {
   const base = {
     key: o.key,
     scenarioId: o.scenarioId,
@@ -132,7 +162,7 @@ async function triageOne(ctx: QaContext, o: TestOutcome, cost: { usd: number }):
     name: `triage-${o.key.replace(/[^A-Za-z0-9-]/g, '_')}`,
     cwd: ctx.root,
     system: TRIAGE_SYSTEM,
-    prompt: buildPrompt(ctx, o),
+    prompt: buildTriagePrompt(ctx, o, target),
     schema: AiVerdictSchema,
     tools: ['Read', 'Glob', 'Grep'],
     // Providers that cannot open images with a read tool get the final screenshot attached.
@@ -172,8 +202,9 @@ async function consolidate(
   const res = await ctx.ai.run({
     name: 'triage-consolidate',
     cwd: ctx.root,
-    system: BASE_SYSTEM,
-    prompt: `These failed tests were each diagnosed as a defect. Several may be symptoms of the SAME underlying defect (same root cause, e.g. one CSS rule, one wrong calculation). Group them so each underlying defect is reported exactly once.
+    system: systemPrompt('defect-consolidator'),
+    prompt: `## Task
+These failed tests were each diagnosed as a defect by a triager. Several may be symptoms of the SAME underlying defect (same root cause, e.g. one CSS rule, one wrong calculation). Group them so each underlying defect is reported exactly once.
 
 ${JSON.stringify(
   defects.map((d) => ({ key: d.key, classification: d.classification, summary: d.summary, bug: d.bug })),
@@ -181,9 +212,13 @@ ${JSON.stringify(
   2,
 )}
 
-Rules:
+## Procedure
+1. Compare the suspected root causes. For candidates to merge, open the files they name and confirm it is the same code that is wrong.
+2. Build the groups, then write one report per group.
+
+## Rules
 - Every key must appear in exactly one group.
-- Only merge when the root cause is the same. Different symptoms of one cause belong together (e.g. missing mobile menu and horizontal overflow caused by the same breakpoint). Different causes stay separate.
+- Only merge when the root cause is the same. Different symptoms of one cause belong together (e.g. missing mobile menu and horizontal overflow caused by the same breakpoint). Different causes stay separate, even on the same page. When you cannot confirm that two causes are the same, keep them separate.
 - For each group write one canonical bug: combined expected/actual, the most useful reproduction steps, the highest justified severity (do not exaggerate).`,
     schema: ConsolidationSchema,
     tools: ['Read', 'Grep'],
@@ -202,8 +237,9 @@ export async function triageRun(ctx: QaContext, run: TestRunResult): Promise<Tri
   const failed = run.outcomes.filter((o) => o.status === 'failed' || o.status === 'flaky');
   const cost = { usd: 0 };
   log.info(`Triaging ${failed.length} failed/flaky test(s)`);
+  const target = run.app ? describeTarget(run.app) : undefined;
   const failures = await mapLimit(failed, 3, async (o) => {
-    const t = await triageOne(ctx, o, cost);
+    const t = await triageOne(ctx, o, cost, target);
     log.info(
       `${o.key}: ${t.classification} (${Math.round(t.confidence * 100)}%, ${t.method}) — ${t.summary}`,
     );

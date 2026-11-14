@@ -2,19 +2,22 @@
  * Bug-fix plans: turn the failed tests of a run into a document developers follow to fix the bugs
  * behind them, written into the host project (default `docs/bug-fix-plan/<run-id>-plan.md`). The AI reads the
  * source code to decide which failures are product bugs and how to fix them; what goes in, the
- * order and the Markdown are decided by code. No other analysis step is needed first.
+ * order and the Markdown are decided by code. No other analysis step is needed first, but when the
+ * run was triaged, the planner starts from the triage verdicts instead of diagnosing from scratch.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { BASE_SYSTEM, projectRules } from '../ai/context.js';
+import { projectRules, systemPrompt } from '../ai/context.js';
 import { readJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import { rel, runDir } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
 import { TestRunResultSchema, type TestOutcome, type TestRunResult } from '../runner/results.js';
+import { describeTarget } from '../runner/server.js';
 import { loadAllScenarios } from '../scenarios/generate.js';
 import type { Scenario } from '../scenarios/schema.js';
+import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
 
 const log = logger('plan');
 
@@ -33,12 +36,30 @@ export interface FailureInput {
   error: string | null;
   /** Project-relative path of the final screenshot, if any. */
   screenshot: string | null;
-  scenario: Pick<Scenario, 'page' | 'category' | 'priority' | 'steps' | 'expectedResults'> | null;
+  scenario:
+    | (Pick<Scenario, 'page' | 'category' | 'priority' | 'steps' | 'expectedResults'> & {
+        /** True for a critical flow: a core journey of the app. */
+        critical?: true;
+      })
+    | null;
+  /** The triager's verdict for this failure, when the run was triaged. */
+  triage?: {
+    classification: string;
+    confidence: number;
+    summary: string;
+    suspectedRootCause: string | null;
+    testProblem: string | null;
+  };
 }
 
-export function collectFailures(run: TestRunResult, scenarios: readonly Scenario[]): FailureInput[] {
+export function collectFailures(
+  run: TestRunResult,
+  scenarios: readonly Scenario[],
+  triage?: Pick<TriageResult, 'failures'>,
+): FailureInput[] {
   return run.outcomes.filter(failing).map((o) => {
     const s = scenarios.find((x) => x.id === o.scenarioId);
+    const verdict = triage?.failures.find((f) => f.key === o.key);
     return {
       key: o.key,
       scenarioId: o.scenarioId,
@@ -54,8 +75,20 @@ export function collectFailures(run: TestRunResult, scenarios: readonly Scenario
             priority: s.priority,
             steps: s.steps,
             expectedResults: s.expectedResults,
+            ...(s.critical ? { critical: true as const } : {}),
           }
         : null,
+      ...(verdict
+        ? {
+            triage: {
+              classification: verdict.classification,
+              confidence: verdict.confidence,
+              summary: verdict.summary,
+              suspectedRootCause: verdict.bug?.suspectedRootCause ?? null,
+              testProblem: verdict.testProblem,
+            },
+          }
+        : {}),
     };
   });
 }
@@ -256,19 +289,32 @@ export function renderPlan(args: {
   return out.join('\n');
 }
 
-function buildPrompt(ctx: QaContext, failures: readonly FailureInput[]): string {
-  return `Developers need a plan to fix the bugs behind the failed end-to-end tests of this app. Read the source code (${ctx.config.source.include.join(', ')}) to work out, for each failure, whether the app is wrong (a product bug or a mismatch with the design) or the test is (test bug, flaky, environment), and how to fix the app.
+function buildPrompt(ctx: QaContext, failures: readonly FailureInput[], target?: string): string {
+  const triaged = failures.some((f) => f.triage);
+  return `## Task
+Developers need a plan to fix the bugs behind the failed end-to-end tests of this app. For each failure, work out from the source code (${ctx.config.source.include.join(', ')}) whether the app is wrong (a product bug or a mismatch with the design) or the test is (test bug, flaky, environment), and how to fix the app.${target ? `\nThe tests ran against ${target}.` : ''}
 
 ## Failed tests
 ${JSON.stringify(failures, null, 2)}
 
-## Instructions
+## Procedure
+1. For each failure, read its error, its scenario${triaged ? ' and its "triage" verdict' : ''}. Open the screenshot with Read when the error alone does not show what the user saw.
+2. ${
+    triaged
+      ? 'Start from the triage verdict: a triager already inspected the evidence of that failure. Open the location it names and confirm the cause in the code. Overrule a verdict only when the code contradicts it, and say so in "notes" with the file and line.'
+      : 'Read the application code the scenario exercises and find the cause of the failure.'
+  }
+3. Read enough of the surrounding code to describe a fix that works: the callers, the state involved, other places that use the same code.
+4. Group failures that share one cause, then order the bugs.
+
+## Rules
 - Group failures with the same cause into one bug; "failureKeys" lists the keys of the failed tests it explains. Every failure key must appear in exactly one bug or in "notIncluded".
 - The expected results describe correct, intended behaviour: fix the app to match them, never the other way round. Put a failure in "notIncluded" only when the test itself is wrong (TEST_BUG), the failure is unstable (FLAKY), or it comes from the environment (ENVIRONMENT); say why in "reason".
+- Every location and every fix must come from code you opened in this task. When you could not find the cause, say "unknown" in rootCause and describe what to investigate; do not guess a file.
 - For every bug: a short user-facing title, severity, the page(s), expected vs actual (with values), the root cause in plain words, where it is ("path/to/file.ts:line", relative to the project root), the fix in plain words, a short code hint only if it helps, risks, manual checks to verify, effort (S = under an hour, M = a few hours, L = a day or more), and relatedIds for bugs to fix together.
+- Severity follows what users lose: a failed critical flow (scenario.critical) caused by the app is at least high.
 - "order": all bug ids in the order to fix them: most severe and most user-facing first, shared causes together, quick wins before large refactors when severity is equal.
 - "notes": anything that applies to several bugs (e.g. a shared component). Empty if nothing.
-- The screenshot paths above can be opened with Read to see what the user saw.
 - Do not modify any file. Only read.${projectRules(ctx)}`;
 }
 
@@ -317,7 +363,8 @@ export async function writeBugFixPlan(
   if (!runId) throw new PlanRefused('No test run with results. Run `ai-qa-agent test` first.');
   const run = loadRun(ctx, runId);
   if (!run) throw new PlanRefused(`Run ${runId} has no results.`);
-  const failures = collectFailures(run, loadAllScenarios(ctx));
+  const triage = readJson(path.join(runDir(ctx.paths, runId), 'triage.json'), TriageResultSchema);
+  const failures = collectFailures(run, loadAllScenarios(ctx), triage);
   if (failures.length === 0) {
     log.info(`No failed tests in run ${runId}; nothing to plan.`);
     return { runId, file: null, bugs: 0, notIncluded: 0, costUsd: 0 };
@@ -331,8 +378,8 @@ export async function writeBugFixPlan(
   const res = await ctx.ai.run({
     name: `plan-${runId}`,
     cwd: ctx.root,
-    system: BASE_SYSTEM,
-    prompt: buildPrompt(ctx, failures),
+    system: systemPrompt('fix-planner'),
+    prompt: buildPrompt(ctx, failures, run.app ? describeTarget(run.app) : undefined),
     schema: PlanSchema,
     tools: ['Read', 'Glob', 'Grep'],
     signal: opts.signal,
@@ -340,7 +387,7 @@ export async function writeBugFixPlan(
   const plan = reconcilePlan(res.output, failures);
   const md = renderPlan({
     runId,
-    baseUrl: ctx.config.app.baseUrl,
+    baseUrl: run.app ? describeTarget(run.app) : ctx.config.app.baseUrl,
     generatedAt: new Date().toISOString(),
     plan,
     failures,

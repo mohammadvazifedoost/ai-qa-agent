@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { BASE_SYSTEM, figmaFileKey } from '../ai/context.js';
+import { figmaFileKey, systemPrompt } from '../ai/context.js';
 import {
   fileHashes,
   globalFilesOf,
@@ -122,7 +122,7 @@ export async function detectDesignChanges(ctx: QaContext, design: DesignSystemFi
   const res = await ctx.ai.run({
     name: 'design-changes',
     cwd: ctx.root,
-    system: BASE_SYSTEM,
+    system: systemPrompt('design-analyst'),
     prompt: `List the pages and top-level frames of Figma file ${fileKey}.
 Call ${ctx.ai.toolRef('figma', 'get_metadata')} once WITHOUT nodeId to list pages, then once per page id. Do not call any other tool.
 Return every page with its top-level frames (direct children of the canvas that are frames/sections/components): nodeId, name, width, height.`,

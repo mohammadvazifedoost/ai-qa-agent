@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { BASE_SYSTEM, projectRules } from '../ai/context.js';
+import { projectRules, systemPrompt } from '../ai/context.js';
+import { EXPECTATION_RULES, PRIORITY_RUBRIC, STEP_RULES } from '../ai/prompts.js';
 import { loadAppModel } from '../analyze/app.js';
 import { readJson, writeJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import type { QaContext } from '../pipeline/context.js';
-import { pageSlug, scenarioFilePath, scenarioIdPrefix } from './generate.js';
+import { flowsThrough, pageSlug, scenarioFilePath, scenarioIdPrefix } from './generate.js';
 import { normalizeId } from './manage.js';
 import {
   CATEGORIES,
@@ -144,27 +145,52 @@ export function saveScenario(ctx: QaContext, raw: unknown, id?: string): Scenari
   return scenario;
 }
 
+/** What the AI returns for a draft: the form fields plus what it could not confirm in the app. */
+const AiDraftSchema = ScenarioDraftSchema.extend({
+  concerns: z
+    .array(z.string())
+    .describe(
+      'Anything in the request you could not match to the app (a control, text or feature that does not exist, an ambiguous wording). Empty when the request is clear.',
+    ),
+});
+
 /** Turn a one-line description into a filled-in form for a person to review. Saves nothing. */
 export async function draftScenario(
   ctx: QaContext,
   req: { page: string; description: string },
-): Promise<ScenarioDraft & { page: string }> {
+): Promise<ScenarioDraft & { page: string; concerns: string[] }> {
   const description = req.description.trim();
   if (!description) throw new ScenarioInputError('Describe what the scenario should check.');
-  const page = loadAppModel(ctx)?.pages.find((p) => p.route === req.page);
-  if (!page) throw new ScenarioInputError(`Unknown page ${req.page}. Run \`ai-qa-agent analyze\` first.`);
+  const app = loadAppModel(ctx);
+  const page = app?.pages.find((p) => p.route === req.page);
+  if (!app || !page) {
+    throw new ScenarioInputError(`Unknown page ${req.page}. Run \`ai-qa-agent analyze\` first.`);
+  }
   const existing = readJson(scenarioFilePath(ctx, page.route), ScenarioFileSchema)?.scenarios ?? [];
+  const otherPages = app.pages
+    .filter((p) => p.route !== page.route)
+    .map((p) => ({ route: p.route, name: p.name, purpose: p.purpose, preconditions: p.preconditions }));
   const res = await ctx.ai.run({
     name: `draft-scenario-${pageSlug(page.route)}`,
     cwd: ctx.root,
-    system: BASE_SYSTEM,
-    prompt: `A person wants to add an end-to-end test scenario for the page ${page.route} ("${page.name}").
+    system: systemPrompt('scenario-designer'),
+    prompt: `## Task
+A person wants to add one end-to-end test scenario for the page ${page.route} ("${page.name}").
 Their description: ${JSON.stringify(description)}
 
-Turn it into one concrete scenario. Stay faithful to what they asked for; do not add unrelated checks.
+Turn it into one concrete scenario that they will review before saving. Stay faithful to what they asked for: do not add unrelated checks, and do not change what they want to verify.
 
-## Page model (from source analysis)
+## Page model (from the application analysis)
 ${JSON.stringify(page, null, 2)}
+
+## Journeys through this page
+${JSON.stringify(flowsThrough(app, page.route), null, 2)}
+
+## Other pages (for steps that start or continue elsewhere)
+${JSON.stringify(otherPages)}
+
+## Test data found in code
+${JSON.stringify(app.testData)}
 
 ## Viewports available
 ${JSON.stringify(ctx.config.viewports)}
@@ -172,12 +198,20 @@ ${JSON.stringify(ctx.config.viewports)}
 ## Scenarios that already exist on this page (do not duplicate them)
 ${existing.map((s) => `- ${s.id}: ${s.title}`).join('\n') || '(none)'}
 
-## Instructions
-- Steps must be concrete and use visible text / accessible names from the page model, and include needed preconditions.
-- Expected results describe correct, intended behaviour, not whatever the code happens to do.
-- feature: kebab-case key, e.g. checkout, auth, navigation. viewport: one of the names above.${projectRules(ctx)}`,
-    schema: ScenarioDraftSchema,
+## Procedure
+1. Find in the page model the controls, texts and rules the description refers to. Read the source file when the model does not settle it.
+2. Write the steps and expected results following the rules below.
+3. List in "concerns" whatever in the description you could not match to the app, and what you assumed instead. If the request duplicates an existing scenario, say which one.
+
+## Rules
+${STEP_RULES.split('\n').slice(0, 3).join('\n')}
+${EXPECTATION_RULES}
+- priority, by this scale:
+${PRIORITY_RUBRIC}
+- feature: kebab-case key, e.g. checkout, auth, navigation. viewport: one of the names above.
+- "rationale" names the functionality the scenario protects and what users lose if it breaks.${projectRules(ctx)}`,
+    schema: AiDraftSchema,
     tools: ['Read', 'Glob', 'Grep'],
   });
-  return { ...res.output, page: page.route };
+  return { ...res.output, concerns: res.output.concerns ?? [], page: page.route };
 }

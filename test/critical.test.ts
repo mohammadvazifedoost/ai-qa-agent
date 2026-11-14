@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { AppModelFile } from '../src/analyze/app.js';
+import type { AppModelFile, Flow } from '../src/analyze/app.js';
 import { qaPaths } from '../src/core/paths.js';
 import { recordScenarioTests, specHash, testRules } from '../src/generate/playwright.js';
 import { generateCriticalTests } from '../src/generate/scenario-test.js';
@@ -11,6 +11,7 @@ import {
   criticalTestFilter,
   generateCriticalScenarios,
   mergeCriticalScenarios,
+  selectCriticalJourneys,
 } from '../src/scenarios/critical.js';
 import { generateScenarios } from '../src/scenarios/generate.js';
 import {
@@ -47,6 +48,9 @@ const pageModel = (route: string, name: string) =>
     route,
     name,
     purpose: name,
+    importance: 'essential',
+    access: 'public',
+    navigatesTo: [],
     files: [`src${route === '/' ? '/home' : route}.ts`],
     headings: [],
     interactiveElements: [],
@@ -61,12 +65,34 @@ const pageModel = (route: string, name: string) =>
 const checkout = pageModel('/checkout', 'Checkout');
 const login = pageModel('/login', 'Login');
 
+const flow = (name: string, routes: string[], extra: Partial<Flow> = {}): Flow => ({
+  name,
+  feature: 'checkout',
+  kind: 'happy-path',
+  criticality: 'critical',
+  criticalityReason: 'No sales without it',
+  preconditions: [],
+  steps: ['add', 'pay'],
+  outcome: 'Order confirmed',
+  routes,
+  implementation: 'complete',
+  gaps: [],
+  ...extra,
+});
+
 const appModel = {
   summary: 'A shop',
   pages: [checkout, login],
-  flows: [{ name: 'Buy', feature: 'checkout', steps: ['add', 'pay'], routes: ['/', '/checkout'] }],
+  flows: [
+    flow('Buy a product', ['/checkout']),
+    flow('Sign in', ['/login'], { feature: 'auth' }),
+    flow('Read the FAQ', ['/checkout'], { criticality: 'secondary' }),
+    flow('Pay with a declined card', ['/checkout'], { kind: 'error-path' }),
+  ],
   auth: 'email + password',
   stateManagement: 'none',
+  integrations: [],
+  modelVersion: 2,
   testData: ['user@example.com / secret'],
   styling: { approach: 'css', tokens: {} },
   unknowns: [],
@@ -230,15 +256,120 @@ describe('critical flow limit', () => {
     const { ctx } = setup([]);
     const prompts = fakeAi(ctx, []);
     await generateCriticalScenarios(ctx, { force: true });
-    expect(prompts[0]).toContain('one scenario for every critical journey the app has');
-    expect(prompts[0]).not.toContain('at most');
+    // No limit: every critical happy path of the model, and nothing else.
+    expect(prompts[0]).toContain('"name": "Buy a product"');
+    expect(prompts[0]).toContain('"name": "Sign in"');
+    expect(prompts[0]).not.toContain('Read the FAQ');
+    expect(prompts[0]).not.toContain('Pay with a declined card');
 
-    (ctx.config as { scenarios: { maxCritical?: number } }).scenarios.maxCritical = 4;
+    // A limit keeps the most important journeys, in the analyst's order.
+    (ctx.config as { scenarios: { maxCritical?: number } }).scenarios.maxCritical = 1;
     await generateCriticalScenarios(ctx, { force: true });
-    expect(prompts[1]).toContain('at most 4 scenarios');
+    expect(prompts[1]).toContain('"name": "Buy a product"');
+    expect(prompts[1]).not.toContain('"name": "Sign in"');
 
     await generateCriticalScenarios(ctx, { force: true, max: 2 });
-    expect(prompts[2]).toContain('at most 2 scenarios');
+    expect(prompts[2]).toContain('"name": "Sign in"');
+  });
+});
+
+describe('critical flows come from the shared application analysis', () => {
+  it('selects the critical happy paths of the model, in order', () => {
+    expect(selectCriticalJourneys(appModel).map((j) => j.name)).toEqual(['Buy a product', 'Sign in']);
+    expect(selectCriticalJourneys(appModel, 1).map((j) => j.name)).toEqual(['Buy a product']);
+  });
+
+  it('asks nothing of the AI when the analysis ranked no journey critical', async () => {
+    const { ctx } = setup([], {
+      '.qa/app-model.json': {
+        ...appModel,
+        flows: [flow('Read the FAQ', ['/checkout'], { criticality: 'important' })],
+      },
+    });
+    const prompts = fakeAi(ctx, []);
+    expect(await generateCriticalScenarios(ctx, { force: true })).toEqual([]);
+    expect(prompts).toHaveLength(0);
+  });
+
+  it('refuses a model written before journeys were ranked', async () => {
+    const { ctx } = setup([], { '.qa/app-model.json': { ...appModel, modelVersion: undefined } });
+    fakeAi(ctx, []);
+    await expect(generateCriticalScenarios(ctx)).rejects.toThrow(/ai-qa-agent analyze/);
+    await expect(generateScenarios(ctx)).rejects.toThrow(/ai-qa-agent analyze/);
+  });
+
+  it('gives the AI the full models of the pages the journeys visit, not of the others', async () => {
+    const { ctx } = setup([], {
+      '.qa/app-model.json': { ...appModel, flows: [flow('Sign in', ['/login'], { feature: 'auth' })] },
+    });
+    const prompts = fakeAi(ctx, []);
+    await generateCriticalScenarios(ctx, { force: true });
+    const pages = prompts[0]!
+      .split('## Page models of every route these journeys visit')[1]!
+      .split('## Other pages')[0]!;
+    expect(pages).toContain('"route": "/login"');
+    expect(pages).not.toContain('"route": "/checkout"');
+  });
+
+  it('marks an existing scenario critical when the AI says it already covers a journey', async () => {
+    const regular = scenario('CHECKOUT-001', 'Checkout end to end');
+    const { ctx, read } = setup([regular]);
+    const prompts: string[] = [];
+    (ctx as { ai: unknown }).ai = {
+      run: async (task: { prompt: string }) => {
+        prompts.push(task.prompt);
+        return {
+          output: {
+            scenarios: [{ ...scenario('NEW-001', 'Sign in', { page: '/login' }), journey: 'Sign in' }],
+            promote: [
+              { scenarioId: 'checkout-001', journey: 'Buy a product' },
+              { scenarioId: 'NOPE-001', journey: 'Buy a product' },
+            ],
+            skipped: [],
+          },
+        };
+      },
+    };
+    await generateCriticalScenarios(ctx, { force: true });
+    expect(prompts[0]).toContain('- CHECKOUT-001 (/checkout, medium): Checkout end to end');
+    expect(read('checkout').scenarios).toEqual([{ ...regular, critical: true }]);
+    expect(read('login').scenarios.map((s) => [s.id, s.critical, 'journey' in s])).toEqual([
+      ['LOGIN-001', true, false],
+    ]);
+
+    // A promoted scenario is not a flow the next round replaces.
+    (ctx as { ai: unknown }).ai = {
+      run: async () => ({
+        output: {
+          scenarios: [],
+          promote: [{ scenarioId: 'CHECKOUT-001', journey: 'Buy a product' }],
+          skipped: [],
+        },
+      }),
+    };
+    await generateCriticalScenarios(ctx, { force: true });
+    expect(read('checkout').scenarios).toEqual([{ ...regular, critical: true }]);
+  });
+
+  it('keeps the routes of a journey that crosses pages, and only known ones', () => {
+    const out = mergeCriticalScenarios(
+      new Map([
+        ['/checkout', undefined],
+        ['/login', undefined],
+      ]),
+      [scenario('NEW-001', 'Buy', { routes: ['/checkout', '/login', '/nowhere'] })],
+      ['mobile', 'desktop'],
+    );
+    const s = out.get('/checkout')!.scenarios[0]!;
+    expect(s.routes).toEqual(['/checkout', '/login']);
+    // Critical flows run on desktop when the project has that viewport, whatever its position.
+    expect(
+      mergeCriticalScenarios(
+        new Map([['/checkout', undefined]]),
+        [scenario('NEW-001', 'Buy', { viewport: 'tv' })],
+        ['mobile', 'desktop'],
+      ).get('/checkout')!.scenarios[0]!.viewport,
+    ).toBe('desktop');
   });
 });
 
@@ -254,8 +385,7 @@ describe('generateCriticalScenarios', () => {
       } as Partial<Scenario>),
     ]);
     const flows = await generateCriticalScenarios(ctx, { max: 3 });
-    expect(prompts[0]).toContain('CRITICAL user journeys');
-    expect(prompts[0]).toContain('at most 3 scenarios');
+    expect(prompts[0]).toContain('## Critical journeys to cover');
     expect(prompts[0]).toContain('user@example.com / secret');
     expect(flows.map((s) => s.id).sort()).toEqual(['CHECKOUT-002', 'LOGIN-001']);
     expect(read('checkout').scenarios.map((s) => s.id)).toEqual(['CHECKOUT-001', 'CHECKOUT-002']);

@@ -173,7 +173,7 @@ export async function draftWithAi(): Promise<void> {
   btn.disabled = true;
   btn.textContent = 'Drafting…';
   status.textContent = 'The AI is reading the page; this can take a minute.';
-  const { ok, out } = await postJson<ScenarioDraft>('/api/scenarios/draft', {
+  const { ok, out } = await postJson<ScenarioDraft & { concerns?: string[] }>('/api/scenarios/draft', {
     page: value('#f-page'),
     description,
   });
@@ -197,7 +197,10 @@ export async function draftWithAi(): Promise<void> {
   set('#f-data', out.testData);
   set('#f-feature', out.feature);
   set('#f-why', out.rationale);
-  status.textContent = 'Drafted. Review the fields, then add the scenario.';
+  // What the AI could not confirm in the app is shown, so the person checks it before saving.
+  status.textContent = out.concerns?.length
+    ? `Drafted, with open points to check: ${out.concerns.join(' ')}`
+    : 'Drafted. Review the fields, then add the scenario.';
 }
 
 export async function saveEditor(): Promise<void> {

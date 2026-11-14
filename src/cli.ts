@@ -41,6 +41,7 @@ import { writeBugFixPlan } from './plan/plan.js';
 import { FilingSummarySchema } from './bugs/file.js';
 import { createTracker, trackerInfo } from './integrations/tracker.js';
 import { chromium } from '@playwright/test';
+import { describePlan, productionPlan } from './runner/production.js';
 
 interface Scope {
   page?: string;
@@ -143,13 +144,24 @@ program
       `Playwright chromium: ${fs.existsSync(browserPath) ? browserPath : 'not installed — run: npx playwright install chromium'}`,
     );
 
-    const reachable = await fetch(ctx.config.app.baseUrl, { signal: AbortSignal.timeout(3000) })
-      .then((r) => r.status < 500)
-      .catch(() => false);
-    line(
-      null,
-      `App at ${ctx.config.app.baseUrl}: ${reachable ? 'reachable' : `not running${ctx.config.app.startCommand ? ` (will be started with "${ctx.config.app.startCommand}")` : ' and no startCommand configured'}`}`,
-    );
+    if (ctx.config.app.mode === 'production') {
+      try {
+        line(
+          true,
+          `App under test: production build — ${describePlan(productionPlan(ctx.root, ctx.config))}`,
+        );
+      } catch (err) {
+        line(false, (err as Error).message);
+      }
+    } else {
+      const reachable = await fetch(ctx.config.app.baseUrl, { signal: AbortSignal.timeout(3000) })
+        .then((r) => r.status < 500)
+        .catch(() => false);
+      line(
+        null,
+        `App under test: DEVELOPMENT server at ${ctx.config.app.baseUrl} (results are not production-validated): ${reachable ? 'reachable' : `not running${ctx.config.app.startCommand ? ` (will be started with "${ctx.config.app.startCommand}")` : ' and no startCommand configured'}`}`,
+      );
+    }
 
     for (const name of Object.keys(ctx.config.ai.mcpServers)) line(null, `MCP server for AI tasks: ${name}`);
     if (ctx.config.figma) {

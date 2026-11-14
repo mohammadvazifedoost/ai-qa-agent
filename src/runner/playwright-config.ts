@@ -40,7 +40,8 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [['list'], ['json', { outputFile: process.env.AI_QA_JSON_REPORT ?? './artifacts/results.json' }]],
   use: {
-    baseURL: ${JSON.stringify(config.app.baseUrl)},
+    // The runner passes the URL of the app it started (a production build on its own port).
+    baseURL: process.env.AI_QA_BASE_URL ?? ${JSON.stringify(config.app.baseUrl)},
     video: 'on',
     trace: 'on',
     screenshot: 'on',

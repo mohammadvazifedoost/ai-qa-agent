@@ -216,6 +216,14 @@ export function collectOutcomes(
 export const TestRunResultSchema = z.object({
   runId: z.string(),
   runDir: z.string(),
+  /** What the tests ran against. Missing in results written before production-mode testing. */
+  app: z
+    .object({
+      url: z.string(),
+      mode: z.enum(['production', 'development']),
+      build: z.enum(['built', 'cached', 'none', 'existing-server']),
+    })
+    .optional(),
   outcomes: z.array(TestOutcomeSchema),
   /** Errors outside any single test, e.g. a spec file that does not compile. */
   globalErrors: z.array(z.string()),

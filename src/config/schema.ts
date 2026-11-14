@@ -44,12 +44,45 @@ export const QaConfigSchema = z
       packageManager: z.enum(['npm', 'pnpm', 'yarn', 'bun']).default('npm'),
     }),
     app: z.object({
+      /** Where the app is served during development; also the host production testing binds to. */
       baseUrl: z.string().url(),
-      /** Command that starts the app. Omit if the app is already running at baseUrl. */
+      /**
+       * What the tests run against. `production` (default): the app is built and served in
+       * production mode, see `production`. `development`: the dev server from `startCommand`; pages
+       * compile on demand there, so tests are slower and less stable, and results are reported as
+       * not production-validated. There is no automatic fallback from one to the other.
+       */
+      mode: z.enum(['production', 'development']).default('production'),
+      /** Command that starts the DEV server (mode `development`). Omit if it is already running at baseUrl. */
       startCommand: z.string().optional(),
       startTimeoutMs: z.number().int().positive().default(120_000),
+      /** Mode `development` only: use a dev server that already answers at baseUrl. */
       reuseExistingServer: z.boolean().default(true),
       env: z.record(z.string(), z.string()).optional(),
+      /** How the production build is made and served. Everything is detected from the project when omitted. */
+      production: z
+        .object({
+          /** Build command, e.g. `npm run build`. Default: the project's `build` script. `false`: nothing to build. */
+          buildCommand: z.union([z.string(), z.literal(false)]).optional(),
+          /**
+           * Command that serves the production build, e.g. `npx next start -p {port} -H {host}`.
+           * `{port}` and `{host}` are filled in (and PORT / HOST are set) so the server can run on a
+           * free port next to a dev server. Default: detected from the framework.
+           */
+          startCommand: z.string().optional(),
+          /**
+           * Fixed URL of the production server. Needed when `startCommand` cannot take a port, or
+           * when the app only works on one origin. Default: a free port on the host of `app.baseUrl`.
+           */
+          baseUrl: z.string().url().optional(),
+          /**
+           * Use a server that already answers at the production URL, without building. Only set this
+           * when that server is known to be a production build: it cannot be verified.
+           */
+          reuseExistingServer: z.boolean().default(false),
+          buildTimeoutMs: z.number().int().positive().default(600_000),
+        })
+        .default({ reuseExistingServer: false, buildTimeoutMs: 600_000 }),
     }),
     source: z.object({
       /** Directories (relative to project root) the AI may read to understand the app. */

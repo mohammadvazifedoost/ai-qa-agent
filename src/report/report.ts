@@ -6,6 +6,7 @@ import { environment, evidenceFor, renderBugMarkdown } from '../bugs/report.js';
 import type { FilingSummary } from '../bugs/file.js';
 import type { QaContext } from '../pipeline/context.js';
 import type { TestRunResult } from '../runner/results.js';
+import { describeTarget } from '../runner/server.js';
 import type { TriageResult } from '../triage/schema.js';
 
 export interface ReportFiles {
@@ -28,7 +29,7 @@ export function buildMarkdown(
   const s = run.stats;
   const out: string[] = [];
   out.push(`# AI QA Agent report — ${ctx.config.project.name}`, '');
-  out.push(`Run \`${run.runId}\` against ${ctx.config.app.baseUrl}`, '');
+  out.push(`Run \`${run.runId}\` against ${run.app ? describeTarget(run.app) : ctx.config.app.baseUrl}`, '');
   out.push('## Summary', '');
   out.push(
     `| Passed | Failed | Flaky | Skipped |`,
@@ -170,7 +171,7 @@ export function writeReport(
   const html = path.join(dir, 'report.html');
   fs.writeFileSync(markdown, md);
   fs.writeFileSync(html, markdownToHtml(md, `AI QA Agent report ${run.runId}`));
-  const env = environment(ctx, run.runId);
+  const env = environment(ctx, run.runId, run.app);
   for (const issue of triage?.issues ?? []) {
     fs.writeFileSync(
       path.join(bugsDir, `${issue.id}.md`),

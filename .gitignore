@@ -9,3 +9,5 @@ coverage/
 .playwright-mcp/
 # agent worktrees
 .claude/worktrees/
+# TypeScript incremental build info (written when a fixture is built for production)
+*.tsbuildinfo

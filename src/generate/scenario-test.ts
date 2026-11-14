@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { BASE_SYSTEM, projectRules } from '../ai/context.js';
-import { loadAppModel, type PageModel } from '../analyze/app.js';
+import { projectRules, systemPrompt } from '../ai/context.js';
+import { loadAppModel, type AppModelFile, type PageModel } from '../analyze/app.js';
 import { readJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import { rel } from '../core/paths.js';
@@ -22,7 +22,10 @@ import {
   designSummary,
   generateTests,
   HELPER_API,
+  lintSpec,
   recordScenarioTests,
+  relatedPages,
+  relatedPagesSection,
   scenarioTestHash,
   specHash,
   specKey,
@@ -76,12 +79,15 @@ const SingleTestSchema = z.object({
 
 function buildPrompt(
   ctx: QaContext,
+  app: AppModelFile,
   page: PageModel,
   scenario: Scenario,
   file: string,
   current: string,
+  appUrl: string,
 ): string {
-  return `Write the Playwright test for one scenario on ${page.route}. It goes into the existing file ${rel(ctx.root, file)}; the app runs at ${ctx.config.app.baseUrl} (baseURL is configured; use relative URLs).
+  return `## Task
+Write the Playwright test for one scenario on ${page.route}. It goes into the existing file ${rel(ctx.root, file)}. The app (production build) runs at ${appUrl}; baseURL is configured, so use relative URLs.
 
 ## Scenario
 ${JSON.stringify(scenario, null, 2)}
@@ -91,14 +97,19 @@ ${JSON.stringify(scenario, null, 2)}
 ${current}
 \`\`\`
 
-## Page model (from source analysis)
+## Page model (from the application analysis)
 ${JSON.stringify(page, null, 2)}
 
-## Figma screens for this route
+${relatedPagesSection(relatedPages(app, page, [scenario]))}## Figma screens for this route
 ${JSON.stringify(designSummary(ctx, page.route))}
 
 ## Helper API
 ${HELPER_API}
+
+## Procedure
+1. From the page models, list the controls the scenario uses and how the state it needs is built.
+2. Decide the locator of every control by the locator rules, reusing a helper of the file when it already locates that control correctly, and confirm role and accessible name in the running app when browser tools are available.
+3. Write the test, then check it against the scenario: every step is performed, every expected result has an assertion, and nothing in the rules below is violated.
 
 ## Rules
 - Return ONLY one statement: test('${scenario.id}: <title>', { tag: [...] }, async ({ page, qa }) => { ... }). No imports, no helpers outside it, no other tests. It replaces the existing test for ${scenario.id} if there is one, or is added after the last test.
@@ -121,14 +132,20 @@ export interface WrittenTest {
 export async function writeScenarioTest(
   ctx: QaContext,
   rawId: string,
-  opts: { validate?: SpecValidator; startApp?: boolean } = {},
+  opts: {
+    validate?: SpecValidator;
+    startApp?: boolean;
+    /** Where the app answers when the caller started it (`startApp: false`). */
+    appUrl?: string;
+  } = {},
 ): Promise<WrittenTest> {
   const id = normalizeId(rawId);
   const scenario = loadAllScenarios(ctx).find((s) => s.id === id);
   if (!scenario) throw new Error(`Unknown scenario ${id}.`);
   if (!scenario.approved) throw new Error(`${id} is not approved; approve it before writing its test.`);
-  const page = loadAppModel(ctx)?.pages.find((p) => p.route === scenario.page);
-  if (!page)
+  const app = loadAppModel(ctx);
+  const page = app?.pages.find((p) => p.route === scenario.page);
+  if (!app || !page)
     throw new Error(`Page ${scenario.page} is not in .qa/app-model.json; run \`ai-qa-agent analyze\`.`);
   const file = specPath(ctx, page.route);
   if (!fs.existsSync(file)) {
@@ -147,12 +164,21 @@ export async function writeScenarioTest(
   let action: 'replaced' | 'added' = 'added';
   let problems: string[] = [];
   try {
-    let prompt = buildPrompt(ctx, page, scenario, file, original);
+    const task = buildPrompt(
+      ctx,
+      app,
+      page,
+      scenario,
+      file,
+      original,
+      server?.url ?? opts.appUrl ?? ctx.config.app.baseUrl,
+    );
+    let prompt = task;
     for (let attempt = 1; attempt <= 3; attempt++) {
       const res = await ctx.ai.run({
         name: `test-${id.toLowerCase()}${attempt > 1 ? `-fix${attempt - 1}` : ''}`,
         cwd: ctx.root,
-        system: BASE_SYSTEM,
+        system: systemPrompt('test-author'),
         prompt,
         schema: SingleTestSchema,
         tools: ['Read', 'Glob', 'Grep'],
@@ -165,7 +191,8 @@ export async function writeScenarioTest(
         const up = upsertTestBlock(original, id, res.output.code);
         action = up.action;
         fs.writeFileSync(file, up.code);
-        problems = await validate(ctx, file, expected);
+        // Reliability rules apply to the new test only; the rest of the file is not this task's.
+        problems = [...(await validate(ctx, file, expected)), ...lintSpec(res.output.code)];
       } catch (err) {
         problems = [(err as Error).message];
       }
@@ -176,7 +203,7 @@ export async function writeScenarioTest(
       );
       prompt =
         `Your test for ${id} had problems. Fix them and return the corrected test statement only.\n\nYour code:\n\`\`\`ts\n${res.output.code}\n\`\`\`\n\nProblems:\n${problems.map((p) => `- ${p}`).join('\n')}\n\n` +
-        `Original task, for reference:\n${buildPrompt(ctx, page, scenario, file, original)}`;
+        `Original task, for reference:\n${task}`;
     }
   } finally {
     server?.stop();
@@ -235,7 +262,7 @@ export async function generateCriticalTests(
   const server = await ensureApp(ctx.root, ctx.config, path.join(ctx.paths.logsDir, 'app-server.log'));
   try {
     for (const s of todo) {
-      const res = await writeScenarioTest(ctx, s.id, { startApp: false });
+      const res = await writeScenarioTest(ctx, s.id, { startApp: false, appUrl: server.url });
       written.push(path.resolve(ctx.root, res.file));
     }
   } finally {

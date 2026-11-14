@@ -45,6 +45,8 @@ const page: AppModelFile['pages'][number] = {
   route: '/checkout',
   name: 'Checkout',
   purpose: 'pay',
+  importance: 'essential',
+  access: 'public',
   files: ['src/checkout.ts'],
   headings: [],
   interactiveElements: [],
@@ -52,6 +54,7 @@ const page: AppModelFile['pages'][number] = {
   states: { loading: null, empty: null, error: null },
   dataDependencies: [],
   preconditions: [],
+  navigatesTo: [],
   responsiveBehavior: [],
   businessRules: [],
 } as unknown as AppModelFile['pages'][number];
@@ -62,6 +65,8 @@ const appModel = {
   flows: [],
   auth: null,
   stateManagement: 'none',
+  integrations: [],
+  modelVersion: 2,
   testData: [],
   styling: { approach: 'css', tokens: {} },
   unknowns: [],
@@ -347,7 +352,7 @@ describe('scenario generation with tombstones', () => {
       },
     };
     await generateScenarios(ctx, { force: true });
-    expect(prompts[0]).toContain('as many high-value scenarios as the page needs for full coverage');
+    expect(prompts[0]).toContain('Return what the page really needs and no more');
     expect(prompts[0]).not.toContain('at most');
 
     (ctx.config as { scenarios: { maxPerPage?: number } }).scenarios.maxPerPage = 12;

@@ -8,7 +8,7 @@ import type { QaContext } from '../pipeline/context.js';
 import { playwrightCli, writePlaywrightConfig } from './playwright-config.js';
 import { collectOutcomes, PwReportSchema, stripAnsi, type TestRunResult } from './results.js';
 export type { TestRunResult } from './results.js';
-import { ensureApp } from './server.js';
+import { describeTarget, ensureApp } from './server.js';
 
 const log = logger('test');
 
@@ -85,6 +85,7 @@ export async function runTests(
       env: playwrightEnv(ctx, {
         AI_QA_OUTPUT_DIR: path.join(dir, 'playwright'),
         AI_QA_JSON_REPORT: jsonReport,
+        AI_QA_BASE_URL: app.url,
       }),
       onStdoutLine: (l) => log.debug(stripAnsi(l)),
       signal,
@@ -107,10 +108,18 @@ export async function runTests(
       skipped: outcomes.filter((o) => o.status === 'skipped').length,
     };
     const globalErrors = report.errors.map((e) => stripAnsi(e.message ?? e.stack ?? 'unknown error'));
-    const result: TestRunResult = { runId, runDir: dir, outcomes, globalErrors, exitCode: proc.code, stats };
+    const result: TestRunResult = {
+      runId,
+      runDir: dir,
+      app: { url: app.url, mode: app.mode, build: app.build },
+      outcomes,
+      globalErrors,
+      exitCode: proc.code,
+      stats,
+    };
     writeJson(path.join(dir, 'results.json'), result);
     log.info(
-      `Tests: ${stats.passed} passed, ${stats.failed} failed, ${stats.flaky} flaky, ${stats.skipped} skipped — evidence in ${rel(ctx.root, dir)}`,
+      `Tests: ${stats.passed} passed, ${stats.failed} failed, ${stats.flaky} flaky, ${stats.skipped} skipped against ${describeTarget(app)} — evidence in ${rel(ctx.root, dir)}`,
     );
     for (const e of globalErrors) log.error(`Playwright error: ${e.split('\n')[0]}`);
     return result;
