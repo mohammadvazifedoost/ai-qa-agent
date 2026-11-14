@@ -3,10 +3,13 @@
 An AI-powered QA agent for web projects. Install it into any web application from GitHub and run
 the `ai-qa-agent` command. It will:
 
-1. read your **Figma** design and your **source code**,
-2. write prioritized **test scenarios** (functional, visual, responsive, accessibility),
+1. read your **Figma** design and your **source code** and build one model of the application:
+   every page, and every user journey ranked by how much the app depends on it,
+2. write prioritized **test scenarios** (functional, visual, responsive, accessibility), including
+   the **critical flows** the app cannot do without,
 3. turn approved scenarios into maintainable **Playwright tests**,
-4. run them with **video, screenshots, traces, console and network logs**,
+4. run them against a **production build** of your app, with **video, screenshots, traces,
+   console and network logs**,
 5. **triage every failure** (product bug? test bug? environment? design mismatch?),
 6. file **confirmed** defects in **ClickUp** or **Jira** with evidence attached (on your click),
 7. write a **QA report** and, on request, a **bug-fix plan** for developers.
@@ -14,8 +17,9 @@ the `ai-qa-agent` command. It will:
 The AI engine is your choice: **Claude Code**, **OpenAI Codex CLI** or **OpenCode**.
 
 ```
-Figma + source code → analysis → scenarios → Playwright tests → execution + evidence
-        → failure analysis → confirmed bugs → ClickUp tasks / Jira issues → QA report
+Figma + source code → analysis → scenarios → Playwright tests → production build
+        → execution + evidence → failure analysis → confirmed bugs
+        → ClickUp tasks / Jira issues → QA report
 ```
 
 The engine lives in this package. The project you test only holds its configuration and the
@@ -79,7 +83,7 @@ Equivalent forms:
 ```bash
 npm install -D git+https://github.com/mohammadvazifedoost/ai-qa-agent.git
 npm install -D github:mohammadvazifedoost/ai-qa-agent#main      # a branch
-npm install -D github:mohammadvazifedoost/ai-qa-agent#v0.1.0    # a tag (recommended for teams)
+npm install -D github:mohammadvazifedoost/ai-qa-agent#v0.2.0    # a tag (recommended for teams)
 npm install -D github:mohammadvazifedoost/ai-qa-agent#948c91f   # an exact commit
 ```
 
@@ -141,10 +145,12 @@ npx ai-qa-agent init
 ```
 
 `init` detects the framework (Next.js, Nuxt, SvelteKit, Remix/React Router, Astro, Angular, Vite…),
-package manager, TypeScript, dev command and port, routes, component directories, design-system
-libraries and existing tests, then writes:
+package manager, TypeScript, dev command and port, the commands that build and serve a production
+build, routes, component directories, design-system libraries and existing tests, then writes:
 
-- `.qa/config.ts`: a minimal configuration containing only what applies,
+- `.qa/config.ts`: a minimal configuration containing only what applies. A comment in the `app`
+  section shows the production build and serve commands that were detected, or says why they
+  could not be detected and what to set,
 - `.qa/rules.md`: free-form guidance for the AI (test accounts, out-of-scope areas, known issues),
 - `.qa/.gitignore`: keeps run artifacts, reports and state out of git.
 
@@ -177,8 +183,10 @@ npx ai-qa-agent run         # analyze → scenarios → generate → test → tr
 npx ai-qa-agent ui          # review results, evidence, and log bugs
 ```
 
-If `app.startCommand` is set (init fills it in from your `dev` script), the agent starts your app
-itself and waits for it. Otherwise start the app first and make sure `app.baseUrl` points at it.
+The agent tests a **production build** of your app: it builds the app, serves the build on a free
+port, runs the tests and stops the server again. `doctor` prints the build and serve commands it
+will use, or the reason it cannot work them out. See
+[Production-mode testing](#production-mode-testing).
 
 ### 5. Add npm scripts (optional)
 
@@ -210,6 +218,26 @@ npm uninstall @mohammadvazifedoost/ai-qa-agent                # remove (then del
 `package-lock.json` pins the exact commit, so everyone on the team gets the same version until
 someone updates it.
 
+### Upgrading from 0.1 to 0.2
+
+Your `.qa/config.ts`, scenarios and tests keep working. Three things behave differently:
+
+- **Tests run against a production build**, not the dev server. Run `npx ai-qa-agent doctor`: it
+  shows the build and serve commands, or tells you what to add under `app.production`. To keep
+  testing the dev server, set `app.mode: 'development'`; results are then labelled as not
+  production-validated. See [Production-mode testing](#production-mode-testing).
+- **The application is analyzed again once.** `app-model.json` now ranks pages and journeys, and
+  a model written by 0.1 does not have that. `run` and `analyze` rebuild it by themselves;
+  `scenarios` and `generate` ask you to run `analyze` first.
+- **Scenarios and tests are refreshed once**, because the model they are built from changed.
+  Scenario ids, `approved` flags, scenarios written by a person and removed scenarios are kept.
+  Generated tests are now rejected when they contain fixed waits, forced clicks or skipped tests,
+  so a regenerated spec can differ from the old one in those places.
+
+[Critical flows](#critical-flows-smoke-tests) are now selected from the same analysis as
+everything else, so the first `scenarios --critical` after the upgrade can return different
+flows than before.
+
 ### Several projects at once
 
 You can also install it once globally and point it at any project:
@@ -232,6 +260,9 @@ A per-project install is still recommended, because `.qa/config.ts` and the gene
   [OpenCode](https://opencode.ai) (`npm i -g opencode-ai`, then `opencode auth login`)
 - **`@playwright/test` ≥ 1.45** in the target project with a browser installed
   (`npx playwright install chromium`)
+- **An app that builds:** the tests run against a production build, so the project needs a
+  working build command and a way to serve the result (detected for the common frameworks, see
+  [Production-mode testing](#production-mode-testing))
 - Optional: Figma access (for design analysis) and a ClickUp or Jira account (for bug filing)
 
 ## How the AI works (and how it authenticates)
@@ -265,6 +296,38 @@ For every provider:
 Deterministic checks decide pass/fail; the AI decides *what* to check and *why* something failed.
 Visual verdicts come from computed-CSS comparison against Figma tokens and pixel comparison
 against Figma frames, never from a model saying "looks right".
+
+### Agents and prompts
+
+Each AI task is done by one of seven agents. An agent has one job, and its output is a file that
+the next agent reads:
+
+| Agent | Job | Writes |
+|---|---|---|
+| Application analyst | Reads the source and describes every page and user journey, with importance and criticality | `app-model.json` |
+| Design analyst | Extracts tokens, components and screens from Figma | `design-system.json` |
+| Scenario designer | Decides what is worth testing on a page, or turns the selected critical journeys into scenarios | `scenarios/<page>.json` |
+| Test author | Implements approved scenarios as Playwright tests, checking locators on the running app | `tests/<page>.spec.ts` |
+| Failure triager | Classifies one failed test from its evidence and the source | `triage.json` |
+| Defect consolidator | Groups verdicts that have the same root cause | `triage.json` (issues) |
+| Fix planner | Turns confirmed bugs into a plan for developers | `docs/bug-fix-plan/` |
+
+All agents share a few rules:
+
+- **Evidence first.** A statement about the code, the app or the design must come from something
+  the agent read or observed.
+- **Intended and observed behaviour are kept apart.** The analyst records what the code does and
+  what a journey is meant to achieve, and lists the difference as a gap. Scenarios assert the
+  intended result, so a bug in the code fails a test instead of becoming its expectation.
+- **Unknown is a valid answer.** What cannot be determined is reported in `unknowns`, not filled
+  with a guess. A feature that is not implemented gets an outcome that can be checked, not
+  invented texts or screens.
+- **Each agent stays in its role.** The scenario designer does not analyze the app again, the
+  test author does not change what a scenario expects, and the planner does not re-triage.
+
+The exact prompts, with real examples from the demo fixture, are in
+[`docs/prompt-examples.md`](./docs/prompt-examples.md). The roles and hand-offs are described in
+[ARCHITECTURE.md](./ARCHITECTURE.md#ai-agents-and-hand-offs).
 
 ### Using Codex or OpenCode instead of Claude Code
 
@@ -304,14 +367,14 @@ Run every command with `npx ai-qa-agent …` in a project where it is installed 
 | Command | What it does |
 |---|---|
 | `ai-qa-agent init` | Detect the project and create `.qa/config.ts`, `.qa/rules.md`, `.qa/.gitignore` |
-| `ai-qa-agent doctor` | Verify the AI CLI, Playwright, the app URL, Figma and ClickUp/Jira configuration |
-| `ai-qa-agent analyze` | Analyze the source code (`.qa/app-model.json`) and the Figma file (`.qa/design-system.json`) |
+| `ai-qa-agent doctor` | Verify the AI CLI, Playwright, how the app is built and served for testing, Figma and ClickUp/Jira configuration |
+| `ai-qa-agent analyze` | Analyze the source code (`.qa/app-model.json`: pages and ranked journeys, used by every mode) and the Figma file (`.qa/design-system.json`); `--skip-design`, `--refresh` |
 | `ai-qa-agent scenarios` | Generate/refresh test scenarios per page (`.qa/scenarios/*.json`); `--critical` for only the [critical flows](#critical-flows-smoke-tests) |
 | `ai-qa-agent scenarios list` | List scenarios (id, type, page, latest status, title); `--page`, `--removed` |
 | `ai-qa-agent scenarios remove <id...>` | Delete unnecessary/unusable scenarios and their tests; they are not regenerated (`--reason "<text>"`) |
 | `ai-qa-agent scenarios restore <id...>` | Undo a removal; the test comes back on the next `generate` |
 | `ai-qa-agent generate` | Generate Playwright tests from approved scenarios (`.qa/tests/*.spec.ts`); `--critical` for only the critical flows' tests |
-| `ai-qa-agent test` | Run the tests and collect evidence (no AI involved); `--critical` for only the critical flows |
+| `ai-qa-agent test` | Build the app, serve the production build, run the tests and collect evidence (no AI involved); `--critical` for only the critical flows |
 | `ai-qa-agent triage` | Classify the failures of the latest run and write a report |
 | `ai-qa-agent report` | Rebuild the report of a run from stored results |
 | `ai-qa-agent plan` | Write a plan for fixing the bugs behind a run's failed tests into the project (`docs/bug-fix-plan/<run>-plan.md`); `--run`, `--dir`, `--force` |
@@ -345,10 +408,10 @@ ai-qa-agent --cwd ../other-project doctor
 ### A typical step-by-step workflow
 
 ```bash
-npx ai-qa-agent analyze      # review .qa/app-model.json and .qa/design-system.json
+npx ai-qa-agent analyze      # review .qa/app-model.json (pages, journeys, unknowns) and .qa/design-system.json
 npx ai-qa-agent scenarios    # review .qa/scenarios/*.json; set "approved": false to skip one
-npx ai-qa-agent generate     # Playwright tests in .qa/tests/
-npx ai-qa-agent test         # run them (no AI)
+npx ai-qa-agent generate     # Playwright tests in .qa/tests/ (builds and serves the app to check locators)
+npx ai-qa-agent test         # run them against the production build (no AI)
 npx ai-qa-agent triage       # classify failures, write the report
 npx ai-qa-agent ui           # review, log confirmed bugs, create a fix plan
 ```
@@ -376,24 +439,42 @@ Typical flow after adding a feature: `ai-qa-agent changes` → `ai-qa-agent run 
 ### Critical flows (smoke tests)
 
 For a quick "is the app basically working?" check without a full suite, generate and run only the
-app's critical flows: the few core journeys users must be able to complete, such as logging in, the
-main purchase or checkout flow, or the primary create/submit action.
+app's critical flows: the journeys the app exists for, such as logging in, the main purchase or
+checkout flow, or the primary create/submit action.
 
 ```bash
-npx ai-qa-agent scenarios --critical         # ask the AI for every critical journey (--max 3, --force)
+npx ai-qa-agent scenarios --critical         # one scenario per critical journey (--max 3, --force)
 npx ai-qa-agent generate --critical          # write only their tests
 npx ai-qa-agent test --critical              # run only them (no AI)
 npx ai-qa-agent run --critical               # all of the above, then triage and report
 ```
 
+- **There is one analysis for every mode.** `analyze` reads the whole app once and records its
+  user journeys in `.qa/app-model.json` → `flows`. Each journey has a `kind` (`happy-path`,
+  `alternate`, `error-path`), a `criticality` (`critical`, `important`, `secondary`) with the
+  reason, the intended steps and outcome, and how much of it the code implements
+  (`implementation`, `gaps`). Critical mode does not analyze the app again or use a simpler
+  analysis: it selects the journeys that are `critical` happy paths and writes a scenario for
+  each. A full run uses the same journeys to set priorities.
+- Which journeys are critical is therefore a result of `analyze`, and you can read it in
+  `app-model.json`. If it is wrong, say what matters in `.qa/rules.md` (for example "Checkout is
+  the core journey; the newsletter form is optional") and run `ai-qa-agent analyze --refresh`.
+  When the analysis finds no critical journey, `scenarios --critical` says so and does not ask
+  the AI. An `app-model.json` written by an older version is analyzed again first.
 - A critical flow is an ordinary scenario with `"critical": true`: functional, high priority, the
   happy path end to end. A journey can span several pages; it is stored with the page where it
-  starts and gets that page's id (e.g. `CHECKOUT-004`). Scenario files without the field stay valid.
-- `scenarios --critical` looks at the whole app and only replaces the AI's critical flows. Other
-  scenarios, scenarios written by a person and removed scenarios are kept as they are, and
-  regenerating a page (`ai-qa-agent scenarios`) leaves the critical flows that start on it alone.
-  It is cached: the AI is asked again only when the app model changes, or with `--force`. Remove a
-  flow you do not want with `scenarios remove <id>` so it is not suggested again.
+  starts and gets that page's id (e.g. `CHECKOUT-004`), and its `routes` field lists every route
+  it visits, so the test author and the triager get the models of all those pages. Scenario
+  files without these fields stay valid.
+- `scenarios --critical` only replaces the AI's critical flows. Other scenarios, scenarios
+  written by a person and removed scenarios are kept as they are, and regenerating a page
+  (`ai-qa-agent scenarios`) leaves the critical flows that start on it alone. An approved
+  scenario that already covers a journey is marked critical instead of being duplicated. A
+  journey the code does not implement is still covered: its scenario states the intended
+  outcome, so the test fails until the feature works. It is cached: the AI is asked again only
+  when the selected journeys, their pages, the test data or the rules change, or with
+  `--force`. Remove a flow you do not want with `scenarios remove <id>` so it is not suggested
+  again.
 - There is no limit on how many flows (or, for regular generation, scenarios per page) the AI
   returns. To cap them, set `scenarios: { maxCritical, maxPerPage }` in `.qa/config.ts`; `--max`
   overrides the config for one run.
@@ -474,7 +555,9 @@ the AI judges to be test bugs, flaky or environment problems are listed at the e
 - It is written to `<project>/docs/bug-fix-plan/<run-id>-plan.md`; change the folder with `plans: { dir: '...' }`
   in `.qa/config.ts` or `--dir`.
 - One AI call reads the source code and the failures; it never edits code. It needs only a test
-  run with failures, no other step first.
+  run with failures, no other step first. When the run was triaged, the planner starts from the
+  triage verdicts instead of working them out again, and the plan says what the run was tested
+  against.
 - An existing plan is not overwritten without `--force` (the dashboard asks first), since the team
   may have edited it.
 
@@ -486,10 +569,16 @@ import { defineConfig } from '@mohammadvazifedoost/ai-qa-agent';
 export default defineConfig({
   project: { name: 'shop', framework: 'next', packageManager: 'pnpm' },
   app: {
-    baseUrl: 'http://127.0.0.1:3000',
-    startCommand: 'pnpm dev',        // omit if the app is already running
+    baseUrl: 'http://127.0.0.1:3000', // dev URL; production testing uses its host with a free port
+    mode: 'production',              // default; 'development' tests the dev server instead
+    production: {                    // optional: detected from the framework and package.json
+      buildCommand: 'pnpm run build',                           // false: nothing to build
+      startCommand: 'pnpm exec next start -p {port} -H {host}', // {port}/{host} are filled in
+      buildTimeoutMs: 600_000,
+    },
+    startCommand: 'pnpm dev',        // dev server; used only with mode: 'development'
     startTimeoutMs: 120_000,
-    reuseExistingServer: true,
+    reuseExistingServer: true,       // mode 'development' only
   },
   source: { include: ['src', 'app'], exclude: ['node_modules', '.next'] },
   figma: {
@@ -542,6 +631,54 @@ easiest way to improve results, for example:
 - Prices are shown in EUR with two decimals.
 - Known issue: the newsletter form is disabled on staging; do not report it.
 ```
+
+### Production-mode testing
+
+Tests run against a production build, not the development server. A dev server compiles pages on
+demand, which makes the first visit of every page slow and causes timeouts that are not bugs; it
+also differs from what users get (no minification, different error handling, dev-only overlays).
+
+For `generate`, `test` and `run` the agent:
+
+1. works out the build and serve commands: `app.production` in the config wins, the rest is
+   detected from the framework and the scripts in `package.json`;
+2. builds the app (`NODE_ENV=production` plus `app.env`). The build is skipped when no file of
+   the project changed since the last successful build;
+3. starts the production server on a free port, so it never collides with a dev server you have
+   running, and waits until it answers;
+4. runs the tests against that URL (the generated Playwright config takes it from
+   `AI_QA_BASE_URL`), stores the results, and stops the server.
+
+| Framework | Build | Serve |
+|---|---|---|
+| Next.js | `build` script | `next start -p {port} -H {host}` |
+| Vite, SvelteKit | `build` script | `vite preview --port {port} --host {host} --strictPort` |
+| Astro | `build` script | `astro preview --port {port} --host {host}` |
+| Gatsby | `build` script | `gatsby serve -p {port} -H {host}` |
+| Nuxt | `build` script | `node .output/server/index.mjs` (port from `PORT`) |
+| Remix, React Router | `build` script | `start` script (port from `PORT`) |
+| Angular, Create React App, anything else | `build` script | not detectable: set `app.production.startCommand`, e.g. `npx serve -s dist -l {port}` |
+
+What you can rely on:
+
+- **No silent fallback.** If the build fails, the run stops, shows the end of the build output
+  (the full output is in `logs/app-build.log` of the run) and no test is run. If the commands
+  cannot be worked out, the error says what is missing and how to configure it. The dev server
+  is never used instead.
+- **Reports say what was tested.** `results.json` records `app: { url, mode, build }`, and the
+  report, the bug reports and the fix plan repeat it. A run against the dev server is labelled
+  "development server — not production-validated".
+- **Testing the dev server is a decision you make**, with `app.mode: 'development'`. Then
+  `app.startCommand`, `app.baseUrl` and `app.reuseExistingServer` apply as before.
+- **Ports.** With `{port}` in the command (or a framework that reads `PORT`) every run gets a
+  free port. A server that only works at one address needs `app.production.baseUrl`; if
+  something already answers there, the run stops, because it could be a dev server. Set
+  `app.production.reuseExistingServer: true` only for a server you know is a production build;
+  the report then says "production server that was already running".
+- **Environment.** The build and the server get the environment of the `ai-qa-agent` process,
+  `NODE_ENV=production`, and the variables in `app.env`. Put values that a framework inlines at
+  build time (`NEXT_PUBLIC_*`, `VITE_*`) in `app.env`: changing them there triggers a new build,
+  changing them only in your shell does not.
 
 ### Secrets and environment variables
 
@@ -710,6 +847,24 @@ Generated tests import `test`/`expect` from `@mohammadvazifedoost/ai-qa-agent/pl
 - `qa.expectAccessible()`: axe-core WCAG checks (see above);
 - automatic capture of console errors, page errors and failed/4xx/5xx requests.
 
+Generated tests follow fixed reliability rules:
+
+- **Locators** in this order: role and accessible name, test id, label, another stable attribute,
+  then a relation to a nearby element. No CSS class chains, no XPath, no position in a list
+  unless the scenario is about the position.
+- **Assertions** state the expected result of the scenario and carry a message that says what
+  was checked, so a failure reads like `Total after SAVE10 … Expected "$37.80", Received "$42.00"`.
+- **Waiting** is done by Playwright's web-first assertions. No fixed waits, no `networkidle`.
+- **No hidden failures:** no `force: true`, no `test.skip` / `test.fixme` / `test.only`, no
+  `try/catch` around an assertion, no serial mode.
+- **Independence:** every test starts from a fresh browser and builds its own state through the
+  UI.
+
+The mechanical part of these rules is checked in code: a generated spec that contains a fixed
+wait, `networkidle`, `force: true`, a skipped or focused test, serial mode or an XPath locator is
+sent back to the test author. If it still has them after three attempts, generation stops with
+the list of problems and the spec is not accepted.
+
 You can use the same helpers in hand-written tests:
 
 ```ts
@@ -775,6 +930,10 @@ jobs:
             .qa/artifacts/runs/
 ```
 
+Both commands build the app and serve the production build inside the job, so the job needs the
+project's dependencies (`npm ci`) and every variable the build reads. A failed build fails the
+job with the build output. Nothing has to be started beforehand, and no port has to be free.
+
 If CI uses npm 11.x or 12 and fails with `EALLOWGIT`, commit the project `.npmrc` with
 `allow-git=all` (see [Installing](#1-add-the-package)).
 
@@ -785,7 +944,8 @@ If CI uses npm 11.x or 12 and fails with `EALLOWGIT`, commit the project `.npmrc
   config.ts              project configuration (commit)
   rules.md               free-form QA rules for the AI (commit)
   project.json           deterministic project discovery
-  app-model.json         AI analysis of the source: pages, forms, states, business rules, test data
+  app-model.json         AI analysis of the source, shared by every mode: pages (elements, forms, states,
+                         business rules, importance), ranked user journeys, auth, integrations, test data, unknowns
   design-system.json     tokens, components, screens from Figma (observed / inferred / unknown)
   design/refs/*.png      1:1 Figma screenshots used as visual references
   scenarios/<page>.json  test scenarios with ids, steps, expected results, priority, approval flag (commit)
@@ -793,6 +953,9 @@ If CI uses npm 11.x or 12 and fails with `EALLOWGIT`, commit the project `.npmrc
   playwright.config.ts   generated on each run
   state.json             stage hashes, run checkpoints, filed-bug fingerprints (resumability)
   artifacts/runs/<run>/  videos/ traces/ screenshots/ logs/ design/ results.json triage.json filing.json
+                         results.json records what was tested: app { url, mode, build };
+                         logs/app-build.log and logs/app-server.log are the build and server output
+  artifacts/production-build.json  fingerprint of the last successful production build (skips unchanged builds)
   artifacts/logs/        ai-qa-agent.log and every AI transcript
   reports/<run>/         report.md, report.html, bugs.json, bugs/BUG-00n.md
   reports/latest.md
@@ -807,9 +970,17 @@ Each failed test is classified as `PRODUCT_BUG`, `TEST_BUG`, `ENVIRONMENT_FAILUR
 1. Unambiguous cases are decided by rules (connection refused, browser missing, spec syntax
    errors, flaky = passed on retry).
 2. Everything else is analyzed by the AI with the error, the test code, the final screenshot,
-   the DOM snapshot at failure, console/network logs, the deterministic check results, the scenario,
-   the page's source analysis and the Figma data. It reads the application source to find the cause.
+   the DOM snapshot at failure, console/network logs, the deterministic check results, the
+   scenario, and the analysis of every page the scenario visits. Figma data is added only for
+   design-related failures. The triager first checks that the test did what the scenario says and
+   that the expectation is legitimate, then reads the application source to find the cause.
+   Behaviour that is missing altogether (a button without a handler) is a product bug when the
+   test asserted it in a generic way, and a test bug when the test demanded a text or route that
+   nothing defines. A failed critical flow that is a product bug is at least high severity.
 3. Defects are consolidated: several failing tests caused by one CSS rule become one issue.
+
+The report, every bug report and the fix plan state what the run was tested against, for example
+`http://127.0.0.1:14944 (production build)`.
 
 Only confirmed defects are filed. Test bugs are listed in the report with a suggested fix. The
 agent never edits tests to make them pass, and never edits application code.
@@ -954,8 +1125,9 @@ Element ids also show up in failure output: `qa.expectNoHorizontalOverflow()` na
   place), seed or inject randomness, avoid A/B flags and rotating content in the test environment,
   and disable or shorten animations under `prefers-reduced-motion: reduce`. A test that passes only
   on retry is reported as flaky and never filed.
-- **Start the app with one command** (`app.startCommand`) on a fixed host and port, with test
-  configuration from environment variables, not from code edits.
+- **Make the production build reproducible**: one `build` script, a server that takes its port
+  from an argument or `PORT`, and test configuration from environment variables (`app.env`),
+  not from code edits.
 
 ### Accessibility
 
@@ -974,6 +1146,11 @@ compare computed styles against the design.
 | `EALLOWGIT: Fetching packages of type "git" have been disabled` | npm 11.x/12 blocks git dependencies by default. Run `npm config set allow-git all --location=project` and install again. |
 | `npx ai-qa-agent` says *could not determine executable to run* or `dist/cli.js` is missing | The package was not built during install. Reinstall with npm (`npm install -D github:mohammadvazifedoost/ai-qa-agent`); with pnpm/Yarn allow the package's build scripts. Git must be installed. |
 | `Cannot find module '@mohammadvazifedoost/ai-qa-agent'` in `.qa/config.ts` or a test | Install the package in the project itself (not only globally); the import name is `@mohammadvazifedoost/ai-qa-agent`. |
+| `The production build failed: "..." exited with code N. Tests were not run.` | The app does not build. The message ends with the build output; the full output is in `.qa/artifacts/runs/<run>/logs/app-build.log`. Fix the build (run the command yourself to reproduce) or correct `app.production.buildCommand`. |
+| `Production-mode testing is not possible: ...` | The serve or build command could not be detected (unknown framework, no `build` script, Angular/CRA without a static server). Set `app.production.startCommand` / `buildCommand`; `ai-qa-agent doctor` shows the result. |
+| `Something already answers at http://...` in production mode | The production server has a fixed URL and another process (often the dev server) uses it. Stop that process, use `{port}` in `app.production.startCommand`, or set `app.production.reuseExistingServer: true` if it really is a production server. |
+| The build is not repeated although something changed | The build is skipped when no project file changed (path, size, modification time) outside dependency and output folders. Delete `.qa/artifacts/production-build.json` to force a build. |
+| `app-model.json was written by an older version` | The application model gained journey ranking. Run `ai-qa-agent analyze` (a `run` does it by itself); scenarios and tests are then refreshed once. |
 | `App did not become ready at http://localhost:...` while the dev server log says ready | `localhost` resolved to IPv6 (`::1`) but the server or the OS only accepts IPv4 (or vice versa). The error prints a loopback probe; bind the server explicitly (`--host 127.0.0.1`) and use `http://127.0.0.1:<port>` in `app.baseUrl`. |
 | `Figma MCP rejected N call(s) because of plan limits` | Monthly/daily Figma MCP quota exhausted. Partial results are kept; re-run `ai-qa-agent analyze` later. |
 | `AI task ... failed (error_max_budget_usd)` | Raise `ai.maxBudgetUsdPerTask` or narrow the scope (`--page`). |

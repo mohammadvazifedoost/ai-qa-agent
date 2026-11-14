@@ -20,6 +20,20 @@
    layout, global CSS), so adding a route re-analyzes and re-tests only the new page.
 6. **Humans decide what reaches the tracker.** Confirmed defects are presented in the report and
    the dashboard; ClickUp tasks are created only on an explicit click or flag.
+7. **One analysis, many selections.** The application is analyzed once into `app-model.json`:
+   every page with its importance, and every user journey with its kind, criticality and how
+   much of it is implemented. No mode has an analysis of its own. A full run, a page run and a
+   critical-flow run differ only in which journeys and scenarios they select from that model,
+   and the selection of critical journeys is code, not a second AI opinion.
+8. **Intended behaviour is separate from observed behaviour.** The model records what the code
+   does (`businessRules`, prefixed `SUSPICIOUS:` when it looks wrong) and what a journey is meant
+   to achieve (`steps`, `outcome`), with the difference in `gaps`. Scenarios assert the intended
+   outcome, so a defect in the code fails a test instead of becoming its expectation. What could
+   not be determined goes to `unknowns`; it is never filled with an assumption.
+9. **Production builds are what is tested.** The app is built and served in production mode on
+   a free port. A build that fails or a project whose production commands cannot be determined
+   is an error with the real reason; the dev server is used only when the config says so, and
+   every result records what it ran against.
 
 ## Pipeline
 
@@ -32,13 +46,14 @@ init ──► analyze ──► design ──► scenarios ──► generate �
 |---|---|---|---|---|
 | init | `discovery/detect.ts`, `init/init.ts` | package.json, file tree | `.qa/config.ts`, `project.json` | — |
 | changes | `changes/detect.ts` | project.json routes, per-page file hashes, optional Figma metadata | list of new/changed/removed pages, changed shared files, new/changed Figma frames | — (free; Figma part costs MCP calls) |
-| analyze | `analyze/app.ts` | source files, project.json, rules | `app-model.json` (pages, forms, states, rules, test data, per-page and shared-file hashes) | all-source hash for the fast path; otherwise only new/changed pages are re-analyzed and merged |
+| analyze | `analyze/app.ts` | source files, project.json, rules | `app-model.json`, model version 2: pages (elements, forms, states, rules, importance, access, navigation), ranked journeys (kind, criticality + reason, intended steps/outcome, implementation, gaps), auth, state, integrations, test data, unknowns, per-page and shared-file hashes. Routes the AI skipped are analyzed in a second pass; remaining inconsistencies are written to `unknowns` as "Model check: …" | all-source hash for the fast path; otherwise only new/changed pages are re-analyzed and merged, and the app-level facts (summary, auth, journeys, test data) are refreshed with them. A model of an older version is analyzed again in full |
 | design | `design/figma.ts` | Figma MCP (metadata, variables, design context, screenshots) | `design-system.json`, `design/refs/*.png` | figma config + viewports |
-| scenarios | `scenarios/generate.ts` | page model, flows, design subset, viewports | `scenarios/<page>.json` | per page: page files hash + model + design |
-| (critical flows) | `scenarios/critical.ts` | app outline (pages, flows, test data, auth); `--critical` on `scenarios`/`generate`/`test`/`run` | a few cross-page happy-path journeys with `critical: true`, stored in the scenario file of their start page; tests tagged `@critical`, selected by scenario id | `state.criticalInputs` |
-| generate | `generate/playwright.ts` | approved scenarios, page model, Playwright MCP (to confirm locators on the live app) | `tests/<page>.spec.ts`, validated with `playwright test --list`; up to 3 fix rounds | per spec: scenarios + model |
-| test | `runner/*` | specs, generated `playwright.config.ts` | `artifacts/runs/<id>/` evidence + `results.json` | — |
-| triage | `triage/*` | outcomes + evidence + scenario + source + design | `triage.json` (per-failure verdicts, consolidated issues) | — |
+| scenarios | `scenarios/generate.ts` | page model, the ranked journeys that pass through the page, the other pages (for navigation), test data, design subset, viewports | `scenarios/<page>.json`; a scenario that leaves its page lists every route in `routes` | per page: page files hash + model + journeys + design |
+| (critical flows) | `scenarios/critical.ts` | the journeys of the shared model with `criticality: critical` and `kind: happy-path` (`selectCriticalJourneys`, deterministic), the full page models of every route they visit, test data, auth; `--critical` on `scenarios`/`generate`/`test`/`run` | one scenario per selected journey with `critical: true`, stored in the scenario file of its start page, or an existing approved scenario promoted to critical; journeys left uncovered are logged with the reason. No critical journey in the model: a warning and no AI call. Tests tagged `@critical`, selected by scenario id | `state.criticalInputs` (selected journeys, their pages, test data, auth, viewports, rules) |
+| generate | `generate/playwright.ts`, `generate/scenario-test.ts` | approved scenarios, the page model plus the models of every other route the scenarios visit, the running production build, Playwright MCP (to confirm locators on it) | `tests/<page>.spec.ts`, validated with `playwright test --list` and `lintSpec` (fixed waits, `networkidle`, `force: true`, `.only`/`.skip`/`.fixme`, serial mode, XPath, wrong import); up to 3 fix rounds | per spec: scenarios + model + related pages |
+| test | `runner/*` | specs, generated `playwright.config.ts`, the production build (`runner/server.ts`) | `artifacts/runs/<id>/` evidence + `results.json` including `app: { url, mode, build }` | — (the build is skipped when the project fingerprint is unchanged) |
+| triage | `triage/*` | outcomes + evidence + scenario + the page models of the scenario's routes + source; design data only for design-related failures | `triage.json` (per-failure verdicts, consolidated issues) | — |
+| plan | `plan/plan.ts` | failed outcomes, their scenarios and the triage verdicts | bug-fix plan; starts from the triage verdict instead of re-deriving it | — |
 | file | `bugs/file.ts` | confirmed issues | `filing.json` marking them *pending* — the pipeline never creates tasks | — |
 | (dashboard button) | `bugs/file.ts` `fileIssues`, `integrations/clickup.ts` | one issue or one failure, on a person's click | ClickUp task + attachments (or a comment on the task filed earlier), `filing.json`, `state.bugs` | fingerprint of scenario ids, root-cause files |
 | ui | `ui/server.ts`, `ui/page.ts` | scenarios, run results, triage, filing | local dashboard (`/api/overview`, `/files/*`, `POST /api/file` to log one issue, `POST /api/scenarios/delete` to remove a scenario, `POST /api/media/delete` to delete a result's screenshots/video, `POST /api/runs/critical` to run only critical flows) | — |
@@ -62,9 +77,14 @@ src/
                           overrides with enabled_tools allow-lists, token usage
   ai/opencode.ts          OpenCodeRunner: `opencode run --format json` with a read-only agent and MCP
                           servers injected via OPENCODE_CONFIG_CONTENT; corrections reuse the session
-  ai/context.ts           shared system prompt, project rules, Figma URL parsing
+  ai/context.ts           system prompts: the rules every agent shares (BASE_SYSTEM) plus one role
+                          per agent (systemPrompt(role)); project rules; Figma URL parsing
+  ai/prompts.ts           prompt fragments shared by several agents: expectation rules, step rules,
+                          the priority rubric, what counts as a low-value scenario
   discovery/detect.ts     deterministic framework/route/test detection
-  analyze/app.ts          AppModel schema; full analysis and per-route incremental analysis + merge
+  analyze/app.ts          AppModel schema and version; full analysis, per-route incremental analysis
+                          + merge, model checks; journey ranking helpers (rankedFlows, criticalFlows)
+                          and requireAppModel, the only way later stages read the model
   changes/detect.ts       deterministic code change detection (per-page + shared-file hashes) and
                           opt-in Figma change detection (frame list + page structure hashes)
   ui/server.ts, ui/page.ts local dashboard server (node:http) and its single static page
@@ -76,14 +96,21 @@ src/
                           rate-limit reporting, back-fill of missing references
   scenarios/              Scenario schema, generation per page (respects removed scenarios), page
                           selection helpers
-  scenarios/critical.ts   critical-flow (smoke) generation, merge into page files, test selection
+  scenarios/critical.ts   critical-flow (smoke) mode: selects the critical happy paths of the shared
+                          model, has one scenario written per journey, merges into page files,
+                          selects their tests
   scenarios/manage.ts     list/remove/restore scenarios; removal tombstones and spec cache upkeep
   scenarios/spec-edit.ts  lexer-based removal of one test('<ID>: …') block from a spec (no AI)
-  generate/playwright.ts  test generation + validation loop
+  generate/playwright.ts  test generation + validation loop; lintSpec (reliability rules as code)
+  generate/scenario-test.ts  writes or replaces the test of a single scenario in a spec
   playwright/index.ts     runtime for generated tests (fixtures: qa helpers, log capture)
   playwright/style.ts     pure CSS value comparison
-  runner/server.ts        start/wait/stop the app (kills the process tree; loopback diagnostics)
-  runner/playwright-config.ts  renders playwright.config.ts (project per browser × viewport)
+  runner/production.ts    production commands per framework, {port}/{host} placeholders, free port,
+                          build fingerprint; EnvironmentError / BuildError
+  runner/server.ts        ensureApp: build (or reuse the current build), serve, wait, stop (kills
+                          the process tree; loopback diagnostics); development mode only by config
+  runner/playwright-config.ts  renders playwright.config.ts (project per browser × viewport); the
+                          base URL comes from AI_QA_BASE_URL, set by the runner for each run
   runner/results.ts       Playwright JSON report → normalized TestOutcome + evidence copying
   runner/run.ts           executes Playwright with filters (files, tags, scenario ids)
   runner/media.ts         delete a result's screenshots/video and drop them from results.json
@@ -100,6 +127,29 @@ src/
   pipeline/context.ts     loads config/state/runner once per invocation
   pipeline/run.ts         stage orchestration with checkpoints and resume
 ```
+
+## AI agents and hand-offs
+
+Every AI task runs as one of seven agents. An agent's system prompt is the shared rules
+(`BASE_SYSTEM`: evidence first, observed versus intended, "unknown" is a valid answer, read-only,
+stay in role, be concrete, answer through the structured output) followed by its role: objective,
+the decisions it may take, what it must not do, and who consumes its output. The task prompt then
+has fixed sections: `## Task`, the data it works on, `## Procedure`, and the rules for its output.
+
+| Agent (`AgentRole`) | Tasks | Decides | Must not | Hands over to |
+|---|---|---|---|---|
+| `app-analyst` | full analysis, analysis of changed or missed routes | what each page does, which journeys exist, their criticality, what is unknown | invent behaviour that is not in the code; write tests or scenarios | scenario designer, test author, triager (through `app-model.json`) |
+| `design-analyst` | Figma extraction, design change detection, missing reference images | what the design specifies, with observed / inferred / unknown certainty | guess tokens or measurements | scenario designer, triager (through `design-system.json`) |
+| `scenario-designer` | scenarios per page, critical-flow scenarios, a scenario drafted from a description | which behaviours are worth a test, their priority and expected results | re-analyze the app; pick critical journeys (they are given); invent copy for features that do not exist | test author (through `scenarios/<page>.json`) |
+| `test-author` | a page's spec, the test of one scenario | locators, waits and assertions that implement a scenario | change what a scenario expects; weaken an assertion to make a test pass | runner, triager (through `tests/<page>.spec.ts`) |
+| `failure-triager` | one verdict per failed test | product bug, test bug, design mismatch, environment or unknown, with the evidence | edit tests or code; classify without the evidence | defect consolidator, fix planner (through `triage.json`) |
+| `defect-consolidator` | grouping verdicts by root cause | which failures are the same defect | change a verdict | report, tracker filing |
+| `fix-planner` | bug-fix plan | the order and content of the fixes | re-triage; change code | the developer |
+
+The contracts between agents are the Zod schemas of those files. A field with a default
+(`criticality`, `importance`, `routes`, …) is required from the AI but optional when an older
+file is read, so existing `.qa` folders keep loading; only `app-model.json` carries a version,
+because later stages need its journey ranking.
 
 ## AI engine integration details (Claude Code shown; see ai/codex.ts and ai/opencode.ts for the others)
 
@@ -153,6 +203,10 @@ the existing task instead of duplicating it.
 - AI tasks cannot write files or run commands (no `Edit`, `Write`, `Bash`).
 - The engine writes only inside `.qa/` of the target project.
 - Test generation is validated but never "fixed" by weakening assertions; failing tests are
-  classified, and test bugs are reported for a human (or a scenario edit) to resolve.
+  classified, and test bugs are reported for a human (or a scenario edit) to resolve. Patterns
+  that hide failures or make tests flaky (fixed waits, forced clicks, skipped tests) are rejected
+  by `lintSpec` before a spec is accepted.
+- The app under test is started on its own port and stopped after the run; a server that was
+  already running is never used as "production" unless the config says it is one.
 - Bugs are filed only after triage confirms them, with the confidence threshold and retry
   reproduction as gates.
