@@ -7,6 +7,7 @@ import type { Project } from './logic.js';
 import { watchJob } from './jobs.js';
 import { render } from './render.js';
 import { state } from './state.js';
+import { loadStorage } from './storage.js';
 
 export async function load(runId?: string): Promise<void> {
   state.data = await getOverview(runId);
@@ -14,6 +15,7 @@ export async function load(runId?: string): Promise<void> {
   void loadTrackers(false);
   void loadProject();
   void loadTrackerSettings();
+  if (state.route.page === 'storage') void loadStorage();
   if (state.data.job?.status === 'running') watchJob();
   // Tracker verification happens after the first paint so the page never waits for it.
   const run = state.data.run;

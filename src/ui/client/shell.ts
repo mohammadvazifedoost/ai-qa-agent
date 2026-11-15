@@ -43,6 +43,9 @@ const ICON = {
   ),
   project: svg('<path d="M12 3 3 7.5l9 4.5 9-4.5L12 3zM3 12l9 4.5 9-4.5M3 16.5 12 21l9-4.5"/>'),
   tracker: svg('<path d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0V7zM12 17v5"/>'),
+  storage: svg(
+    '<ellipse cx="12" cy="5.5" rx="8" ry="2.5"/><path d="M4 5.5v13c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-13M4 12c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5"/>',
+  ),
   check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 18, 2.2),
   run: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', 18, 2),
   // The theme icon shows what the button switches to.
@@ -108,7 +111,9 @@ function nav(defects: number): string {
         'project',
         'Project',
         state.project && projectSummary(state.project).outdated ? badge('Out of date', 'nav-badge-warn') : '',
-      ) + entry('tracker', 'Bug tracker', trackerBadge()),
+      ) +
+        entry('tracker', 'Bug tracker', trackerBadge()) +
+        entry('storage', 'Storage'),
     )
   );
 }
@@ -442,6 +447,7 @@ export function renderShell(): void {
     scenarios: 'Scenarios',
     project: 'Project',
     tracker: 'Bug tracker',
+    storage: 'Storage',
   }[state.route.page];
   document.title = title + ' | ' + data.project.name + ' | AI QA Agent';
 }

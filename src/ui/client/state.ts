@@ -1,5 +1,6 @@
 /** Shared, mutable page state: the loaded overview, the page being shown and the list filters. */
 import type { TrackerStatus } from '../../integrations/tracker.js';
+import type { CleanupKind, StorageReport } from '../../runner/storage.js';
 import type { TrackerSettings } from '../tracker-setup.js';
 import {
   parseRoute,
@@ -46,6 +47,12 @@ export const state = {
   trackerBusy: '' as '' | 'test' | 'save',
   /** What the last action on a scenario did; shown in that scenario's detail until another opens. */
   notice: null as { id: string; text: string } | null,
+  /** The Storage page: the last measurement, what is ticked, and a cleanup being confirmed or done. */
+  storage: null as StorageReport | null,
+  storageError: '',
+  storagePick: null as Set<CleanupKind> | null,
+  storageConfirm: false,
+  storageBusy: false,
 };
 
 /** Open a page (and an item on it). The address changes, so Back returns to where the user was. */

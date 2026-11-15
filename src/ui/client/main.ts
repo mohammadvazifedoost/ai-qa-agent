@@ -33,6 +33,13 @@ import { askStep, startStep } from './project.js';
 import { render } from './render.js';
 import type { MediaTarget } from './scenarios.js';
 import { state } from './state.js';
+import {
+  askStorageClean,
+  cancelStorageClean,
+  confirmStorageClean,
+  loadStorage,
+  toggleStorageKind,
+} from './storage.js';
 import { tableView } from './table.js';
 import { toggleTheme, watchSystemTheme } from './theme.js';
 import { setDraftField, submitTracker, toggleToken } from './tracker.js';
@@ -205,6 +212,12 @@ document.addEventListener('click', (e) => {
       return cancelRunsDelete();
     case 'confirm-runs-delete':
       return void confirmRunsDelete(el as HTMLButtonElement, load);
+    case 'storage-ask':
+      return askStorageClean();
+    case 'storage-cancel':
+      return cancelStorageClean();
+    case 'storage-clean':
+      return void confirmStorageClean();
     case 'dismiss-job':
       state.watched = null;
       return render();
@@ -247,6 +260,7 @@ document.addEventListener('input', (e) => {
 document.addEventListener('change', (e) => {
   const el = e.target as HTMLInputElement;
   if (el.dataset.tf === 'kind') return setDraftField('kind', el.value);
+  if (el.dataset.storageKind) return toggleStorageKind(el.dataset.storageKind, el.checked);
   if (el.dataset.filter === 'type') state.view.type = el.value;
   else if (el.dataset.filter === 'page') state.view.page = el.value;
   else return;
@@ -279,6 +293,8 @@ window.addEventListener('hashchange', () => {
   if (!state.data) return;
   render();
   if (before.page !== state.route.page) {
+    // Measured again on every visit: runs and jobs change what there is to free.
+    if (state.route.page === 'storage') void loadStorage();
     window.scrollTo(0, 0);
     document.getElementById('page-title')?.focus({ preventScroll: true });
   } else if (state.route.id && !sideBySide.matches) {

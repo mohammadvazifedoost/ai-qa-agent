@@ -59,3 +59,18 @@ export function slugify(input: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 80);
 }
+
+/** Bytes a file or folder takes, counting every file below it. Links are not followed. */
+export function sizeOf(target: string): number {
+  let st: fs.Stats;
+  try {
+    st = fs.lstatSync(target);
+  } catch {
+    return 0;
+  }
+  if (st.isSymbolicLink()) return 0;
+  if (!st.isDirectory()) return st.size;
+  let total = 0;
+  for (const name of fs.readdirSync(target)) total += sizeOf(path.join(target, name));
+  return total;
+}

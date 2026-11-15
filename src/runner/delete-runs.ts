@@ -6,6 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { sizeOf } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import { isInside, runDir, type QaPaths } from '../core/paths.js';
 import type { StateStore } from '../state/state.js';
@@ -26,16 +27,6 @@ export interface RunDeleteResult {
   deleted: string[];
   /** Bytes freed on disk. */
   freedBytes: number;
-}
-
-function sizeOf(dir: string): number {
-  if (!fs.existsSync(dir)) return 0;
-  let total = 0;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    total += entry.isDirectory() ? sizeOf(full) : fs.statSync(full).size;
-  }
-  return total;
 }
 
 export function deleteRuns(

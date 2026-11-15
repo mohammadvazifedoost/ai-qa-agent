@@ -65,7 +65,7 @@ export const label = (s: string | null | undefined): string => {
 export const plural = (n: number, one: string, many = one + 's'): string => `${n} ${n === 1 ? one : many}`;
 
 /* ---------- routes: #/overview, #/defects/<id>, #/scenarios/<id> ---------- */
-export type PageName = 'overview' | 'defects' | 'scenarios' | 'project' | 'tracker';
+export type PageName = 'overview' | 'defects' | 'scenarios' | 'project' | 'tracker' | 'storage';
 export interface Route {
   page: PageName;
   /** The defect or scenario shown in the detail panel; empty for none. */
@@ -75,7 +75,11 @@ export interface Route {
 export function parseRoute(hash: string): Route {
   const [page, ...rest] = hash.replace(/^#\/?/, '').split('/');
   const name: PageName =
-    page === 'defects' || page === 'scenarios' || page === 'project' || page === 'tracker'
+    page === 'defects' ||
+    page === 'scenarios' ||
+    page === 'project' ||
+    page === 'tracker' ||
+    page === 'storage'
       ? page
       : 'overview';
   let id = rest.join('/');
@@ -612,4 +616,18 @@ export function formatBytes(n: number): string {
     u++;
   }
   return (u === 0 ? String(v) : v.toFixed(v < 10 ? 1 : 0)) + ' ' + units[u];
+}
+
+/* ---------- the Storage page ---------- */
+
+/** What a cleanup of the picked kinds frees: old runs already include their raw output. */
+export function cleanupBytes(
+  items: ReadonlyArray<{ kind: string; bytes: number; overlap?: number }>,
+  picked: ReadonlySet<string>,
+): number {
+  let total = 0;
+  for (const i of items) if (picked.has(i.kind)) total += i.bytes;
+  const old = items.find((i) => i.kind === 'old-runs');
+  if (old?.overlap && picked.has('old-runs') && picked.has('raw-output')) total -= old.overlap;
+  return Math.max(0, total);
 }

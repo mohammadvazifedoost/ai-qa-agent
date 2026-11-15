@@ -29,6 +29,7 @@ import { scenarioTestStates, writeScenarioTest, type ScenarioTestState } from '.
 import { criticalFlows, isOutdatedModel, loadAppModel, type PageModel } from '../analyze/app.js';
 import { deleteMedia, MediaDeleteError } from '../runner/media.js';
 import { deleteRuns, RunDeleteError } from '../runner/delete-runs.js';
+import { cleanStorage, StorageCleanError, storageReport } from '../runner/storage.js';
 import { runScenarioTest, runScenarioTests } from '../runner/rerun.js';
 import { Cancelled } from '../core/process.js';
 import { runTests } from '../runner/run.js';
@@ -781,11 +782,28 @@ function handleDeleteMedia(ctx: QaContext, body: string): { status: number; payl
 /** Delete old runs with their evidence and reports; a run a job is using is refused. */
 function handleDeleteRuns(ctx: QaContext, body: string): { status: number; payload: unknown } {
   const { ids } = JSON.parse(body || '{}') as { ids?: unknown };
-  const inUse = job?.status === 'running' && job.runId ? [job.runId] : [];
   try {
-    return { status: 200, payload: deleteRuns(ctx, { ids, inUse }) };
+    return { status: 200, payload: deleteRuns(ctx, { ids, inUse: jobUse().inUse }) };
   } catch (err) {
     if (err instanceof RunDeleteError) return { status: err.status, payload: { error: err.message } };
+    throw err;
+  }
+}
+
+/** The run a running job writes to, and whether any job is running. */
+function jobUse(): { busy: boolean; inUse: string[] } {
+  const busy = job?.status === 'running';
+  return { busy, inUse: busy && job?.runId ? [job.runId] : [] };
+}
+
+/** Free disk space: raw Playwright output, logs, leftover folders and/or old runs. */
+function handleCleanStorage(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { kinds } = JSON.parse(body || '{}') as { kinds?: unknown };
+  try {
+    const res = cleanStorage(ctx, { kinds, ...jobUse() });
+    return { status: 200, payload: { ...res, storage: storageReport(ctx, jobUse()) } };
+  } catch (err) {
+    if (err instanceof StorageCleanError) return { status: err.status, payload: { error: err.message } };
     throw err;
   }
 }
@@ -906,6 +924,11 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/scenarios/delete') {
         const { status, payload } = await handleDeleteScenario(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'GET' && url.pathname === '/api/storage') {
+        json(res, 200, storageReport(ctx, jobUse()));
+      } else if (req.method === 'POST' && url.pathname === '/api/storage/clean') {
+        const { status, payload } = handleCleanStorage(ctx, await readBody(req));
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/runs/delete') {
         const { status, payload } = handleDeleteRuns(ctx, await readBody(req));

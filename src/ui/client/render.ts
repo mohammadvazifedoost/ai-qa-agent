@@ -6,6 +6,7 @@ import { projectPage } from './project.js';
 import { scenariosPage } from './scenarios.js';
 import { jobBanner, renderShell } from './shell.js';
 import { state } from './state.js';
+import { storagePage } from './storage.js';
 import { trackerPage } from './tracker.js';
 
 /** What the detail panel showed at the last render, to keep its scroll position while it stays. */
@@ -41,7 +42,9 @@ export function render(): void {
           ? projectPage(banner)
           : route.page === 'tracker'
             ? trackerPage(banner)
-            : overviewPage(banner);
+            : route.page === 'storage'
+              ? storagePage(banner)
+              : overviewPage(banner);
 
   const detail = $('#detail');
   if (detail && scroll) detail.scrollTop = scroll;
