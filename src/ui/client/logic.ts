@@ -631,3 +631,6 @@ export function cleanupBytes(
   if (old?.overlap && picked.has('old-runs') && picked.has('raw-output')) total -= old.overlap;
   return Math.max(0, total);
 }
+
+/** URL of a file under the project (evidence), relative to the page like the API (see appUrl in api.ts). */
+export const fileUrl = (p: string): string => 'files/' + p.split('/').map(encodeURIComponent).join('/');

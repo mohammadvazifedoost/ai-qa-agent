@@ -100,11 +100,11 @@ Your `package.json` then contains:
 
 > **Names at a glance.**
 >
-> | What | Name |
-> |---|---|
-> | GitHub repository | `mohammadvazifedoost/ai-qa-agent` |
+> | What                                    | Name                               |
+> | --------------------------------------- | ---------------------------------- |
+> | GitHub repository                       | `mohammadvazifedoost/ai-qa-agent`  |
 > | Package name (imports, `npm uninstall`) | `@mohammadvazifedoost/ai-qa-agent` |
-> | Command | `ai-qa-agent` |
+> | Command                                 | `ai-qa-agent`                      |
 >
 > Imports use the package name, e.g. `import { defineConfig } from '@mohammadvazifedoost/ai-qa-agent'`.
 > Always run the command through the local install (`npx ai-qa-agent` in a project where it is
@@ -156,15 +156,15 @@ build, routes, component directories, design-system libraries and existing tests
 
 Useful `init` options (all optional; you can also edit `.qa/config.ts` later):
 
-| Option | Purpose |
-|---|---|
-| `--ai <provider>` | `claude-code` (default), `codex` or `opencode` |
-| `--model <model>` | Model for the AI engine, e.g. `sonnet`, `opus` |
-| `--base-url <url>` | URL the app is served at (default: the detected dev port) |
-| `--figma <url>` | Figma file with the designs |
-| `--clickup-list <id>` | ClickUp list where bugs are created |
-| `--jira-url <url> --jira-project <KEY>` | Jira Cloud site and project where bugs are created |
-| `--force` | Overwrite an existing `.qa/config.ts` |
+| Option                                  | Purpose                                                   |
+| --------------------------------------- | --------------------------------------------------------- |
+| `--ai <provider>`                       | `claude-code` (default), `codex` or `opencode`            |
+| `--model <model>`                       | Model for the AI engine, e.g. `sonnet`, `opus`            |
+| `--base-url <url>`                      | URL the app is served at (default: the detected dev port) |
+| `--figma <url>`                         | Figma file with the designs                               |
+| `--clickup-list <id>`                   | ClickUp list where bugs are created                       |
+| `--jira-url <url> --jira-project <KEY>` | Jira Cloud site and project where bugs are created        |
+| `--force`                               | Overwrite an existing `.qa/config.ts`                     |
 
 Example with every integration:
 
@@ -270,11 +270,11 @@ A per-project install is still recommended, because `.qa/config.ts` and the gene
 All reasoning runs through an agent CLI that is already installed and logged in on the machine.
 Pick one with `ai.provider` (or `ai-qa-agent init --ai <provider>`):
 
-| `ai.provider` | Runs | Authentication | `ai.model` examples |
-|---|---|---|---|
-| `claude-code` (default) | `claude -p` (headless, native JSON-schema output) | Claude subscription login, `ANTHROPIC_API_KEY`, Bedrock/Vertex | `sonnet` (default), `opus` |
-| `codex` | `codex exec --json --sandbox read-only` | `codex login` (ChatGPT account) or an OpenAI API key | omit for Codex's default, `gpt-5-codex` |
-| `opencode` | `opencode run --format json` with an injected read-only agent | `opencode auth login` (any provider OpenCode supports) | `openai/gpt-5.5`, `anthropic/claude-sonnet-4-5` |
+| `ai.provider`           | Runs                                                          | Authentication                                                 | `ai.model` examples                             |
+| ----------------------- | ------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------- |
+| `claude-code` (default) | `claude -p` (headless, native JSON-schema output)             | Claude subscription login, `ANTHROPIC_API_KEY`, Bedrock/Vertex | `sonnet` (default), `opus`                      |
+| `codex`                 | `codex exec --json --sandbox read-only`                       | `codex login` (ChatGPT account) or an OpenAI API key           | omit for Codex's default, `gpt-5-codex`         |
+| `opencode`              | `opencode run --format json` with an injected read-only agent | `opencode auth login` (any provider OpenCode supports)         | `openai/gpt-5.5`, `anthropic/claude-sonnet-4-5` |
 
 For every provider:
 
@@ -290,10 +290,10 @@ For every provider:
 - The engine writes all files itself. Every AI transcript is kept in `.qa/artifacts/logs/ai/`.
 - Cost: Claude Code reports dollars and honours `ai.maxBudgetUsdPerTask`; OpenCode reports what its
   provider reports; Codex reports tokens only (shown in the log) and has no per-task cap.
-- Figma through MCP: the remote Figma server needs OAuth *in the CLI you use*: Claude Code via
+- Figma through MCP: the remote Figma server needs OAuth _in the CLI you use_: Claude Code via
   `claude mcp add`, Codex via `codex mcp login figma`, OpenCode via `opencode mcp auth figma`.
 
-Deterministic checks decide pass/fail; the AI decides *what* to check and *why* something failed.
+Deterministic checks decide pass/fail; the AI decides _what_ to check and _why_ something failed.
 Visual verdicts come from computed-CSS comparison against Figma tokens and pixel comparison
 against Figma frames, never from a model saying "looks right".
 
@@ -302,15 +302,15 @@ against Figma frames, never from a model saying "looks right".
 Each AI task is done by one of seven agents. An agent has one job, and its output is a file that
 the next agent reads:
 
-| Agent | Job | Writes |
-|---|---|---|
-| Application analyst | Reads the source and describes every page and user journey, with importance and criticality | `app-model.json` |
-| Design analyst | Extracts tokens, components and screens from Figma | `design-system.json` |
-| Scenario designer | Decides what is worth testing on a page, or turns the selected critical journeys into scenarios | `scenarios/<page>.json` |
-| Test author | Implements approved scenarios as Playwright tests, checking locators on the running app | `tests/<page>.spec.ts` |
-| Failure triager | Classifies one failed test from its evidence and the source | `triage.json` |
-| Defect consolidator | Groups verdicts that have the same root cause | `triage.json` (issues) |
-| Fix planner | Turns confirmed bugs into a plan for developers | `docs/bug-fix-plan/` |
+| Agent               | Job                                                                                             | Writes                  |
+| ------------------- | ----------------------------------------------------------------------------------------------- | ----------------------- |
+| Application analyst | Reads the source and describes every page and user journey, with importance and criticality     | `app-model.json`        |
+| Design analyst      | Extracts tokens, components and screens from Figma                                              | `design-system.json`    |
+| Scenario designer   | Decides what is worth testing on a page, or turns the selected critical journeys into scenarios | `scenarios/<page>.json` |
+| Test author         | Implements approved scenarios as Playwright tests, checking locators on the running app         | `tests/<page>.spec.ts`  |
+| Failure triager     | Classifies one failed test from its evidence and the source                                     | `triage.json`           |
+| Defect consolidator | Groups verdicts that have the same root cause                                                   | `triage.json` (issues)  |
+| Fix planner         | Turns confirmed bugs into a plan for developers                                                 | `docs/bug-fix-plan/`    |
 
 All agents share a few rules:
 
@@ -364,23 +364,23 @@ again in the new CLI (see above).
 
 Run every command with `npx ai-qa-agent …` in a project where it is installed locally.
 
-| Command | What it does |
-|---|---|
-| `ai-qa-agent init` | Detect the project and create `.qa/config.ts`, `.qa/rules.md`, `.qa/.gitignore` |
-| `ai-qa-agent doctor` | Verify the AI CLI, Playwright, how the app is built and served for testing, Figma and ClickUp/Jira configuration |
-| `ai-qa-agent analyze` | Analyze the source code (`.qa/app-model.json`: pages and ranked journeys, used by every mode) and the Figma file (`.qa/design-system.json`); `--skip-design`, `--refresh` |
-| `ai-qa-agent scenarios` | Generate/refresh test scenarios per page (`.qa/scenarios/*.json`); `--critical` for only the [critical flows](#critical-flows-smoke-tests) |
-| `ai-qa-agent scenarios list` | List scenarios (id, type, page, latest status, title); `--page`, `--removed` |
-| `ai-qa-agent scenarios remove <id...>` | Delete unnecessary/unusable scenarios and their tests; they are not regenerated (`--reason "<text>"`) |
-| `ai-qa-agent scenarios restore <id...>` | Undo a removal; the test comes back on the next `generate` |
-| `ai-qa-agent generate` | Generate Playwright tests from approved scenarios (`.qa/tests/*.spec.ts`); `--critical` for only the critical flows' tests |
-| `ai-qa-agent test` | Build the app, serve the production build, run the tests and collect evidence (no AI involved); `--critical` for only the critical flows |
-| `ai-qa-agent triage` | Classify the failures of the latest run and write a report |
-| `ai-qa-agent report` | Rebuild the report of a run from stored results |
-| `ai-qa-agent plan` | Write a plan for fixing the bugs behind a run's failed tests into the project (`docs/bug-fix-plan/<run>-plan.md`); `--run`, `--dir`, `--force` |
-| `ai-qa-agent run` | The full pipeline: analyze → scenarios → generate → test → triage → report; `--critical` for a smoke run of the critical flows only |
-| `ai-qa-agent changes` | Show what changed since the last analysis: new/changed/removed pages, changed shared files, and with `--design` new/changed Figma frames |
-| `ai-qa-agent ui` | Local dashboard: every scenario with its result, screenshots, videos, traces, analysis, and a button to log confirmed bugs in ClickUp or Jira |
+| Command                                 | What it does                                                                                                                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ai-qa-agent init`                      | Detect the project and create `.qa/config.ts`, `.qa/rules.md`, `.qa/.gitignore`                                                                                           |
+| `ai-qa-agent doctor`                    | Verify the AI CLI, Playwright, how the app is built and served for testing, Figma and ClickUp/Jira configuration                                                          |
+| `ai-qa-agent analyze`                   | Analyze the source code (`.qa/app-model.json`: pages and ranked journeys, used by every mode) and the Figma file (`.qa/design-system.json`); `--skip-design`, `--refresh` |
+| `ai-qa-agent scenarios`                 | Generate/refresh test scenarios per page (`.qa/scenarios/*.json`); `--critical` for only the [critical flows](#critical-flows-smoke-tests)                                |
+| `ai-qa-agent scenarios list`            | List scenarios (id, type, page, latest status, title); `--page`, `--removed`                                                                                              |
+| `ai-qa-agent scenarios remove <id...>`  | Delete unnecessary/unusable scenarios and their tests; they are not regenerated (`--reason "<text>"`)                                                                     |
+| `ai-qa-agent scenarios restore <id...>` | Undo a removal; the test comes back on the next `generate`                                                                                                                |
+| `ai-qa-agent generate`                  | Generate Playwright tests from approved scenarios (`.qa/tests/*.spec.ts`); `--critical` for only the critical flows' tests                                                |
+| `ai-qa-agent test`                      | Build the app, serve the production build, run the tests and collect evidence (no AI involved); `--critical` for only the critical flows                                  |
+| `ai-qa-agent triage`                    | Classify the failures of the latest run and write a report                                                                                                                |
+| `ai-qa-agent report`                    | Rebuild the report of a run from stored results                                                                                                                           |
+| `ai-qa-agent plan`                      | Write a plan for fixing the bugs behind a run's failed tests into the project (`docs/bug-fix-plan/<run>-plan.md`); `--run`, `--dir`, `--force`                            |
+| `ai-qa-agent run`                       | The full pipeline: analyze → scenarios → generate → test → triage → report; `--critical` for a smoke run of the critical flows only                                       |
+| `ai-qa-agent changes`                   | Show what changed since the last analysis: new/changed/removed pages, changed shared files, and with `--design` new/changed Figma frames                                  |
+| `ai-qa-agent ui`                        | Local dashboard: every scenario with its result, screenshots, videos, traces, analysis, and a button to log confirmed bugs in ClickUp or Jira                             |
 
 Global options: `-C, --cwd <dir>` (target project root), `--debug` (verbose logging),
 `-h, --help` (help for any command, e.g. `ai-qa-agent run --help`).
@@ -400,6 +400,7 @@ ai-qa-agent scenarios --page login --force --max 8   # cap this run; default: sc
 ai-qa-agent scenarios list --page checkout
 ai-qa-agent scenarios remove CHECKOUT-008 --reason "order placement is out of scope"
 ai-qa-agent ui --port 4310
+ai-qa-agent ui --port 3130 --base-path /blog/admin/qa   # behind a reverse proxy
 ai-qa-agent --cwd ../other-project doctor
 ```
 
@@ -426,7 +427,7 @@ Nothing is regenerated from scratch on every run:
   stored at analysis time (free, no AI). Only new and changed pages are re-analyzed; unchanged
   pages keep their model verbatim, so their scenarios and tests stay cached too.
 - Files shared by every page (router entry, layout, global CSS) are tracked separately as
-  *shared files*: registering a new route does not mark every page as changed. A changed shared
+  _shared files_: registering a new route does not mark every page as changed. A changed shared
   file is reported with a hint to do a full run when it matters (e.g. global styles).
 - **Scenarios** and **tests** are cached per page on their inputs. When a page changes, its
   existing scenarios are handed to the AI to update; ids and `approved` flags are kept.
@@ -484,15 +485,15 @@ npx ai-qa-agent run --critical               # all of the above, then triage and
 - `test --critical` and `run --critical` select the tests by scenario id, and combine with `--page`,
   `--feature` and `--grep`. `run --critical` skips the Figma extraction and cannot be combined with
   `--changed`.
-- In the dashboard, critical flows show a *Critical flow* chip, the Overview lists them with their
-  results, and **Run tests → Critical flows** starts a new run with only their tests. *Choose
-  critical flows* on the dashboard's Project page does the same as `scenarios --critical`.
+- In the dashboard, critical flows show a _Critical flow_ chip, the Overview lists them with their
+  results, and **Run tests → Critical flows** starts a new run with only their tests. _Choose
+  critical flows_ on the dashboard's Project page does the same as `scenarios --critical`.
 
 ### Removing scenarios
 
 Some generated scenarios are not worth keeping (duplicates, out of scope, untestable). Delete them
 with `ai-qa-agent scenarios remove <id...> [--reason "<text>"]` (find ids with
-`ai-qa-agent scenarios list`) or with *Remove* at the bottom of a scenario's panel in the dashboard.
+`ai-qa-agent scenarios list`) or with _Remove_ at the bottom of a scenario's panel in the dashboard.
 
 - The scenario leaves the `scenarios` array of `.qa/scenarios/<page>.json` and its
   `test('<ID>: …')` block is cut out of `.qa/tests/<page>.spec.ts`, without AI; other tests and
@@ -509,49 +510,49 @@ with `ai-qa-agent scenarios remove <id...> [--reason "<text>"]` (find ids with
 
 ### Adding and editing scenarios
 
-In the dashboard, *Add scenario* opens a form (page, title, type, priority, viewport, steps,
+In the dashboard, _Add scenario_ opens a form (page, title, type, priority, viewport, steps,
 expected results, and optional preconditions, test data, feature and rationale). Either fill it in
-yourself, or write one sentence under *Describe the test* and click *Draft with AI*: the AI fills
-in the fields for you to review, and nothing is saved until you click *Add scenario*. *Edit* at
+yourself, or write one sentence under _Describe the test_ and click _Draft with AI_: the AI fills
+in the fields for you to review, and nothing is saved until you click _Add scenario_. _Edit_ at
 the bottom of a scenario's panel opens the same form for an existing scenario.
 
 - Scenarios you add or edit get `"origin": "person"` in `.qa/scenarios/<page>.json` and show a
-  *Yours* chip. Scenario generation keeps them exactly as written: the AI is told not to repeat
+  _Yours_ chip. Scenario generation keeps them exactly as written: the AI is told not to repeat
   them, and any AI scenario that reuses their id or title is dropped. Editing an AI scenario makes
   it yours.
 - New scenarios get the next free id on the page; ids of removed scenarios are never reused.
-- Saving does not touch the tests. A scenario without a test shows *No test yet*, and one changed
-  after its test was written shows *Test out of date*; both are listed under the *Needs a test*
-  tab. Its panel then offers *Create test* or *Rewrite test* (always available for approved
+- Saving does not touch the tests. A scenario without a test shows _No test yet_, and one changed
+  after its test was written shows _Test out of date_; both are listed under the _Needs a test_
+  tab. Its panel then offers _Create test_ or _Rewrite test_ (always available for approved
   scenarios): the AI writes only that scenario's test, and it is spliced into
   `.qa/tests/<page>.spec.ts` in place of the old one (or after the last test), so every other test
   in the file stays exactly as it was. The edited file is checked with `playwright test --list`;
   after three failed attempts the original file is kept. A page with no spec file yet gets its
   whole file generated instead.
-- *All* lists every scenario, the ones with a result in the selected run first; *Not run (N)* lists
-  those without one. A scenario with a test has *Run this test* (*Run this test again* once it has
+- _All_ lists every scenario, the ones with a result in the selected run first; _Not run (N)_ lists
+  those without one. A scenario with a test has _Run this test_ (_Run this test again_ once it has
   a result) in its panel: Playwright runs only that test, and its result replaces the scenario's
   result in the selected run (evidence under `.qa/artifacts/runs/<run>/reruns/`), marked as run on
   its own. An earlier AI analysis of that test is no longer shown, since it described an older
   failure. With no run yet, a new run is started. `ai-qa-agent test` still runs everything.
-- *Run tests* in the top bar opens a menu: *All tests* (a new run with every test, like
-  `ai-qa-agent test`; the dashboard switches to it when done), *Failed tests (N)* (only the failed
-  and flaky tests of the selected run, run again and updated in it), *Critical flows (N)* (a new
-  run with only those) and *Tests not run yet (N)* (every test without a result in the selected
-  run, added to that run). *Refresh* (the round-arrows icon) reloads results and re-checks the bug
+- _Run tests_ in the top bar opens a menu: _All tests_ (a new run with every test, like
+  `ai-qa-agent test`; the dashboard switches to it when done), _Failed tests (N)_ (only the failed
+  and flaky tests of the selected run, run again and updated in it), _Critical flows (N)_ (a new
+  run with only those) and _Tests not run yet (N)_ (every test without a result in the selected
+  run, added to that run). _Refresh_ (the round-arrows icon) reloads results and re-checks the bug
   tracker. Runs and fix plans continue in the background; reloading the page keeps showing their
-  progress. *Cancel* in
+  progress. _Cancel_ in
   the progress banner stops Playwright or the AI at once (the whole process tree) and changes
   nothing: no results are merged, no plan is written, and a cancelled run of all tests is recorded
   as failed with "Cancelled".
 - The menu on the left shows how the tests run (production build or development server) and the
-  bug tracker in use: *connected* (verified against the tracker with your token, with the project
-  or list), *credentials missing* (which variables to set), *cannot connect* (the error), or *not
-  set up*. With no tracker configured it lists the ones you can set up.
+  bug tracker in use: _connected_ (verified against the tracker with your token, with the project
+  or list), _credentials missing_ (which variables to set), _cannot connect_ (the error), or _not
+  set up_. With no tracker configured it lists the ones you can set up.
 
 ### Bug-fix plans
 
-`ai-qa-agent plan` (or *Create fix plan* on the dashboard's Overview and Defects pages) turns the failed tests of a run
+`ai-qa-agent plan` (or _Create fix plan_ on the dashboard's Overview and Defects pages) turns the failed tests of a run
 into a document for developers: a summary table in the suggested fix order, then per bug what is
 wrong, steps to reproduce, the root cause with file and line, the proposed fix (with a short code
 hint where it helps), files to change, risks, how to verify, and screenshot evidence. Failed tests
@@ -575,31 +576,33 @@ export default defineConfig({
   project: { name: 'shop', framework: 'next', packageManager: 'pnpm' },
   app: {
     baseUrl: 'http://127.0.0.1:3000', // dev URL; production testing uses its host with a free port
-    mode: 'production',              // default; 'development' tests the dev server instead
-    production: {                    // optional: detected from the framework and package.json
-      buildCommand: 'pnpm run build',                           // false: nothing to build
+    mode: 'production', // default; 'development' tests the dev server instead
+    production: {
+      // optional: detected from the framework and package.json
+      buildCommand: 'pnpm run build', // false: nothing to build
       startCommand: 'pnpm exec next start -p {port} -H {host}', // {port}/{host} are filled in
       buildTimeoutMs: 600_000,
     },
-    startCommand: 'pnpm dev',        // dev server; used only with mode: 'development'
+    startCommand: 'pnpm dev', // dev server; used only with mode: 'development'
     startTimeoutMs: 120_000,
-    reuseExistingServer: true,       // mode 'development' only
+    reuseExistingServer: true, // mode 'development' only
   },
   source: { include: ['src', 'app'], exclude: ['node_modules', '.next'] },
   figma: {
     fileUrl: 'https://www.figma.com/design/<fileKey>/<name>',
-    frames: [                        // optional: pin frames to routes
+    frames: [
+      // optional: pin frames to routes
       { name: 'checkout-desktop', nodeId: '12:34', route: '/checkout', viewport: 'desktop' },
     ],
   },
   clickup: {
     listId: '901523571090',
-    tokenEnv: 'CLICKUP_API_TOKEN',   // the token is read from this env var, never from config
+    tokenEnv: 'CLICKUP_API_TOKEN', // the token is read from this env var, never from config
     tags: ['ai-qa-agent'],
-    status: 'to do',                 // optional; default is the list's first status
+    status: 'to do', // optional; default is the list's first status
     attachEvidence: true,
   },
-  browsers: ['chromium'],            // chromium | firefox | webkit
+  browsers: ['chromium'], // chromium | firefox | webkit
   viewports: {
     desktop: { width: 1440, height: 900 },
     tablet: { width: 834, height: 1112, hasTouch: true },
@@ -607,14 +610,14 @@ export default defineConfig({
   },
   tests: { timeoutMs: 30_000, workers: 2, verifyRetries: 1 },
   scenarios: {
-    maxPerPage: 15,                  // optional cap per page; omit for no limit (default)
-    maxCritical: 5,                  // optional cap on critical flows; omit for no limit (default)
+    maxPerPage: 15, // optional cap per page; omit for no limit (default)
+    maxCritical: 5, // optional cap on critical flows; omit for no limit (default)
   },
   visual: { pixelThreshold: 0.1, acceptableDiffRatio: 0.02 },
   ai: {
-    provider: 'claude-code',         // claude-code | codex | opencode
-    model: 'sonnet',                 // provider-specific; omit for the provider's default
-    command: 'claude',               // optional: path to the CLI executable
+    provider: 'claude-code', // claude-code | codex | opencode
+    model: 'sonnet', // provider-specific; omit for the provider's default
+    command: 'claude', // optional: path to the CLI executable
     maxBudgetUsdPerTask: 3,
     minConfidenceToFile: 0.7,
     mcpServers: {
@@ -654,14 +657,14 @@ For `generate`, `test` and `run` the agent:
 4. runs the tests against that URL (the generated Playwright config takes it from
    `AI_QA_BASE_URL`), stores the results, and stops the server.
 
-| Framework | Build | Serve |
-|---|---|---|
-| Next.js | `build` script | `next start -p {port} -H {host}` |
-| Vite, SvelteKit | `build` script | `vite preview --port {port} --host {host} --strictPort` |
-| Astro | `build` script | `astro preview --port {port} --host {host}` |
-| Gatsby | `build` script | `gatsby serve -p {port} -H {host}` |
-| Nuxt | `build` script | `node .output/server/index.mjs` (port from `PORT`) |
-| Remix, React Router | `build` script | `start` script (port from `PORT`) |
+| Framework                                | Build          | Serve                                                                                 |
+| ---------------------------------------- | -------------- | ------------------------------------------------------------------------------------- |
+| Next.js                                  | `build` script | `next start -p {port} -H {host}`                                                      |
+| Vite, SvelteKit                          | `build` script | `vite preview --port {port} --host {host} --strictPort`                               |
+| Astro                                    | `build` script | `astro preview --port {port} --host {host}`                                           |
+| Gatsby                                   | `build` script | `gatsby serve -p {port} -H {host}`                                                    |
+| Nuxt                                     | `build` script | `node .output/server/index.mjs` (port from `PORT`)                                    |
+| Remix, React Router                      | `build` script | `start` script (port from `PORT`)                                                     |
 | Angular, Create React App, anything else | `build` script | not detectable: set `app.production.startCommand`, e.g. `npx serve -s dist -l {port}` |
 
 What you can rely on:
@@ -693,7 +696,7 @@ named in `clickup.tokenEnv`, Jira through the variables named in `jira.tokenEnv`
 OAuth flows. `.qa/.gitignore` excludes artifacts, reports and state; scenarios, tests, config and rules
 are meant to be committed.
 
-The *Bug tracker* page of the dashboard can keep the token (and the Jira email) for you in
+The _Bug tracker_ page of the dashboard can keep the token (and the Jira email) for you in
 `.qa/.env.local`, a git-ignored file read when any command starts. A variable already set in the
 shell wins over that file.
 
@@ -715,7 +718,7 @@ captures video/screenshots/traces, and triages failures. Visual/design-token sce
 not generated, since there is no design to compare against.
 
 With no `clickup` or `jira` section, confirmed defects stay in the report
-(`.qa/reports/<run>/bugs/*.md`) and in the dashboard, which shows no *Create task* / *Create issue*
+(`.qa/reports/<run>/bugs/*.md`) and in the dashboard, which shows no _Create task_ / _Create issue_
 buttons.
 
 ```bash
@@ -775,6 +778,7 @@ keeps the partial result, and fetches missing reference screenshots on the next 
      priorities: { critical: 'Highest', high: 'High', medium: 'Medium', low: 'Low' }, // default
    },
    ```
+
 3. `ai-qa-agent doctor` verifies the credentials and shows the project name.
 4. Defects become issues through the official REST API v3: the bug report is converted to Atlassian
    Document Format, labels are added, priority is mapped from severity (and dropped automatically if
@@ -784,7 +788,7 @@ If both `clickup` and `jira` are configured, set `tracker: 'jira'` or `tracker: 
 
 **Nothing is ever filed automatically; there is no flag or setting for it.** After a run,
 confirmed defects wait in the report and in the dashboard (`ai-qa-agent ui`); a task/issue is
-created only when a person clicks *Create task* (ClickUp) or *Create issue* (Jira) on a failed
+created only when a person clicks _Create task_ (ClickUp) or _Create issue_ (Jira) on a failed
 test. Symptoms of one underlying defect are grouped into one bug report, so one click covers all
 the tests it affects.
 
@@ -793,25 +797,31 @@ the tests it affects.
 `npx ai-qa-agent ui` serves a local page (default `http://127.0.0.1:4310`) built from the files the
 pipeline writes. There is no database and no external service.
 
-The menu on the left has the project, five pages in two groups (*Results*: Overview, Defects,
-Scenarios; *Setup*: Project, Bug tracker; *Set up* next to Bug tracker while it is not connected)
+**Behind a reverse proxy.** `--base-path /blog/admin/qa` serves the dashboard under that path: the
+page gets a `<base href>`, and every request it makes (API, evidence, assets) stays under the path.
+The proxy may pass the path through or strip it. The dashboard has no login of its own and can
+start AI tasks and test runs, so keep it on `127.0.0.1` and put your own authentication in front
+of the proxy.
+
+The menu on the left has the project, five pages in two groups (_Results_: Overview, Defects,
+Scenarios; _Setup_: Project, Bug tracker; _Set up_ next to Bug tracker while it is not connected)
 and, under them, the selected run at a glance (a ring of passed, flaky and failed tests with the
 pass rate). The top bar has the run picker (every run, newest first, with its date,
 counts and verdict; arrow keys move through it, Escape closes it), two icon buttons (dark / light
-mode, and *Refresh*), *Add scenario* and *Run tests*. On a small screen the menu opens from the
+mode, and _Refresh_), _Add scenario_ and _Run tests_. On a small screen the menu opens from the
 button in the top bar.
 
 - **Overview** answers "how did the run go": passed / failed / flaky / not run with the pass rate
   against the target, the defects to review, results per page (a page name opens its scenarios),
   the critical flows with their results, and what to do next. Before the first run it shows the
   steps to get started instead.
-- **Scenarios** lists every scenario with its result. Filter by result (*All*, *Failed*, *Passed*,
-  *Not run*, *Needs a test*, each with its count), page, type (functional, visual, responsive,
+- **Scenarios** lists every scenario with its result. Filter by result (_All_, _Failed_, _Passed_,
+  _Not run_, _Needs a test_, each with its count), page, type (functional, visual, responsive,
   accessibility) or search; long lists are paged. Selecting a scenario opens its panel: the result
   and why it failed (with a link to the defect), the evidence (screenshot, video, trace,
   console/network log, page snapshot), the test error (collapsed), preconditions, steps and
-  expected results, and the actions *Run this test*, *Create test* / *Rewrite test*, *Edit* and
-  *Remove*.
+  expected results, and the actions _Run this test_, _Create test_ / _Rewrite test_, _Edit_ and
+  _Remove_.
 - **Defects** lists what needs a decision: the defects the analyzer confirmed, by severity, then
   the failed tests it did not confirm as a product bug (test problem, environment problem, cause
   not confirmed, not analyzed). A defect shows what was expected and what happened, the cause with
@@ -819,36 +829,36 @@ button in the top bar.
   their evidence.
 - **Project** shows what the agent knows about the application and brings it up to date without
   a terminal, in three steps. Each step says whether it is out of date, asks before it starts
-  (what changes, what stays) and then runs in the background with a progress line and *Cancel*:
-  1. *Application analysis*: the pages, journeys and when they were analyzed, and which pages
-     changed in the code since then. *Update the analysis* reads only the changed and new pages
-     (`ai-qa-agent analyze`); *Analyze everything again* reads the whole application
+  (what changes, what stays) and then runs in the background with a progress line and _Cancel_:
+  1. _Application analysis_: the pages, journeys and when they were analyzed, and which pages
+     changed in the code since then. _Update the analysis_ reads only the changed and new pages
+     (`ai-qa-agent analyze`); _Analyze everything again_ reads the whole application
      (`analyze --refresh`), optionally with the Figma design.
-  2. *Scenarios*: per page, how many there are and whether they are older than the analysis.
-     *Update scenarios* writes the pages that are out of date or have none, *Regenerate all
-     scenarios* writes every page (`scenarios --force`), and each row can be written on its own.
+  2. _Scenarios_: per page, how many there are and whether they are older than the analysis.
+     _Update scenarios_ writes the pages that are out of date or have none, _Regenerate all
+     scenarios_ writes every page (`scenarios --force`), and each row can be written on its own.
      Pages are saved one by one, so cancelling keeps the pages already written.
-  3. *Critical flows*: the ones chosen, and *Choose critical flows* (`scenarios --critical`), with
+  3. _Critical flows_: the ones chosen, and _Choose critical flows_ (`scenarios --critical`), with
      an optional maximum.
 
   Long tables (the pages of the analysis, scenarios per page, results per page on Overview) get a
-  search box, *All* / *Changed* (or *Out of date*, *With failures*) with counts, and ten rows at a
-  time with *Previous* / *Next*.
+  search box, _All_ / _Changed_ (or _Out of date_, _With failures_) with counts, and ten rows at a
+  time with _Previous_ / _Next_.
 
   These steps call the AI, so they take minutes and are billed by your AI provider; the result
   line ends with the cost when the provider reports it. Checking what is out of date compares
-  files only and is free. The menu shows *Out of date* next to Project when step 1 or 2 needs an
+  files only and is free. The menu shows _Out of date_ next to Project when step 1 or 2 needs an
   update.
 
-- Every defect has either an *Open task … in ClickUp* / *Open … in Jira* link or a *Create task in
-  ClickUp* / *Create issue in Jira* button. The dashboard checks the tracker for the item recorded
+- Every defect has either an _Open task … in ClickUp_ / _Open … in Jira_ link or a _Create task in
+  ClickUp_ / _Create issue in Jira_ button. The dashboard checks the tracker for the item recorded
   for that defect (from this run or an earlier run of the same defect, cached for a minute); if it
   still exists you get the link, otherwise (never created, or deleted there) the button. A click
   creates it from the bug report (consolidated for confirmed defects; for failures the analyzer
   did not confirm it is built from the scenario and the error and labelled `needs-verification`).
-- *Remove* at the bottom of a scenario's panel removes the scenario and its test after an inline
+- _Remove_ at the bottom of a scenario's panel removes the scenario and its test after an inline
   confirmation (optional reason); see [Removing scenarios](#removing-scenarios).
-- *Delete screenshot* / *Delete video* (and *Delete all media* when there are several) under the
+- _Delete screenshot_ / _Delete video_ (and _Delete all media_ when there are several) under the
   evidence delete those files from the run after an inline confirmation and remove them from its
   `results.json`. Traces and logs are kept.
 - The dashboard follows the light or dark setting of your system until you choose one with the
@@ -857,8 +867,8 @@ button in the top bar.
   Every view has its own address (`#/scenarios/CONTACT-009`, `#/defects/ISSUE-001`), so the
   browser's back button and bookmarks work.
 - **Bug tracker** connects ClickUp (list ID, API token, optional status of new tasks) or Jira (site
-  address, project key, email, API token). *Test connection* checks them without saving; *Save and
-  connect* tests again, then writes the list or project into `.qa/config.ts` (comments and the rest
+  address, project key, email, API token). _Test connection_ checks them without saving; _Save and
+  connect_ tests again, then writes the list or project into `.qa/config.ts` (comments and the rest
   of the file are kept; `tracker` is set when both are configured) and the token and email into
   `.qa/.env.local`, never into config. A token set in the shell that started the UI still works and
   wins. Filing results are written back to the run so the report and the dashboard stay consistent.
@@ -870,9 +880,9 @@ in the states that matter (page loaded, a form showing its errors, an open dialo
 generated tests reach the state and call `qa.expectAccessible()`:
 
 ```ts
-await qa.expectAccessible();                                   // the whole page
+await qa.expectAccessible(); // the whole page
 await qa.expectAccessible({ include: page.getByRole('dialog') }); // one region
-await qa.expectAccessible({ disableRules: ['color-contrast'] });  // skip rules by id
+await qa.expectAccessible({ disableRules: ['color-contrast'] }); // skip rules by id
 ```
 
 - **Serious** and **critical** violations fail the test; minor and moderate ones do not. Every
@@ -1198,24 +1208,24 @@ compare computed styles against the design.
 
 ## Troubleshooting
 
-| Symptom | Cause / fix |
-|---|---|
-| `EALLOWGIT: Fetching packages of type "git" have been disabled` | npm 11.x/12 blocks git dependencies by default. Run `npm config set allow-git all --location=project` and install again. |
-| `npx ai-qa-agent` says *could not determine executable to run* or `dist/cli.js` is missing | The package was not built during install. Reinstall with npm (`npm install -D github:mohammadvazifedoost/ai-qa-agent`); with pnpm/Yarn allow the package's build scripts. Git must be installed. |
-| `Cannot find module '@mohammadvazifedoost/ai-qa-agent'` in `.qa/config.ts` or a test | Install the package in the project itself (not only globally); the import name is `@mohammadvazifedoost/ai-qa-agent`. |
-| `The production build failed: "..." exited with code N. Tests were not run.` | The app does not build. The message ends with the build output; the full output is in `.qa/artifacts/runs/<run>/logs/app-build.log`. Fix the build (run the command yourself to reproduce) or correct `app.production.buildCommand`. |
-| `Production-mode testing is not possible: ...` | The serve or build command could not be detected (unknown framework, no `build` script, Angular/CRA without a static server). Set `app.production.startCommand` / `buildCommand`; `ai-qa-agent doctor` shows the result. |
-| `Something already answers at http://...` in production mode | The production server has a fixed URL and another process (often the dev server) uses it. Stop that process, use `{port}` in `app.production.startCommand`, or set `app.production.reuseExistingServer: true` if it really is a production server. |
-| The build is not repeated although something changed | The build is skipped when no project file changed (path, size, modification time) outside dependency and output folders. Delete `.qa/artifacts/production-build.json` to force a build. |
-| `app-model.json was written by an older version` | The application model gained journey ranking. Run `ai-qa-agent analyze` (a `run` does it by itself); scenarios and tests are then refreshed once. |
-| `App did not become ready at http://localhost:...` while the dev server log says ready | `localhost` resolved to IPv6 (`::1`) but the server or the OS only accepts IPv4 (or vice versa). The error prints a loopback probe; bind the server explicitly (`--host 127.0.0.1`) and use `http://127.0.0.1:<port>` in `app.baseUrl`. |
-| `Figma MCP rejected N call(s) because of plan limits` | Monthly/daily Figma MCP quota exhausted. Partial results are kept; re-run `ai-qa-agent analyze` later. |
-| `AI task ... failed (error_max_budget_usd)` | Raise `ai.maxBudgetUsdPerTask` or narrow the scope (`--page`). |
-| `Claude Code exited ... without a result` | Run `claude --version` and `claude -p "hi"`; log in with `claude` if needed. |
-| `No page matches "..."` | Use a route (`/checkout`), a slug (`checkout`) or the page name from `app-model.json`. |
-| Visual tests fail with `no-reference` | The screen has no downloaded reference; check `design-system.json` → `references`. |
-| A test is wrong, not the app | The triage report says `TEST_BUG` with the reason; fix `.qa/scenarios/<page>.json` (the expectation) and rerun `ai-qa-agent generate --page <page> --force`, or drop it with `ai-qa-agent scenarios remove <id>`. |
-| Everything is regenerated each run | `.qa/state.json` is missing or ignored; keep it writable (it is git-ignored but must persist locally/in CI cache). |
+| Symptom                                                                                    | Cause / fix                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EALLOWGIT: Fetching packages of type "git" have been disabled`                            | npm 11.x/12 blocks git dependencies by default. Run `npm config set allow-git all --location=project` and install again.                                                                                                                           |
+| `npx ai-qa-agent` says _could not determine executable to run_ or `dist/cli.js` is missing | The package was not built during install. Reinstall with npm (`npm install -D github:mohammadvazifedoost/ai-qa-agent`); with pnpm/Yarn allow the package's build scripts. Git must be installed.                                                   |
+| `Cannot find module '@mohammadvazifedoost/ai-qa-agent'` in `.qa/config.ts` or a test       | Install the package in the project itself (not only globally); the import name is `@mohammadvazifedoost/ai-qa-agent`.                                                                                                                              |
+| `The production build failed: "..." exited with code N. Tests were not run.`               | The app does not build. The message ends with the build output; the full output is in `.qa/artifacts/runs/<run>/logs/app-build.log`. Fix the build (run the command yourself to reproduce) or correct `app.production.buildCommand`.               |
+| `Production-mode testing is not possible: ...`                                             | The serve or build command could not be detected (unknown framework, no `build` script, Angular/CRA without a static server). Set `app.production.startCommand` / `buildCommand`; `ai-qa-agent doctor` shows the result.                           |
+| `Something already answers at http://...` in production mode                               | The production server has a fixed URL and another process (often the dev server) uses it. Stop that process, use `{port}` in `app.production.startCommand`, or set `app.production.reuseExistingServer: true` if it really is a production server. |
+| The build is not repeated although something changed                                       | The build is skipped when no project file changed (path, size, modification time) outside dependency and output folders. Delete `.qa/artifacts/production-build.json` to force a build.                                                            |
+| `app-model.json was written by an older version`                                           | The application model gained journey ranking. Run `ai-qa-agent analyze` (a `run` does it by itself); scenarios and tests are then refreshed once.                                                                                                  |
+| `App did not become ready at http://localhost:...` while the dev server log says ready     | `localhost` resolved to IPv6 (`::1`) but the server or the OS only accepts IPv4 (or vice versa). The error prints a loopback probe; bind the server explicitly (`--host 127.0.0.1`) and use `http://127.0.0.1:<port>` in `app.baseUrl`.            |
+| `Figma MCP rejected N call(s) because of plan limits`                                      | Monthly/daily Figma MCP quota exhausted. Partial results are kept; re-run `ai-qa-agent analyze` later.                                                                                                                                             |
+| `AI task ... failed (error_max_budget_usd)`                                                | Raise `ai.maxBudgetUsdPerTask` or narrow the scope (`--page`).                                                                                                                                                                                     |
+| `Claude Code exited ... without a result`                                                  | Run `claude --version` and `claude -p "hi"`; log in with `claude` if needed.                                                                                                                                                                       |
+| `No page matches "..."`                                                                    | Use a route (`/checkout`), a slug (`checkout`) or the page name from `app-model.json`.                                                                                                                                                             |
+| Visual tests fail with `no-reference`                                                      | The screen has no downloaded reference; check `design-system.json` → `references`.                                                                                                                                                                 |
+| A test is wrong, not the app                                                               | The triage report says `TEST_BUG` with the reason; fix `.qa/scenarios/<page>.json` (the expectation) and rerun `ai-qa-agent generate --page <page> --force`, or drop it with `ai-qa-agent scenarios remove <id>`.                                  |
+| Everything is regenerated each run                                                         | `.qa/state.json` is missing or ignored; keep it writable (it is git-ignored but must persist locally/in CI cache).                                                                                                                                 |
 
 Logs: `.qa/artifacts/logs/ai-qa.log` (all levels), `ai-qa-agent --debug ...` for console verbosity,
 `AI_QA_DEBUG=1` to print stack traces.

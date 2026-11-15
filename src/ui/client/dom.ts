@@ -1,5 +1,5 @@
 /** Small DOM helpers shared by the dashboard modules. */
-import { esc } from './logic.js';
+import { esc, fileUrl } from './logic.js';
 
 /** The element for a selector. Callers only ask for elements the page or current modal contains. */
 export const $ = <T extends HTMLElement = HTMLElement>(s: string, el: ParentNode = document): T =>
@@ -11,8 +11,7 @@ export const $ = <T extends HTMLElement = HTMLElement>(s: string, el: ParentNode
  */
 export const sideBySide = window.matchMedia('(min-width: 1280px)');
 
-/** URL of a file under the project (evidence), served by the dashboard under /files/. */
-export const fileUrl = (p: string): string => '/files/' + p.split('/').map(encodeURIComponent).join('/');
+export { fileUrl };
 
 export const link = (href: string | null | undefined, text: string, blank?: boolean): string =>
   href

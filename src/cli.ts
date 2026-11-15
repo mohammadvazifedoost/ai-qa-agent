@@ -32,7 +32,7 @@ import {
   routesToAnalyze,
 } from './changes/detect.js';
 import { loadDesign } from './scenarios/generate.js';
-import { startUi } from './ui/server.js';
+import { normalizeBasePath, startUi } from './ui/server.js';
 import { TestRunResultSchema, type TestRunResult } from './runner/results.js';
 import { triageRun } from './triage/triage.js';
 import { TriageResultSchema } from './triage/schema.js';
@@ -429,12 +429,17 @@ program
   )
   .option('--port <port>', 'port to listen on', (v) => Number(v), 4310)
   .option('--host <host>', 'interface to bind', '127.0.0.1')
-  .action(async (o: { port: number; host: string }) => {
+  .option(
+    '--base-path <path>',
+    'URL path a reverse proxy serves the dashboard under, e.g. /blog/admin/qa (default: none)',
+  )
+  .action(async (o: { port: number; host: string; basePath?: string }) => {
     const ctx = await createContext(root());
-    const server = await startUi(ctx, { port: o.port, host: o.host });
+    const basePath = normalizeBasePath(o.basePath);
+    const server = await startUi(ctx, { port: o.port, host: o.host, basePath });
     const addr = server.address();
-    const url =
-      typeof addr === 'object' && addr ? `http://${o.host}:${addr.port}/` : `http://${o.host}:${o.port}/`;
+    const port = typeof addr === 'object' && addr ? addr.port : o.port;
+    const url = `http://${o.host}:${port}${basePath}/`;
     console.log(`AI QA Agent dashboard: ${pc.bold(url)}  (Ctrl+C to stop)`);
     const info = trackerInfo(ctx.config);
     if (info.kind && !info.credentialsPresent) {

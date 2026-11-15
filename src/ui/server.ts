@@ -874,7 +874,7 @@ async function handleRunTest(ctx: QaContext, body: string): Promise<{ status: nu
  * The dashboard's own files, compiled into dist/ui at package build time: the page (`/`) and its
  * ES modules (`/client/*.js`). Nothing else under dist is reachable.
  */
-function serveAsset(urlPath: string, res: http.ServerResponse): void {
+function serveAsset(urlPath: string, res: http.ServerResponse, basePath = ''): void {
   const uiDir = fileURLToPath(new URL('.', import.meta.url));
   const clientDir = path.join(uiDir, 'client');
   const file =
@@ -895,12 +895,50 @@ function serveAsset(urlPath: string, res: http.ServerResponse): void {
     'Content-Type': urlPath === '/' ? 'text/html; charset=utf-8' : 'text/javascript; charset=utf-8',
     'Cache-Control': 'no-cache',
   });
+  if (urlPath === '/' && basePath) {
+    res.end(withBaseHref(fs.readFileSync(file, 'utf8'), basePath));
+    return;
+  }
   fs.createReadStream(file).pipe(res);
 }
 
-export function startUi(ctx: QaContext, opts: { port: number; host?: string }): Promise<http.Server> {
+/**
+ * The path a reverse proxy serves the dashboard under (`--base-path /qa`), without a trailing slash,
+ * or '' for none. Only plain path segments are accepted, since the value is written into the page.
+ */
+export function normalizeBasePath(value: string | undefined): string {
+  const trimmed = (value ?? '').trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+  const withSlash = trimmed.startsWith('/') ? trimmed : '/' + trimmed;
+  if (
+    !/^(\/[A-Za-z0-9._~-]+)+$/.test(withSlash) ||
+    withSlash.split('/').some((s) => s === '.' || s === '..')
+  ) {
+    throw new Error(`--base-path must be a URL path such as /qa or /blog/admin/qa (got "${value}")`);
+  }
+  return withSlash;
+}
+
+/** The page with a `<base href>` for `basePath`: its relative URLs (API, files, assets) then resolve under it. */
+export function withBaseHref(html: string, basePath: string): string {
+  return basePath ? html.replace(/<head>/i, `<head>\n    <base href="${basePath}/" />`) : html;
+}
+
+/** The request path inside the dashboard: `basePath` is removed when the proxy passed it through. */
+export function appPath(pathname: string, basePath: string): string {
+  if (!basePath) return pathname;
+  if (pathname === basePath) return '/';
+  return pathname.startsWith(basePath + '/') ? pathname.slice(basePath.length) : pathname;
+}
+
+export function startUi(
+  ctx: QaContext,
+  opts: { port: number; host?: string; basePath?: string },
+): Promise<http.Server> {
+  const basePath = normalizeBasePath(opts.basePath);
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
+    url.pathname = appPath(url.pathname, basePath);
     // Every change is a JSON request from the page itself. A plain form on another site cannot
     // send one without the browser asking this server first, which it never allows.
     if (req.method === 'POST' && !/^application\/json/i.test(req.headers['content-type'] ?? '')) {
@@ -909,7 +947,7 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
     }
     try {
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname.startsWith('/client/'))) {
-        serveAsset(url.pathname, res);
+        serveAsset(url.pathname, res, basePath);
       } else if (req.method === 'GET' && url.pathname === '/api/overview') {
         json(res, 200, await buildOverview(ctx, url.searchParams.get('run') ?? undefined));
       } else if (req.method === 'GET' && url.pathname === '/api/tasks') {

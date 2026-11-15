@@ -7,9 +7,16 @@ export interface Answer<T> {
   out: T & { error?: string };
 }
 
+/**
+ * Server paths are written as `/api/...`, but requested relative to the page, so the dashboard also
+ * works behind a reverse proxy that serves it under a path (`ai-qa-agent ui --base-path`). The page
+ * then carries a `<base href>` naming that path.
+ */
+export const appUrl = (url: string): string => url.replace(/^\/+/, '');
+
 async function send<T>(url: string, init?: RequestInit): Promise<Answer<T>> {
   try {
-    const res = await fetch(url, init);
+    const res = await fetch(appUrl(url), init);
     return { ok: res.ok, out: (await res.json()) as T & { error?: string } };
   } catch (err) {
     return { ok: false, out: { error: String(err) } as T & { error?: string } };
@@ -26,6 +33,6 @@ export const postJson = <T>(url: string, body: unknown): Promise<Answer<T>> =>
   });
 
 export async function getOverview(runId?: string): Promise<Data> {
-  const res = await fetch('/api/overview' + (runId ? '?run=' + encodeURIComponent(runId) : ''));
+  const res = await fetch(appUrl('/api/overview' + (runId ? '?run=' + encodeURIComponent(runId) : '')));
   return (await res.json()) as Data;
 }
