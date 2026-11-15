@@ -13,6 +13,7 @@ describe('dashboard base path', () => {
     expect(normalizeBasePath('/')).toBe('');
     expect(normalizeBasePath('/blog/admin/qa/')).toBe('/blog/admin/qa');
     expect(normalizeBasePath('qa')).toBe('/qa');
+    expect(normalizeBasePath('C:/Program Files/Git/blog/admin/qa')).toBe('/blog/admin/qa');
     for (const bad of ['/qa"><script>', '/a/../b', '/a b', '/a?b', 'https://x/qa']) {
       expect(() => normalizeBasePath(bad)).toThrow(/--base-path/);
     }

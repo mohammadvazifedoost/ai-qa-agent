@@ -907,7 +907,9 @@ function serveAsset(urlPath: string, res: http.ServerResponse, basePath = ''): v
  * or '' for none. Only plain path segments are accepted, since the value is written into the page.
  */
 export function normalizeBasePath(value: string | undefined): string {
-  const trimmed = (value ?? '').trim().replace(/\/+$/, '');
+  // Git Bash turns "/blog/admin/qa" into "C:/Program Files/Git/blog/admin/qa"; undo that.
+  const unmangled = (value ?? '').trim().replace(/^[A-Za-z]:[\\/](?:Program Files[\\/])?Git[\\/]/i, '/');
+  const trimmed = unmangled.replace(/\/+$/, '');
   if (!trimmed) return '';
   const withSlash = trimmed.startsWith('/') ? trimmed : '/' + trimmed;
   if (
