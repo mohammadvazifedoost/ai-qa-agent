@@ -5,7 +5,7 @@ import { rel } from '../core/paths.js';
 import { environment, evidenceFor, renderBugMarkdown } from '../bugs/report.js';
 import type { FilingSummary } from '../bugs/file.js';
 import type { QaContext } from '../pipeline/context.js';
-import type { TestRunResult } from '../runner/results.js';
+import { videosOf, type TestRunResult } from '../runner/results.js';
 import { describeTarget } from '../runner/server.js';
 import type { TriageResult } from '../triage/schema.js';
 
@@ -97,7 +97,9 @@ export function buildMarkdown(
   for (const o of run.outcomes) {
     const ev = [
       o.artifacts.screenshots[0] && 'screenshot',
-      o.artifacts.video && 'video',
+      videosOf(o.artifacts).length > 1
+        ? `${videosOf(o.artifacts).length} videos`
+        : o.artifacts.video && 'video',
       o.artifacts.trace && 'trace',
     ]
       .filter(Boolean)

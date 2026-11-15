@@ -1,6 +1,15 @@
 /** Small pieces of HTML shared by the pages: result marks, chips, the evidence block. */
 import { act, fileUrl, link } from './dom.js';
-import { esc, label, routeHash, type Defect, type Outcome, type ScenarioView, type Status } from './logic.js';
+import {
+  esc,
+  label,
+  routeHash,
+  videosOf,
+  type Defect,
+  type Outcome,
+  type ScenarioView,
+  type Status,
+} from './logic.js';
 import { state } from './state.js';
 
 export const STATUS_LABEL: Record<Status, string> = {
@@ -102,14 +111,18 @@ export function trackerAction(keys: readonly string[], body: Defect['body']): st
   );
 }
 
-/** Screenshot, video and files of one result. `controls` adds markup under each (delete buttons). */
+/**
+ * Screenshot, videos and files of one result. `controls` adds markup under each (delete buttons);
+ * `page` is the 1-based page a video belongs to.
+ */
 export function evidence(
   o: Outcome,
-  controls: (what: 'screenshot' | 'video' | 'all', file?: string) => string = () => '',
+  controls: (what: 'screenshot' | 'video' | 'all', file?: string, page?: number) => string = () => '',
 ): string {
   const a = o.artifacts;
   const shot = a.screenshots[0];
-  if (!shot && !a.video) return '';
+  const videos = videosOf(a);
+  if (!shot && videos.length === 0) return '';
   const links =
     link(a.trace, 'Trace') +
     link(a.logs, 'Console and network', true) +
@@ -128,16 +141,29 @@ export function evidence(
         controls('screenshot', shot) +
         '</div>'
       : '') +
-    (a.video
-      ? '<div><video class="block w-full rounded-[10px] bg-black" controls preload="metadata" src="' +
-        fileUrl(a.video) +
-        '" aria-label="Video of ' +
-        esc(o.key) +
-        '"></video>' +
-        controls('video', a.video) +
-        '</div>'
-      : '') +
-    (a.screenshots.length + (a.video ? 1 : 0) > 1 ? controls('all') : '') +
+    // One video per page the test opened (popups, new tabs), first page first.
+    videos
+      .map((v, i) => {
+        const page = i + 1;
+        const name = videos.length > 1 ? 'Video of page ' + page + ' of ' + o.key : 'Video of ' + o.key;
+        return (
+          '<div>' +
+          (videos.length > 1
+            ? '<p class="mb-1 text-sm text-muted">' +
+              (page === 1 ? 'Page 1 (where the test started)' : 'Page ' + page + ' (opened by the test)') +
+              '</p>'
+            : '') +
+          '<video class="block w-full rounded-[10px] bg-black" controls preload="metadata" src="' +
+          fileUrl(v) +
+          '" aria-label="' +
+          esc(name) +
+          '"></video>' +
+          controls('video', v, page) +
+          '</div>'
+        );
+      })
+      .join('') +
+    (a.screenshots.length + videos.length > 1 ? controls('all') : '') +
     (links ? '<div class="flex flex-wrap gap-x-5">' + links + '</div>' : '') +
     '</div>'
   );

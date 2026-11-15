@@ -70,7 +70,15 @@ const outcome = (status: TestOutcome['status']): TestOutcome => ({
   durationMs: 1,
   error: status === 'failed' ? { message: 'boom' } : null,
   annotations: [],
-  artifacts: { video: null, trace: null, screenshots: [], errorContext: null, logs: null, design: [] },
+  artifacts: {
+    video: null,
+    videos: [],
+    trace: null,
+    screenshots: [],
+    errorContext: null,
+    logs: null,
+    design: [],
+  },
 });
 
 function setup() {

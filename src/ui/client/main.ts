@@ -38,6 +38,7 @@ const mediaTarget = (el: HTMLElement): MediaTarget => ({
   key: el.dataset.key ?? '',
   what: (el.dataset.what ?? 'all') as MediaTarget['what'],
   file: el.dataset.file ?? '',
+  page: el.dataset.page ? Number(el.dataset.page) : undefined,
 });
 
 /* ---------- the Run tests menu ---------- */

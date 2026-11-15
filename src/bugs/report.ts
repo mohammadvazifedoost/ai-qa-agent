@@ -2,7 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import type { QaContext } from '../pipeline/context.js';
-import type { TestOutcome, TestRunResult } from '../runner/results.js';
+import { videosOf, type TestOutcome, type TestRunResult } from '../runner/results.js';
 import { describeTarget, type AppTarget } from '../runner/server.js';
 import type { Issue } from '../triage/schema.js';
 
@@ -48,6 +48,8 @@ export interface Evidence {
   project: string;
   screenshot: string | null;
   video: string | null;
+  /** Every page's video (popups, new tabs), first page first; `video` is the first. */
+  videos: string[];
   trace: string | null;
   design: string[];
   errorContext: string | null;
@@ -62,6 +64,7 @@ export function evidenceFor(issue: Issue, run: TestRunResult): Evidence[] {
       project: o.project,
       screenshot: o.artifacts.screenshots[0] ?? null,
       video: o.artifacts.video,
+      videos: videosOf(o.artifacts),
       trace: o.artifacts.trace,
       design: o.artifacts.design,
       errorContext: o.artifacts.errorContext,
@@ -104,7 +107,11 @@ export function renderBugMarkdown(issue: Issue, env: BugEnvironment, evidence: E
     ...evidence.flatMap((e) => [
       `- **${e.key}**`,
       e.screenshot ? `  - Screenshot: \`${e.screenshot}\`` : '',
-      e.video ? `  - Video: \`${e.video}\`` : '',
+      ...(e.videos.length > 1
+        ? e.videos.map((v, i) => `  - Video, page ${i + 1}: \`${v}\``)
+        : e.video
+          ? [`  - Video: \`${e.video}\``]
+          : []),
       e.trace ? `  - Trace: \`${e.trace}\` (open with \`npx playwright show-trace <file>\`)` : '',
       ...e.design.map((d) => `  - Design comparison: \`${d}\``),
     ]),

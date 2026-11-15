@@ -40,6 +40,7 @@ const outcome = (
   annotations: [],
   artifacts: {
     video: null,
+    videos: [],
     trace: null,
     screenshots: [`.qa/artifacts/runs/${RUN}/screens/${id}.png`],
     errorContext: null,

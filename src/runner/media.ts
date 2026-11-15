@@ -3,7 +3,7 @@ import path from 'node:path';
 import { readJson, writeJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import { isInside, runDir, type QaPaths } from '../core/paths.js';
-import { TestRunResultSchema } from './results.js';
+import { TestRunResultSchema, videosOf } from './results.js';
 
 const log = logger('media');
 
@@ -26,11 +26,12 @@ export interface MediaDeleteResult {
   missing: string[];
   /** The result's media after the deletion. */
   video: string | null;
+  videos: string[];
   screenshots: string[];
 }
 
 /**
- * Delete the screenshots and video of one test result in a run: one `file` (a project-relative
+ * Delete the screenshots and videos of one test result in a run: one `file` (a project-relative
  * path, exactly as the result lists it) or, without `file`, all of them. Only files the result
  * references as a screenshot or video, and that lie under `.qa/artifacts`, can be deleted; the
  * run's results.json is updated so nothing points at them any more. Traces, logs and design
@@ -54,7 +55,7 @@ export function deleteMedia(
   if (!outcome) throw new MediaDeleteError(`${key} not found in run ${runId}`, 404);
 
   const { artifacts } = outcome;
-  const media = [...artifacts.screenshots, ...(artifacts.video ? [artifacts.video] : [])];
+  const media = [...artifacts.screenshots, ...videosOf(artifacts)];
   if (file !== undefined && !media.includes(file))
     throw new MediaDeleteError(`${file} is not a screenshot or video of ${key}`, 400);
   const targets = file !== undefined ? [file] : media;
@@ -77,7 +78,8 @@ export function deleteMedia(
   }
   const gone = new Set(targets);
   artifacts.screenshots = artifacts.screenshots.filter((s) => !gone.has(s));
-  if (artifacts.video && gone.has(artifacts.video)) artifacts.video = null;
+  artifacts.videos = videosOf(artifacts).filter((v) => !gone.has(v));
+  artifacts.video = artifacts.videos[0] ?? null;
   writeJson(resultsFile, run);
   log.info(`Deleted ${targets.length} media file(s) of ${key} in run ${runId}`);
 
@@ -87,6 +89,7 @@ export function deleteMedia(
     removed: targets,
     missing,
     video: artifacts.video,
+    videos: artifacts.videos,
     screenshots: artifacts.screenshots,
   };
 }

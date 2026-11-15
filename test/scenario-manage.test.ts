@@ -279,7 +279,15 @@ describe('listScenarioRows / formatScenarioTable', () => {
       durationMs: 1,
       error: null,
       annotations: [],
-      artifacts: { video: null, trace: null, screenshots: [], errorContext: null, logs: null, design: [] },
+      artifacts: {
+        video: null,
+        videos: [],
+        trace: null,
+        screenshots: [],
+        errorContext: null,
+        logs: null,
+        design: [],
+      },
     });
     const dir = path.join(ctx.paths.artifactsDir, 'runs', run.id);
     fs.mkdirSync(dir, { recursive: true });

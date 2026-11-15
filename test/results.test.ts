@@ -121,5 +121,67 @@ describe('collectOutcomes', () => {
     expect(failed.artifacts.design).toEqual(['run/design/HOME-002_chromium-desktop_design-diff-home.png']);
     expect(fs.readFileSync(path.join(root, failed.artifacts.logs!), 'utf8')).toBe('{"console":[]}');
     expect(fs.existsSync(path.join(root, failed.artifacts.video!))).toBe(true);
+    expect(failed.artifacts.videos).toEqual(['run/videos/HOME-002_chromium-desktop.webm']);
+  });
+
+  it('keeps the video of every page, in the order the pages were opened', () => {
+    // Playwright names videos by page order (video.webm, video-1.webm, ...) but attaches them in the
+    // order the pages closed, so a popup's video comes first.
+    const root = makeProject({
+      'out/video.webm': 'main',
+      'out/video-1.webm': 'popup',
+      'out/video-2.webm': 'third',
+    });
+    const report = PwReportSchema.parse({
+      stats: { expected: 1, unexpected: 0, flaky: 0, skipped: 0 },
+      errors: [],
+      suites: [
+        {
+          title: 'a.spec.ts',
+          file: 'a.spec.ts',
+          specs: [
+            {
+              title: 'A-001: opens a popup',
+              file: 'a.spec.ts',
+              line: 1,
+              tags: [],
+              tests: [
+                {
+                  projectName: 'chromium-desktop',
+                  status: 'expected',
+                  annotations: [],
+                  results: [
+                    {
+                      status: 'passed',
+                      duration: 1,
+                      retry: 0,
+                      errors: [],
+                      attachments: ['video-2', 'video-1', 'video'].map((n) => ({
+                        name: 'video',
+                        contentType: 'video/webm',
+                        path: path.join(root, 'out', `${n}.webm`),
+                      })),
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const [outcome] = collectOutcomes(report, path.join(root, 'run'), root, path.join(root, '.qa', 'tests'));
+    const { video, videos } = outcome!.artifacts;
+    expect(videos).toEqual([
+      'run/videos/A-001_chromium-desktop.webm',
+      'run/videos/A-001_chromium-desktop-1.webm',
+      'run/videos/A-001_chromium-desktop-2.webm',
+    ]);
+    expect(video).toBe(videos[0]);
+    expect(videos.map((v) => fs.readFileSync(path.join(root, v), 'utf8'))).toEqual([
+      'main',
+      'popup',
+      'third',
+    ]);
   });
 });

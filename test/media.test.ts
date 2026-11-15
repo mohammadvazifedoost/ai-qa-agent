@@ -11,6 +11,7 @@ const DIR = `.qa/artifacts/runs/${RUN}`;
 const SHOT = `${DIR}/screenshots/A-001_chromium-desktop.png`;
 const SHOT2 = `${DIR}/screenshots/A-001_chromium-desktop-1.png`;
 const VIDEO = `${DIR}/videos/A-001_chromium-desktop.webm`;
+const VIDEO2 = `${DIR}/videos/A-001_chromium-desktop-1.webm`;
 const TRACE = `${DIR}/traces/A-001_chromium-desktop.zip`;
 const KEY = 'A-001@chromium-desktop';
 
@@ -29,6 +30,7 @@ const outcome = (artifacts: Partial<TestOutcome['artifacts']> = {}): TestOutcome
   annotations: [],
   artifacts: {
     video: VIDEO,
+    videos: [VIDEO],
     trace: TRACE,
     screenshots: [SHOT, SHOT2],
     errorContext: null,
@@ -88,7 +90,31 @@ describe('deleteMedia', () => {
     deleteMedia(ctx, { runId: RUN, key: KEY, file: VIDEO });
     expect(exists(VIDEO)).toBe(false);
     expect(saved().video).toBeNull();
+    expect(saved().videos).toEqual([]);
     expect(saved().screenshots).toEqual([SHOT, SHOT2]);
+  });
+
+  it('deletes one video of a test that opened several pages; the next one becomes the main video', () => {
+    const { ctx, saved, exists } = setup({ videos: [VIDEO, VIDEO2] }, [SHOT, SHOT2, VIDEO, VIDEO2, TRACE]);
+    const res = deleteMedia(ctx, { runId: RUN, key: KEY, file: VIDEO });
+    expect(res).toMatchObject({ removed: [VIDEO], video: VIDEO2, videos: [VIDEO2] });
+    expect(exists(VIDEO)).toBe(false);
+    expect(exists(VIDEO2)).toBe(true);
+    expect(saved()).toMatchObject({ video: VIDEO2, videos: [VIDEO2] });
+  });
+
+  it('deletes every video with the rest of the media', () => {
+    const { ctx, saved, exists } = setup({ videos: [VIDEO, VIDEO2] }, [SHOT, SHOT2, VIDEO, VIDEO2, TRACE]);
+    const res = deleteMedia(ctx, { runId: RUN, key: KEY });
+    expect(res.removed).toEqual([SHOT, SHOT2, VIDEO, VIDEO2]);
+    expect([VIDEO, VIDEO2].some(exists)).toBe(false);
+    expect(saved()).toMatchObject({ video: null, videos: [], screenshots: [] });
+  });
+
+  it('handles results written before `videos` existed (only `video`)', () => {
+    const { ctx, saved } = setup({ videos: [] });
+    deleteMedia(ctx, { runId: RUN, key: KEY, file: VIDEO });
+    expect(saved()).toMatchObject({ video: null, videos: [] });
   });
 
   it('deletes all media of a result without touching the trace', () => {
@@ -141,7 +167,7 @@ describe('deleteMedia', () => {
   });
 
   it('says so when a result has no media left', () => {
-    const { ctx } = setup({ video: null, screenshots: [] });
+    const { ctx } = setup({ video: null, videos: [], screenshots: [] });
     rejects(() => deleteMedia(ctx, { runId: RUN, key: KEY }), 404);
   });
 });

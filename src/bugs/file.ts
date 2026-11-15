@@ -169,9 +169,9 @@ export async function fileIssues(
       ctx.state.save();
       const attachments: string[] = [];
       if (tracker.attachEvidence) {
-        // Evidence of the first failing test (screenshot, video, trace) plus any design diff images.
+        // Evidence of the first failing test (screenshot, every page's video, trace) plus any design diff images.
         const e = evidence[0];
-        const files = [e?.screenshot, e?.video, e?.trace, ...(e?.design ?? [])].filter(
+        const files = [e?.screenshot, ...(e?.videos ?? []), e?.trace, ...(e?.design ?? [])].filter(
           (f): f is string => !!f,
         );
         for (const f of files) {

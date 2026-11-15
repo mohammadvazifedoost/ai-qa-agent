@@ -125,6 +125,7 @@ describe('renderBugMarkdown', () => {
           project: 'chromium-desktop',
           screenshot: 's.png',
           video: 'v.webm',
+          videos: ['v.webm'],
           trace: 't.zip',
           design: [],
           errorContext: null,

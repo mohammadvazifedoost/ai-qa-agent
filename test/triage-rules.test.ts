@@ -16,7 +16,15 @@ function outcome(over: Partial<TestOutcome> & { message?: string; stack?: string
     durationMs: 1,
     error: over.message ? { message: over.message, stack: over.stack } : null,
     annotations: [],
-    artifacts: { video: null, trace: null, screenshots: [], errorContext: null, logs: null, design: [] },
+    artifacts: {
+      video: null,
+      videos: [],
+      trace: null,
+      screenshots: [],
+      errorContext: null,
+      logs: null,
+      design: [],
+    },
     ...over,
   };
 }

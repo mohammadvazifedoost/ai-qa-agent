@@ -7,7 +7,7 @@ import { sha256, writeJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import { rel } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
-import type { TestOutcome, TestRunResult } from '../runner/results.js';
+import { videosOf, type TestOutcome, type TestRunResult } from '../runner/results.js';
 import { describeTarget } from '../runner/server.js';
 import { loadAllScenarios } from '../scenarios/generate.js';
 import { scenarioRoutes, type Scenario } from '../scenarios/schema.js';
@@ -114,7 +114,7 @@ ${JSON.stringify(scenario, null, 2)}
 - Accessibility/DOM snapshot at failure: ${a.errorContext ?? 'none'}
 - Console + network log: ${a.logs ?? 'none'}
 - Design comparison images (expected/actual/diff): ${a.design.join(', ') || 'none'}
-- Video: ${a.video ?? 'none'} (binary; not readable, referenced in the bug)
+- Video: ${videosOf(a).join(', ') || 'none'} (one per page the test opened, first page first; binary, not readable, referenced in the bug)
 - Trace: ${a.trace ?? 'none'} (binary; not readable, referenced in the bug)
 
 ## Application model of the page(s) the scenario visits (from the application analysis; the source code is in this repository, read files to confirm)

@@ -18,6 +18,7 @@ import {
   projectSummary,
   routeHash,
   runCounts,
+  videosOf,
   runLabel,
   scenarioTargets,
   shortUrl,
@@ -218,7 +219,21 @@ describe('mediaDeleteLabel', () => {
       'Delete final screenshot of A-001@chromium-desktop',
     );
     expect(mediaDeleteLabel('video', 'A-001@x')).toBe('Delete video of A-001@x');
-    expect(mediaDeleteLabel('all', 'A-001@x')).toBe('Delete all screenshots and the video of A-001@x');
+    expect(mediaDeleteLabel('all', 'A-001@x')).toBe('Delete all screenshots and videos of A-001@x');
+  });
+
+  it('tells the videos of a test that opened several pages apart', () => {
+    expect(mediaDeleteLabel('video', 'A-001@x', 1)).toBe('Delete video of A-001@x');
+    expect(mediaDeleteLabel('video', 'A-001@x', 2)).toBe('Delete video of page 2 of A-001@x');
+  });
+});
+
+describe('videosOf', () => {
+  it('lists every page video, and falls back to `video` for older results', () => {
+    expect(videosOf({ video: 'a.webm', videos: ['a.webm', 'a-1.webm'] })).toEqual(['a.webm', 'a-1.webm']);
+    expect(videosOf({ video: 'a.webm' })).toEqual(['a.webm']);
+    expect(videosOf({ video: 'a.webm', videos: [] })).toEqual(['a.webm']);
+    expect(videosOf({ video: null, videos: [] })).toEqual([]);
   });
 });
 

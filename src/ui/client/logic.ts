@@ -13,13 +13,25 @@ export type Status = 'passed' | 'failed' | 'flaky' | 'none';
 /** Which media of a result a delete control removes. */
 export type MediaWhat = 'screenshot' | 'video' | 'all';
 
-/** Accessible name of the control that deletes a result's media. */
-export const mediaDeleteLabel = (what: MediaWhat, key: string): string =>
+/**
+ * Every video of a result, first page first. A test that opens popups or new tabs has one video per
+ * page; results written before `videos` existed have only `video`.
+ */
+export const videosOf = (a: { video: string | null; videos?: string[] }): string[] =>
+  a.videos?.length ? a.videos : a.video ? [a.video] : [];
+
+/**
+ * Accessible name of the control that deletes a result's media. `page` (1-based) tells the videos
+ * of a test that opened several pages apart; the first page's video keeps the plain name.
+ */
+export const mediaDeleteLabel = (what: MediaWhat, key: string, page = 1): string =>
   what === 'all'
-    ? 'Delete all screenshots and the video of ' + key
+    ? 'Delete all screenshots and videos of ' + key
     : what === 'screenshot'
       ? 'Delete final screenshot of ' + key
-      : 'Delete video of ' + key;
+      : page > 1
+        ? 'Delete video of page ' + page + ' of ' + key
+        : 'Delete video of ' + key;
 
 export interface View {
   page: string;

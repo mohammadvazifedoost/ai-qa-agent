@@ -197,16 +197,27 @@ export interface MediaTarget {
   what: MediaWhat;
   /** Project-relative path of the file; empty for `all`. */
   file: string;
+  /** For a video: the 1-based page it belongs to (a test can open several pages). */
+  page?: number;
 }
+
+/** A media target as `data-*` attributes for `act()` (see mediaTarget in main.ts). */
+export const mediaArgs = (t: MediaTarget): Record<string, string> => ({
+  id: t.id,
+  key: t.key,
+  what: t.what,
+  file: t.file,
+  ...(t.page ? { page: String(t.page) } : {}),
+});
 
 export function mediaButton(t: MediaTarget): string {
   return (
     '<button type="button" class="btn btn-text btn-text-danger" data-testid="media-delete-' +
     t.what +
     '" aria-label="' +
-    esc(mediaDeleteLabel(t.what, t.key)) +
+    esc(mediaDeleteLabel(t.what, t.key, t.page)) +
     '" ' +
-    act('ask-media-delete', { ...t }) +
+    act('ask-media-delete', mediaArgs(t)) +
     '>' +
     (t.what === 'all' ? 'Delete all media' : 'Delete ' + t.what) +
     '</button>'
@@ -218,6 +229,7 @@ const mediaArea = (t: MediaTarget): string =>
   mediaSlug(t.key) +
   '-' +
   t.what +
+  (t.page && t.page > 1 ? '-' + t.page : '') +
   '" class="mt-1 flex flex-wrap items-center gap-2">' +
   mediaButton(t) +
   '</div>';
@@ -267,7 +279,9 @@ function resultBlock(sc: ScenarioView, o: Outcome, many: boolean): string {
       '<details class="disclosure"><summary>Test error</summary><pre class="m-0 mt-1 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-subtle p-3 font-mono text-xs">' +
       esc(o.error.message) +
       '</pre></details>';
-  const media = evidence(o, (what, file = '') => mediaArea({ id: sc.id, key: o.key, what, file }));
+  const media = evidence(o, (what, file = '', page) =>
+    mediaArea({ id: sc.id, key: o.key, what, file, page }),
+  );
   if (media) html += section('Evidence', media);
   return html;
 }

@@ -10,7 +10,7 @@ import { load } from './app.js';
 import { $, act, toast } from './dom.js';
 import { esc, mediaDeleteLabel } from './logic.js';
 import { render } from './render.js';
-import { deleteArea, mediaButton, shownScenario, type MediaTarget } from './scenarios.js';
+import { deleteArea, mediaArgs, mediaButton, shownScenario, type MediaTarget } from './scenarios.js';
 import { go, state } from './state.js';
 
 /** Is this scenario's detail on screen? */
@@ -162,15 +162,15 @@ export function askMediaDelete(el: HTMLElement, t: MediaTarget): void {
   if (!area) return;
   area.innerHTML =
     '<span class="text-ink-2">Delete ' +
-    (t.what === 'all' ? 'all screenshots and the video' : 'this ' + t.what) +
+    (t.what === 'all' ? 'all screenshots and videos' : 'this ' + t.what) +
     '? This cannot be undone.</span>' +
     '<button type="button" class="btn" data-testid="media-delete-cancel" ' +
-    act('cancel-media-delete', { ...t }) +
+    act('cancel-media-delete', mediaArgs(t)) +
     '>Cancel</button>' +
     '<button type="button" class="btn btn-danger" data-testid="media-delete-confirm" aria-label="' +
-    esc('Confirm: ' + mediaDeleteLabel(t.what, t.key)) +
+    esc('Confirm: ' + mediaDeleteLabel(t.what, t.key, t.page)) +
     '" ' +
-    act('confirm-media-delete', { ...t }) +
+    act('confirm-media-delete', mediaArgs(t)) +
     '>Delete</button>' +
     '<p class="m-0 basis-full text-[13px] text-fail-ink" role="alert"></p>';
   $<HTMLButtonElement>('[data-action="cancel-media-delete"]', area).focus();

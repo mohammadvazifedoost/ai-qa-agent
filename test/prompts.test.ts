@@ -328,7 +328,15 @@ const outcome = (id: string, extra: Partial<TestOutcome> = {}): TestOutcome => (
   durationMs: 10,
   error: { message: 'Expected: "$16.20"\nReceived: "$18.00"' },
   annotations: [],
-  artifacts: { video: null, trace: null, screenshots: [], errorContext: null, logs: null, design: [] },
+  artifacts: {
+    video: null,
+    videos: [],
+    trace: null,
+    screenshots: [],
+    errorContext: null,
+    logs: null,
+    design: [],
+  },
   ...extra,
 });
 

@@ -87,7 +87,13 @@ export const TestOutcomeSchema = z.object({
     .nullable(),
   annotations: z.array(z.object({ type: z.string(), description: z.string().optional() })),
   artifacts: z.object({
+    /** The video of the test's first page (the one the test started on). Same as `videos[0]`. */
     video: z.string().nullable(),
+    /**
+     * The video of every page the test opened (popups, new tabs), in the order they were opened.
+     * Results written before this field existed have only `video`; use `videosOf()`.
+     */
+    videos: z.array(z.string()).default([]),
     trace: z.string().nullable(),
     screenshots: z.array(z.string()),
     errorContext: z.string().nullable(),
@@ -112,6 +118,23 @@ function* walk(suites: PwSuiteT[]): Generator<z.infer<typeof PwSpec>> {
     for (const spec of s.specs ?? []) yield spec;
     yield* walk(s.suites ?? []);
   }
+}
+
+/**
+ * Playwright records one video per page and names them in page order (`video.webm`, `video-1.webm`,
+ * ...), but attaches them in the order the pages were closed, so a popup's video usually comes first.
+ * This is the page index from the file name; attachments without a path keep their place.
+ */
+function pageIndex(att: z.infer<typeof Attachment>, fallback: number): number {
+  const m = att.path ? /video(?:-(\d+))?\.webm$/i.exec(path.basename(att.path)) : null;
+  if (!m) return fallback;
+  return m[1] ? Number(m[1]) : 0;
+}
+
+/** Every video of a result, first page first; also for results that only have `video`. */
+export function videosOf(artifacts: { video: string | null; videos?: string[] }): string[] {
+  if (artifacts.videos?.length) return artifacts.videos;
+  return artifacts.video ? [artifacts.video] : [];
 }
 
 const STATUS: Record<z.infer<typeof PwTest>['status'], TestOutcome['status']> = {
@@ -160,6 +183,12 @@ export function collectOutcomes(
         .filter((a) => a.name === 'screenshot')
         .map((a, i) => copy(a, 'screenshots', `${base}${i ? `-${i}` : ''}.png`))
         .filter((p): p is string => !!p);
+      const videos = atts
+        .filter((a) => a.name === 'video')
+        .map((a, i) => ({ a, order: pageIndex(a, i) }))
+        .sort((x, y) => x.order - y.order)
+        .map(({ a }, i) => copy(a, 'videos', `${base}${i ? `-${i}` : ''}.webm`))
+        .filter((p): p is string => !!p);
       const design = atts
         .filter((a) => a.name.startsWith('design-'))
         .map((a) => copy(a, 'design', `${base}_${slugify(a.name.replace(/\.png$/, ''))}.png`))
@@ -200,7 +229,8 @@ export function collectOutcomes(
           )
           .map((a) => ({ type: a.type, description: a.description })),
         artifacts: {
-          video: copy(byName('video'), 'videos', `${base}.webm`),
+          video: videos[0] ?? null,
+          videos,
           trace: copy(byName('trace'), 'traces', `${base}.zip`),
           screenshots,
           errorContext: copy(byName('error-context'), 'logs', `${base}_error-context.md`),

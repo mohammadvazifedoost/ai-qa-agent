@@ -26,7 +26,15 @@ const outcome = (
   durationMs: 10,
   error: status === 'failed' ? { message: 'boom' } : null,
   annotations: [],
-  artifacts: { video: null, trace: null, screenshots: [], errorContext: null, logs: null, design: [] },
+  artifacts: {
+    video: null,
+    videos: [],
+    trace: null,
+    screenshots: [],
+    errorContext: null,
+    logs: null,
+    design: [],
+  },
 });
 
 const result = (runId: string, outcomes: TestOutcome[], globalErrors: string[] = []): TestRunResult => ({
