@@ -9,6 +9,7 @@ import {
   planFile,
   planStatus,
   PlanRefused,
+  projectLocationCheck,
   reconcilePlan,
   renderPlan,
   writeBugFixPlan,
@@ -86,11 +87,17 @@ const bug = (id: string, failureKeys: string[], extra: Partial<PlanBug> = {}): P
   expected: 'Total is $16.20',
   actual: 'Total stays $18.00',
   rootCause: `Cause of ${id}`,
+  rootCauseStatus: 'verified',
   locations: ['src/cart.ts:42'],
   fix: `Fix ${id}`,
+  implementationSteps: [],
+  alternatives: [],
   codeHint: null,
   risks: 'None',
+  acceptanceCriteria: [],
   verify: ['Apply SAVE10 and check the total'],
+  regressionTests: [],
+  dependsOn: [],
   effort: 'S',
   relatedIds: [],
   ...extra,
@@ -288,5 +295,52 @@ describe('writeBugFixPlan', () => {
     expect(prompts).toHaveLength(0);
     expect(fs.existsSync(path.join(root, 'docs'))).toBe(false);
     expect(planStatus(ctx, RUN)).toMatchObject({ failures: 0, exists: false });
+  });
+});
+
+describe('plan accuracy checks', () => {
+  it('drops locations that are not in the project and lists every failed test with its fix', () => {
+    const root = makeProject({ 'src/cart.ts': 'a\nb\nc' });
+    const failures = collectFailures(
+      runResult([
+        outcome('A-001', 'failed', {
+          steps: [{ title: 'Apply SAVE10', durationMs: 1, status: 'failed', error: 'x' }],
+        }),
+        outcome('A-002', 'failed'),
+      ]),
+      [scenario('A-001')],
+    );
+    const plan = reconcilePlan(
+      {
+        bugs: [
+          bug('BUG-1', ['A-001@chromium-desktop'], {
+            locations: ['src/cart.ts:2', 'src/ghost.ts:9'],
+            dependsOn: ['BUG-9'],
+          }),
+        ],
+        order: ['BUG-1'],
+        notIncluded: [{ failureKey: 'A-002@chromium-desktop', kind: 'TEST_BUG', reason: 'stale locator' }],
+        notes: [],
+      },
+      failures,
+      projectLocationCheck(root),
+    );
+    expect(plan.bugs[0]!.locations).toEqual(['src/cart.ts:2']);
+    expect(plan.bugs[0]!.dependsOn).toEqual([]);
+    expect(plan.rejectedLocations).toEqual([
+      { bugId: 'BUG-1', location: 'src/ghost.ts:9', reason: 'file does not exist' },
+    ]);
+    const md = renderPlan({
+      runId: RUN,
+      baseUrl: 'x',
+      generatedAt: '2026-11-15T00:00:00Z',
+      plan,
+      failures,
+      evidenceBase: 'docs',
+    });
+    expect(md).toContain('| A-001 (chromium-desktop) | 1. Apply SAVE10 | [#1 Bug BUG-1](#bug-1) |');
+    expect(md).toContain('| A-002 (chromium-desktop) | — | not an app bug (TEST_BUG), see the end |');
+    expect(md).toContain('### Acceptance criteria\n\n- Total is $16.20');
+    expect(md).toContain('`src/ghost.ts:9` (file does not exist)');
   });
 });

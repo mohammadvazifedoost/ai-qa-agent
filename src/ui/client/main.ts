@@ -170,7 +170,10 @@ document.addEventListener('click', (e) => {
       return void refreshAll(el as HTMLButtonElement);
     case 'start-job':
       setRunMenu(false);
-      return void startJob(el.dataset.url ?? '');
+      return void startJob(
+        el.dataset.url ?? '',
+        JSON.parse(el.dataset.extra ?? '{}') as Record<string, unknown>,
+      );
     case 'ask-step':
       return askStep((el.dataset.step ?? 'analyze') as StepKind, {
         all: el.dataset.all === '1',

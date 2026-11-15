@@ -13,10 +13,16 @@ import { readJson } from '../core/fs.js';
 import { logger } from '../core/logger.js';
 import { rel, runDir } from '../core/paths.js';
 import type { QaContext } from '../pipeline/context.js';
-import { TestRunResultSchema, type TestOutcome, type TestRunResult } from '../runner/results.js';
+import {
+  failedStepOf,
+  TestRunResultSchema,
+  type TestOutcome,
+  type TestRunResult,
+} from '../runner/results.js';
 import { describeTarget } from '../runner/server.js';
 import { loadAllScenarios } from '../scenarios/generate.js';
 import type { Scenario } from '../scenarios/schema.js';
+import { checkLocations } from '../triage/analysis.js';
 import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
 
 const log = logger('plan');
@@ -36,6 +42,8 @@ export interface FailureInput {
   error: string | null;
   /** Project-relative path of the final screenshot, if any. */
   screenshot: string | null;
+  /** The named step the test stopped at, when steps were recorded. */
+  failedStep: string | null;
   scenario:
     | (Pick<Scenario, 'page' | 'category' | 'priority' | 'steps' | 'expectedResults'> & {
         /** True for a critical flow: a core journey of the app. */
@@ -49,6 +57,12 @@ export interface FailureInput {
     summary: string;
     suspectedRootCause: string | null;
     testProblem: string | null;
+    /** From the structured analysis, when the triage wrote one. */
+    category?: string;
+    rootCauseStatus?: 'verified' | 'hypothesis' | 'unconfirmed';
+    /** Locations the engine verified exist, as "path:line". */
+    locations?: string[];
+    fix?: { target: string; summary: string; requiredChanges: string[] };
   };
 }
 
@@ -60,6 +74,8 @@ export function collectFailures(
   return run.outcomes.filter(failing).map((o) => {
     const s = scenarios.find((x) => x.id === o.scenarioId);
     const verdict = triage?.failures.find((f) => f.key === o.key);
+    const step = failedStepOf(o);
+    const a = verdict?.analysis;
     return {
       key: o.key,
       scenarioId: o.scenarioId,
@@ -68,6 +84,7 @@ export function collectFailures(
       status: o.status as 'failed' | 'flaky',
       error: o.error?.message.slice(0, 1500) ?? null,
       screenshot: o.artifacts.screenshots[0] ?? null,
+      failedStep: step ? `${step.index + 1}. ${step.step.title}` : null,
       scenario: s
         ? {
             page: s.page,
@@ -86,6 +103,20 @@ export function collectFailures(
               summary: verdict.summary,
               suspectedRootCause: verdict.bug?.suspectedRootCause ?? null,
               testProblem: verdict.testProblem,
+              ...(a
+                ? {
+                    category: a.category,
+                    rootCauseStatus: a.rootCause.status,
+                    locations: a.rootCause.locations.map(
+                      (l) => `${l.file}${l.line !== null ? `:${l.line}` : ''}`,
+                    ),
+                    fix: {
+                      target: a.fix.target,
+                      summary: a.fix.summary,
+                      requiredChanges: a.fix.requiredChanges,
+                    },
+                  }
+                : {}),
             },
           }
         : {}),
@@ -102,11 +133,25 @@ export const PlanBugSchema = z.object({
   expected: z.string().describe('The correct behaviour'),
   actual: z.string().describe('What happens instead, with values'),
   rootCause: z.string().describe('Why the bug happens, in plain words for a developer'),
+  rootCauseStatus: z
+    .enum(['verified', 'hypothesis', 'unconfirmed'])
+    .describe(
+      'verified: seen in the code you opened; hypothesis: likely, not confirmed; unconfirmed: unknown',
+    ),
   locations: z.array(z.string()).describe('Where the cause is, as "path/to/file.ts:line"'),
   fix: z.string().describe('What to change, in plain words'),
+  implementationSteps: z.array(z.string()).describe('Ordered steps a developer follows to make the change'),
+  alternatives: z.array(z.string()).describe('Other valid fixes and when to prefer them; may be empty'),
   codeHint: z.string().nullable().describe('A short code snippet showing the change, or null'),
   risks: z.string().describe('Side effects and other places that may break'),
+  acceptanceCriteria: z
+    .array(z.string())
+    .describe("Measurable conditions beyond the scenarios' expected results that show the fix works"),
   verify: z.array(z.string()).describe('Manual checks that show the bug is fixed'),
+  regressionTests: z
+    .array(z.string())
+    .describe('Other functionality or scenario ids to re-test after the fix'),
+  dependsOn: z.array(z.string()).describe('Ids of bugs that must be fixed before this one; may be empty'),
   effort: z.enum(['S', 'M', 'L']),
   relatedIds: z.array(z.string()).describe('Bugs with the same cause or to fix together'),
 });
@@ -131,12 +176,29 @@ export interface NotIncluded {
   title: string;
   kind: string;
   reason: string;
+  /** What to change instead (the test or the environment), from the triage analysis when it has one. */
+  fix?: string;
 }
 
 export interface ReconciledPlan {
   bugs: PlanBug[];
   notIncluded: NotIncluded[];
   notes: string[];
+  /** Locations the AI named that are not in the project; removed from the bugs. */
+  rejectedLocations?: Array<{ bugId: string; location: string; reason: string }>;
+}
+
+/** Returns why a "path:line" location is not in the project, or null when it is. */
+export type LocationCheck = (location: string) => string | null;
+
+export function projectLocationCheck(root: string): LocationCheck {
+  return (location) => {
+    const m = /^(.*?)(?::(\d+))?(?::\d+)?$/.exec(location.trim());
+    const res = checkLocations(root, [
+      { file: m?.[1] ?? location, line: m?.[2] ? Number(m[2]) : null, symbol: null, role: 'cause', note: '' },
+    ]);
+    return res.rejected[0]?.reason ?? null;
+  };
 }
 
 /**
@@ -144,9 +206,14 @@ export interface ReconciledPlan {
  * explains (first bug wins), bugs explaining nothing are dropped, the order is the AI's for known
  * bugs, and every failure not explained by a bug is listed as not included.
  */
-export function reconcilePlan(plan: Plan, failures: readonly FailureInput[]): ReconciledPlan {
+export function reconcilePlan(
+  plan: Plan,
+  failures: readonly FailureInput[],
+  checkLocation?: LocationCheck,
+): ReconciledPlan {
   const known = new Map(failures.map((f) => [f.key, f]));
   const claimed = new Set<string>();
+  const rejectedLocations: NonNullable<ReconciledPlan['rejectedLocations']> = [];
   const bugs = new Map<string, PlanBug>();
   for (const b of plan.bugs) {
     const keys = [...new Set(b.failureKeys)].filter((k) => known.has(k) && !claimed.has(k));
@@ -157,8 +224,21 @@ export function reconcilePlan(plan: Plan, failures: readonly FailureInput[]): Re
       continue;
     }
     for (const k of keys) claimed.add(k);
-    bugs.set(b.id, { ...b, failureKeys: keys });
+    const locations = b.locations.filter((l) => {
+      const reason = checkLocation?.(l) ?? null;
+      if (reason) rejectedLocations.push({ bugId: b.id, location: l, reason });
+      return !reason;
+    });
+    bugs.set(b.id, {
+      ...b,
+      failureKeys: keys,
+      locations,
+      // A cause the engine could not find in the project is not verified.
+      rootCauseStatus:
+        b.rootCauseStatus === 'verified' && locations.length === 0 ? 'hypothesis' : b.rootCauseStatus,
+    });
   }
+  for (const b of bugs.values()) b.dependsOn = b.dependsOn.filter((id) => id !== b.id && bugs.has(id));
   const order = [...new Set(plan.order.filter((id) => bugs.has(id)))];
   for (const id of bugs.keys()) if (!order.includes(id)) order.push(id);
 
@@ -168,7 +248,7 @@ export function reconcilePlan(plan: Plan, failures: readonly FailureInput[]): Re
     const f = known.get(n.failureKey);
     if (!f || claimed.has(f.key) || explained.has(f.key)) continue;
     explained.add(f.key);
-    notIncluded.push({ key: f.key, title: f.title, kind: n.kind, reason: n.reason });
+    notIncluded.push({ key: f.key, title: f.title, kind: n.kind, reason: n.reason, ...fixOf(f) });
   }
   for (const f of failures) {
     if (!claimed.has(f.key) && !explained.has(f.key)) {
@@ -177,10 +257,23 @@ export function reconcilePlan(plan: Plan, failures: readonly FailureInput[]): Re
         title: f.title,
         kind: 'UNKNOWN',
         reason: 'The AI did not classify this failure.',
+        ...fixOf(f),
       });
     }
   }
-  return { bugs: order.map((id) => bugs.get(id)!), notIncluded, notes: plan.notes };
+  return {
+    bugs: order.map((id) => bugs.get(id)!),
+    notIncluded,
+    notes: plan.notes,
+    ...(rejectedLocations.length ? { rejectedLocations } : {}),
+  };
+}
+
+/** The test- or environment-side fix the triage proposed for a failure that is not an app bug. */
+function fixOf(f: FailureInput): { fix?: string } {
+  const fix = f.triage?.fix;
+  if (!fix || fix.target === 'application') return {};
+  return { fix: fix.target === 'investigate' ? `Investigate: ${fix.summary}` : fix.summary };
 }
 
 const cell = (s: string): string => s.replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
@@ -224,7 +317,35 @@ export function renderPlan(args: {
     );
   }
   out.push('');
-  if (notes.length) out.push('## Notes', '', ...notes.map((x) => `- ${x}`), '');
+  const rejected = args.plan.rejectedLocations ?? [];
+  if (notes.length || rejected.length)
+    out.push(
+      '## Notes',
+      '',
+      ...notes.map((x) => `- ${x}`),
+      ...rejected.map(
+        (r) =>
+          `- Left out of ${r.bugId}: \`${r.location}\` (${r.reason}); the AI named it but it is not in the project.`,
+      ),
+      '',
+    );
+
+  // Every failed test, and where in this plan its fix is.
+  out.push('## Failed tests', '', '| Test | Failed step | Fix |', '|---|---|---|');
+  for (const f of args.failures) {
+    const k = bugs.findIndex((b) => b.failureKeys.includes(f.key));
+    const ni = notIncluded.find((x) => x.key === f.key);
+    out.push(
+      `| ${f.scenarioId ?? cell(f.title)} (${f.project}) | ${cell(f.failedStep ?? '—')} | ${
+        k >= 0
+          ? `[#${k + 1} ${cell(bugs[k]!.title)}](#bug-${k + 1})`
+          : ni
+            ? `not an app bug (${ni.kind}), see the end`
+            : '—'
+      } |`,
+    );
+  }
+  out.push('');
 
   for (const [k, b] of bugs.entries()) {
     const fails = b.failureKeys.map((key) => byKey.get(key)).filter((f): f is FailureInput => !!f);
@@ -238,13 +359,34 @@ export function renderPlan(args: {
     );
     out.push('### What is wrong', '', `- **Expected:** ${b.expected}`, `- **Actual:** ${b.actual}`, '');
     if (steps.length) out.push('### Steps to reproduce', '', ...steps.map((s, j) => `${j + 1}. ${s}`), '');
-    out.push('### Root cause', '', b.rootCause, '');
+    out.push(
+      '### Root cause',
+      '',
+      b.rootCause,
+      '',
+      `Status: ${b.rootCauseStatus === 'verified' ? 'verified in the code' : b.rootCauseStatus === 'hypothesis' ? 'hypothesis, not verified in the code' : 'unconfirmed, investigate before changing code'}`,
+      '',
+    );
     if (b.locations.length) out.push(`Where: ${b.locations.map((l) => `\`${l}\``).join(', ')}`, '');
     out.push('### Proposed fix', '', b.fix, '');
+    if (b.implementationSteps.length)
+      out.push(...b.implementationSteps.map((st, j) => `${j + 1}. ${st}`), '');
     if (b.codeHint) out.push('```', b.codeHint.trim(), '```', '');
+    if (b.alternatives.length) out.push('Alternatives:', '', ...b.alternatives.map((x) => `- ${x}`), '');
+    const deps = b.dependsOn.filter((id) => n.has(id));
+    if (deps.length)
+      out.push(
+        `Fix first: ${deps.map((id) => `#${n.get(id)} ${bugs[n.get(id)! - 1]!.title}`).join(', ')}`,
+        '',
+      );
     const files = filesOf(b);
     if (files.length) out.push('### Files to change', '', ...files.map((f) => `- \`${f}\``), '');
     if (b.risks) out.push('### Risks', '', b.risks, '');
+    // The scenarios' expected results are the acceptance criteria; the plan may only add to them.
+    const criteria = [
+      ...new Set([...fails.flatMap((f) => f.scenario?.expectedResults ?? []), ...b.acceptanceCriteria]),
+    ];
+    if (criteria.length) out.push('### Acceptance criteria', '', ...criteria.map((c) => `- ${c}`), '');
     out.push(
       '### How to verify',
       '',
@@ -252,6 +394,8 @@ export function renderPlan(args: {
       ...scenarioIds.map((id) => `- Run its test: \`npx ai-qa-agent test --grep ${id}\``),
       '',
     );
+    if (b.regressionTests.length)
+      out.push('### Regression tests', '', ...b.regressionTests.map((x) => `- ${x}`), '');
     const related = b.relatedIds.filter((id) => n.has(id) && id !== b.id);
     if (related.length) {
       out.push(
@@ -280,9 +424,11 @@ export function renderPlan(args: {
       '',
       'Failed tests that are not product bugs (or could not be classified), so they have no fix plan here.',
       '',
-      '| Test | Title | Kind | Reason |',
-      '|---|---|---|---|',
-      ...notIncluded.map((x) => `| ${x.key} | ${cell(x.title)} | ${x.kind} | ${cell(x.reason)} |`),
+      '| Test | Title | Kind | Reason | What to change instead |',
+      '|---|---|---|---|---|',
+      ...notIncluded.map(
+        (x) => `| ${x.key} | ${cell(x.title)} | ${x.kind} | ${cell(x.reason)} | ${cell(x.fix ?? '—')} |`,
+      ),
       '',
     );
   }
@@ -310,7 +456,9 @@ ${JSON.stringify(failures, null, 2)}
 ## Rules
 - Group failures with the same cause into one bug; "failureKeys" lists the keys of the failed tests it explains. Every failure key must appear in exactly one bug or in "notIncluded".
 - The expected results describe correct, intended behaviour: fix the app to match them, never the other way round. Put a failure in "notIncluded" only when the test itself is wrong (TEST_BUG), the failure is unstable (FLAKY), or it comes from the environment (ENVIRONMENT); say why in "reason".
-- Every location and every fix must come from code you opened in this task. When you could not find the cause, say "unknown" in rootCause and describe what to investigate; do not guess a file.
+- Every location and every fix must come from code you opened in this task; the engine removes locations that are not in the project. When you could not find the cause, set rootCauseStatus "unconfirmed", say so in rootCause and describe what to investigate; do not guess a file. "verified" only when you saw the cause in the code.
+- A fix makes the app meet the scenario's expected results. Never propose skipping, loosening or deleting a test or assertion, or suppressing an error. The expected results are the acceptance criteria; "acceptanceCriteria" only adds measurable checks.
+- "implementationSteps": the ordered steps of the recommended fix; other valid fixes go to "alternatives" with when to prefer them. "dependsOn": bugs that must be fixed first (e.g. a shared component). "regressionTests": related functionality or scenario ids to re-test.
 - For every bug: a short user-facing title, severity, the page(s), expected vs actual (with values), the root cause in plain words, where it is ("path/to/file.ts:line", relative to the project root), the fix in plain words, a short code hint only if it helps, risks, manual checks to verify, effort (S = under an hour, M = a few hours, L = a day or more), and relatedIds for bugs to fix together.
 - Severity follows what users lose: a failed critical flow (scenario.critical) caused by the app is at least high.
 - "order": all bug ids in the order to fix them: most severe and most user-facing first, shared causes together, quick wins before large refactors when severity is equal.
@@ -384,7 +532,7 @@ export async function writeBugFixPlan(
     tools: ['Read', 'Glob', 'Grep'],
     signal: opts.signal,
   });
-  const plan = reconcilePlan(res.output, failures);
+  const plan = reconcilePlan(res.output, failures, projectLocationCheck(ctx.root));
   const md = renderPlan({
     runId,
     baseUrl: run.app ? describeTarget(run.app) : ctx.config.app.baseUrl,

@@ -58,7 +58,7 @@ init ──► analyze ──► design ──► scenarios ──► generate �
 | (dashboard button) | `bugs/file.ts` `fileIssues`, `integrations/clickup.ts` | one issue or one failure, on a person's click | ClickUp task + attachments (or a comment on the task filed earlier), `filing.json`, `state.bugs` | fingerprint of scenario ids, root-cause files |
 | ui | `ui/server.ts`, `ui/index.html`, `ui/client/*` | scenarios, run results, triage, filing | local dashboard (`/api/overview`, `GET /api/project` for what is out of date, `POST /api/project/analyze|scenarios|critical` to run those stages as cancellable jobs, `/files/*`, `POST /api/file` to log one issue, `POST /api/scenarios/delete` to remove a scenario, `POST /api/media/delete` to delete a result's screenshots/video, `POST /api/runs/critical` to run only critical flows, `GET /api/tracker` + `POST /api/tracker/test|save` to connect ClickUp or Jira (config through `config/edit.ts`, secrets in `.qa/.env.local` through `config/local-env.ts`); every POST must be `application/json`) | — |
 | (remove / restore) | `scenarios/manage.ts`, `scenarios/spec-edit.ts` | scenario ids from the CLI or the dashboard | scenario moved to `removed` in `scenarios/<page>.json`; its test cut from the spec (validated with `--list`, rolled back on failure); `generatedSpecs` kept fresh | — |
-| report | `report/report.ts` | everything above | `reports/<id>/report.md|html`, `bugs/*.md` | — |
+| report | `report/model.ts`, `report/render.ts`, `report/evidence.ts` | results, scenarios, triage, filing (no AI) | `reports/<id>/report.json` (the `QaReport` model), `report.md`, `report.html`, `bugs/*.md`; also served as `GET /api/report?run=<id>` | — |
 
 ## Modules
 
@@ -130,7 +130,14 @@ src/
   integrations/clickup.ts minimal ClickUp REST v2 client (validated responses)
   integrations/jira.ts    minimal Jira Cloud REST v3 client (basic auth, ADF, attachments, priority fallback)
   integrations/adf.ts     Markdown → Atlassian Document Format for bug descriptions
-  report/report.ts        markdown + HTML report
+  report/evidence.ts      evidence of one result from disk: parsed assertion, console/page errors,
+                          failed and 4xx/5xx requests, captured vs missing artifacts
+  report/model.ts         buildQaReport: the structured, schema-validated report (one entry per
+                          scenario, consolidated issues, fix order, regression, statistics)
+  report/render.ts        Markdown and HTML renderings of the model (8 sections, per-scenario template)
+  report/report.ts        writes report.json/md/html and the per-issue bug files
+  triage/analysis.ts      engine checks of an AI analysis (locations exist, category agrees with the
+                          classification, no test-weakening fixes, severity floor) and rule analyses
   state/state.ts          .qa/state.json store (stage hashes, runs, filed bugs)
   pipeline/context.ts     loads config/state/runner once per invocation
   pipeline/run.ts         stage orchestration with checkpoints and resume
@@ -191,6 +198,28 @@ requests, recorded by the `qaCapture` fixture) and `design` images (expected/act
 with the deterministic check results, which the triage prompt receives verbatim.
 
 ## Failure classification
+
+Every failed test gets a classification (who must act: app, test, environment, nobody yet) and a
+category (what broke): APP_FUNCTIONAL, UI_RENDERING, BACKEND_API, DATA_INTEGRITY, AUTH,
+NAVIGATION, STATE_MANAGEMENT, PERFORMANCE_TIMEOUT, TEST_IMPLEMENTATION, ENVIRONMENT_INFRA, FLAKY,
+UNKNOWN. The triager's structured `analysis` holds failure point, expected/actual/difference,
+timing, root cause (verified facts apart from hypotheses, code locations, missing evidence, next
+checks; status verified/hypothesis/unconfirmed) and the fix (target, changes, steps, alternatives,
+side effects, acceptance criteria, verification, regression scenarios). `triage/analysis.ts` then
+checks it: locations that do not exist are removed and listed, a "verified" cause without a verified
+location becomes a hypothesis, a category that contradicts the classification is corrected or the
+verdict becomes UNKNOWN, an unconfirmed cause gets the fix target "investigate", fixes that skip,
+loosen or time out the test are flagged, unknown regression ids are dropped, and a product bug in a
+critical flow is at least high. The scenario's expected results always stay its acceptance criteria.
+Executed `test.step`s are recorded per result, so the failed step comes from the run, not the AI.
+
+In the report a scenario is passed, failed, error (its check could not run: environment,
+infrastructure or a programming error in the test), blocked (its spec did not load), skipped or
+not run (outside the run; listed, not counted). Pass rate = passed / scenarios of the run.
+Consolidated issues: the triage's defects (BUG-*), plus test problems failing at the same spec line
+(TEST-*), environment failures with the same diagnosis (ENV-*) and unconfirmed failures (INV-*);
+every scenario keeps its own report and points at its issue.
+
 
 ```
 flaky (passed on retry)          → UNKNOWN (not filed)

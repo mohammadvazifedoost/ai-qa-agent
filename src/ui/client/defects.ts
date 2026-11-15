@@ -1,12 +1,122 @@
 /** The Defects page: failed tests grouped by cause, with what to decide about each. */
-import { act, sideBySide } from './dom.js';
-import { defectsOf, esc, plural, routeHash, type Defect } from './logic.js';
+import { act, fileUrl, sideBySide } from './dom.js';
+import { bugReportText, defectsOf, esc, label, plural, routeHash, type Defect } from './logic.js';
 import { planButtons } from './shell.js';
 import { state } from './state.js';
 import { emptyBox, evidence, pageHeading, scenarioLink, severityChip, trackerAction } from './ui.js';
 
 const section = (title: string, body: string): string =>
   '<div class="flex flex-col gap-2"><h3 class="h-section">' + title + '</h3>' + body + '</div>';
+
+const items = (xs: readonly string[], tag: 'ul' | 'ol' = 'ul'): string =>
+  xs.length
+    ? '<' +
+      tag +
+      ' class="m-0 flex flex-col gap-1 pl-5 text-ink-2 ' +
+      (tag === 'ol' ? 'list-decimal' : 'list-disc') +
+      '">' +
+      xs.map((x) => '<li class="break-words">' + esc(x) + '</li>').join('') +
+      '</' +
+      tag +
+      '>'
+    : '';
+
+const ROOT_STATUS = {
+  verified: 'Verified in the code and the evidence',
+  hypothesis: 'Hypothesis: likely, not verified',
+  unconfirmed: 'Unconfirmed: the evidence is not enough to tell',
+} as const;
+
+const FIX_TARGET: Record<string, string> = {
+  application: 'Change the application',
+  test: 'Change the test (its expected results stay as they are)',
+  environment: 'Fix the test environment',
+  investigate: 'Investigate first: the cause is not confirmed',
+};
+
+/** Failure analysis, fix plan and acceptance criteria of a defect, from the structured analysis. */
+function analysisBlock(d: Defect): string {
+  const a = d.analysis;
+  const where = d.failedStep || a?.failurePoint || '';
+  let html = where
+    ? section('Where it failed', '<p class="m-0 break-words text-ink-2">' + esc(where) + '</p>')
+    : '';
+  if (a) {
+    html += section(
+      'Failure analysis',
+      '<dl class="m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 max-md:grid-cols-1">' +
+        '<dt class="text-muted">Category</dt><dd class="m-0">' +
+        esc(a.category) +
+        '</dd><dt class="text-muted">Difference</dt><dd class="m-0 break-words">' +
+        esc(a.difference) +
+        '</dd><dt class="text-muted">Root cause</dt><dd class="m-0">' +
+        esc(ROOT_STATUS[a.rootCauseStatus]) +
+        '</dd><dt class="text-muted">Timing</dt><dd class="m-0 break-words">' +
+        esc(a.timing) +
+        '</dd></dl>' +
+        (a.facts.length
+          ? '<h4 class="m-0 mt-2 text-sm font-semibold">Verified facts</h4>' + items(a.facts)
+          : '') +
+        (a.hypotheses.length
+          ? '<h4 class="m-0 mt-2 text-sm font-semibold">Hypotheses (not verified)</h4>' + items(a.hypotheses)
+          : '') +
+        (a.locations.length
+          ? '<h4 class="m-0 mt-2 text-sm font-semibold">Code involved</h4>' +
+            '<ul class="m-0 flex flex-col gap-1 pl-5 font-mono text-[13px]">' +
+            a.locations.map((l) => '<li class="break-words">' + esc(l) + '</li>').join('') +
+            '</ul>'
+          : '') +
+        (a.missing.length
+          ? '<h4 class="m-0 mt-2 text-sm font-semibold">Missing evidence</h4>' + items(a.missing)
+          : '') +
+        (a.investigation.length
+          ? '<h4 class="m-0 mt-2 text-sm font-semibold">What to check next</h4>' +
+            items(a.investigation, 'ol')
+          : ''),
+    );
+    const f = a.fix;
+    html += section(
+      'How to fix it',
+      '<p class="m-0 font-semibold">' +
+        esc(FIX_TARGET[f.target] ?? label(f.target)) +
+        '</p><p class="m-0 max-w-[68ch] text-ink-2">' +
+        esc(f.summary) +
+        '</p>' +
+        items(f.changes) +
+        (f.steps.length
+          ? '<details class="disclosure"><summary>Implementation steps</summary>' +
+            items(f.steps, 'ol') +
+            '</details>'
+          : '') +
+        (f.alternatives.length
+          ? '<details class="disclosure"><summary>Alternatives</summary>' +
+            items(f.alternatives) +
+            '</details>'
+          : '') +
+        (f.sideEffects
+          ? '<p class="m-0 text-[13px] text-muted">Side effects: ' + esc(f.sideEffects) + '</p>'
+          : '') +
+        (f.expectedAfterFix
+          ? '<p class="m-0 text-[13px] text-muted">After the fix: ' + esc(f.expectedAfterFix) + '</p>'
+          : ''),
+    );
+  }
+  if (d.acceptance.length) html += section('Acceptance criteria', items(d.acceptance));
+  if (a && (a.fix.verification.length || a.fix.regression.length))
+    html += section(
+      'Verify and re-test',
+      items(a.fix.verification) +
+        (a.fix.regression.length
+          ? '<p class="m-0 mt-1 text-[13px] text-muted">Re-test: ' + esc(a.fix.regression.join(', ')) + '</p>'
+          : ''),
+    );
+  if (a?.engineNotes.length)
+    html +=
+      '<details class="disclosure"><summary>Engine checks of this analysis</summary>' +
+      items(a.engineNotes) +
+      '</details>';
+  return html;
+}
 
 /** Whether a tracker item exists for the defect, from the tracker check of the selected run. */
 function logged(d: Defect): string {
@@ -112,6 +222,7 @@ function detail(d: Defect): string {
         esc(d.reasoning) +
         '</p></details>'
       : '') +
+    analysisBlock(d) +
     (d.steps.length
       ? section(
           'Steps to reproduce',
@@ -128,9 +239,27 @@ function detail(d: Defect): string {
     ) +
     (media ? section('Evidence', media) : '') +
     '<div class="flex flex-col gap-3 border-t border-divider pt-5"><h3 class="h-section">Your decision</h3>' +
-    (tracker
-      ? '<div class="flex flex-wrap items-center gap-x-3 gap-y-2">' + tracker + '</div>'
-      : '<p class="m-0 text-muted">No bug tracker is set up. Add a <code>clickup</code> or <code>jira</code> section to <code>.qa/config.ts</code> to log defects from here.</p>') +
+    '<div class="flex flex-wrap items-center gap-x-3 gap-y-2">' +
+    // 1. Log it. Without a tracker the button stays, disabled, so the choice is visible.
+    (tracker ||
+      '<button type="button" class="btn btn-primary" disabled aria-describedby="no-tracker">Create task in bug tracker</button>') +
+    // 2. Run its tests again (only this defect's scenarios).
+    '<button type="button" class="btn"' +
+    (data.job?.status === 'running' ? ' disabled' : '') +
+    ' ' +
+    act('start-job', { url: '/api/runs/failed', extra: JSON.stringify({ ids: d.scenarioIds }) }) +
+    '>' +
+    (d.scenarioIds.length === 1 ? 'Run test again' : 'Run its ' + d.scenarioIds.length + ' tests again') +
+    '</button>' +
+    // 3. Take the report elsewhere (chat, another tracker, a pull request).
+    '<button type="button" class="btn" ' +
+    act('copy', { text: bugReportText(d) }) +
+    '>Copy bug report</button></div>' +
+    (data.tracker.configured
+      ? ''
+      : '<p id="no-tracker" class="m-0 text-[13px] text-muted">No bug tracker is set up, so creating a task is off. <a class="link" href="' +
+        routeHash('tracker') +
+        '">Set up ClickUp or Jira</a> to log defects from here.</p>') +
     (d.confirmed
       ? d.note
         ? '<p class="m-0 text-[13px] text-muted">The analyzer would not log this on its own: ' +
@@ -173,14 +302,22 @@ export function defectsPage(banner: string): string {
   const heading =
     '<div class="flex flex-wrap items-start justify-between gap-x-4">' +
     pageHeading('Defects', text) +
-    (defects.length
+    (defects.length || run?.report
       ? '<div class="mb-6 flex flex-wrap gap-2">' +
-        planButtons() +
-        '<button type="button" class="btn"' +
-        (data.job?.status === 'running' ? ' disabled' : '') +
-        ' ' +
-        act('start-job', { url: '/api/runs/failed' }) +
-        '>Run failed tests</button></div>'
+        (run?.report
+          ? '<a class="btn" href="' +
+            fileUrl(run.report) +
+            '" target="_blank" rel="noopener" title="Every scenario with its result, cause, fix plan and acceptance criteria">Open QA report</a>'
+          : '') +
+        (defects.length
+          ? planButtons() +
+            '<button type="button" class="btn"' +
+            (data.job?.status === 'running' ? ' disabled' : '') +
+            ' ' +
+            act('start-job', { url: '/api/runs/failed' }) +
+            '>Run failed tests</button>'
+          : '') +
+        '</div>'
       : '') +
     '</div>';
   if (!defects.length) {

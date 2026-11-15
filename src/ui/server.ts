@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   fileIssues,
+  FilingSummarySchema,
   FilingUnavailable,
   loadFiling,
   previouslyFiled,
@@ -38,6 +39,7 @@ import { removeScenarios } from '../scenarios/manage.js';
 import { CATEGORIES, isCriticalScenario } from '../scenarios/schema.js';
 import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
 import { planFile, planStatus, writeBugFixPlan } from '../plan/plan.js';
+import { buildReport } from '../report/report.js';
 import { projectStatus, runAnalysis, runCritical, runScenarios, type Progress } from './project.js';
 import { saveTracker, testTracker, trackerSettings, TrackerSetupError } from './tracker-setup.js';
 
@@ -74,6 +76,8 @@ export interface Overview {
     tasks: Record<string, TaskLink>;
     /** True when /api/tasks should be called to verify items (tracker configured and credentials present). */
     tasksPending: boolean;
+    /** Project-relative path of the run's HTML report, served under /files/, or null before `report`. */
+    report: string | null;
   } | null;
   scenarios: ReturnType<typeof loadAllScenarios>;
   /** Choices for the add/edit scenario form. */
@@ -209,6 +213,12 @@ export async function buildOverview(ctx: QaContext, runId?: string): Promise<Ove
       // Filled in by a second request (/api/tasks) so the page never waits for the tracker.
       tasks: {},
       tasksPending: trackerInfo(ctx.config).credentialsPresent,
+      report: fs.existsSync(path.join(ctx.paths.reportsDir, test.runId, 'report.html'))
+        ? path
+            .relative(ctx.root, path.join(ctx.paths.reportsDir, test.runId, 'report.html'))
+            .split(path.sep)
+            .join('/')
+        : null,
     };
   }
   const info = trackerInfo(ctx.config);
@@ -268,8 +278,8 @@ async function readBody(req: http.IncomingMessage): Promise<string> {
 function serveFile(ctx: QaContext, urlPath: string, res: http.ServerResponse): void {
   const relative = decodeURIComponent(urlPath.replace(/^\/files\//, ''));
   const abs = path.resolve(ctx.root, relative);
-  const allowed = [ctx.paths.artifactsDir, path.join(ctx.paths.qaDir, 'design')].some((dir) =>
-    isInside(dir, abs),
+  const allowed = [ctx.paths.artifactsDir, ctx.paths.reportsDir, path.join(ctx.paths.qaDir, 'design')].some(
+    (dir) => isInside(dir, abs),
   );
   if (!allowed || !fs.existsSync(abs) || fs.statSync(abs).isDirectory()) {
     res.writeHead(404);
@@ -609,9 +619,12 @@ function rerunJob(
 }
 
 function handleRunFailed(ctx: QaContext, body: string): { status: number; payload: unknown } {
-  const { runId } = JSON.parse(body || '{}') as { runId?: unknown };
+  const { runId, ids: only } = JSON.parse(body || '{}') as { runId?: unknown; ids?: unknown };
   if (typeof runId !== 'string' || !runId) return { status: 400, payload: { error: 'runId is required' } };
-  const ids = failedIds(ctx, runId);
+  if (only !== undefined && !(Array.isArray(only) && only.every((x) => typeof x === 'string')))
+    return { status: 400, payload: { error: 'ids must be a list of scenario ids' } };
+  // Optionally only some of them (the tests of one defect).
+  const ids = failedIds(ctx, runId).filter((id) => !only || (only as string[]).includes(id));
   if (ids.length === 0) return { status: 400, payload: { error: 'No failed tests to run in this run.' } };
   return rerunJob(
     ctx,
@@ -645,6 +658,20 @@ function handlePlan(ctx: QaContext, body: string): { status: number; payload: un
 }
 
 /** The plan file's text for the dashboard viewer (only this file, never other paths). */
+/**
+ * The structured QA report of a run (GET /api/report?run=<id>): built from the run's stored files
+ * on every request, so it reflects re-runs and filing without an AI call.
+ */
+function readReport(ctx: QaContext, runId: string): { status: number; payload: unknown } {
+  if (!/^[\w-]+$/.test(runId)) return { status: 400, payload: { error: 'invalid run id' } };
+  const dir = runDir(ctx.paths, runId);
+  const test = readJson(path.join(dir, 'results.json'), TestRunResultSchema);
+  if (!test) return { status: 404, payload: { error: `Run ${runId} has no results.` } };
+  const triage = readJson(path.join(dir, 'triage.json'), TriageResultSchema) ?? null;
+  const filing = readJson(path.join(dir, 'filing.json'), FilingSummarySchema) ?? null;
+  return { status: 200, payload: buildReport(ctx, test, triage, filing, triage?.costUsd ?? 0) };
+}
+
 function readPlan(ctx: QaContext, runId: string): { status: number; payload: unknown } {
   if (!/^[\w-]+$/.test(runId)) return { status: 400, payload: { error: 'invalid run id' } };
   const file = planFile(ctx, runId);
@@ -890,6 +917,9 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, 200, { job });
       } else if (req.method === 'POST' && url.pathname === '/api/plan') {
         const { status, payload } = handlePlan(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'GET' && url.pathname === '/api/report') {
+        const { status, payload } = readReport(ctx, url.searchParams.get('run') ?? '');
         json(res, status, payload);
       } else if (req.method === 'GET' && url.pathname === '/api/plan') {
         const { status, payload } = readPlan(ctx, url.searchParams.get('run') ?? '');

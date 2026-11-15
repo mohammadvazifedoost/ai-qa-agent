@@ -25,7 +25,7 @@ import {
   type Scenario,
 } from '../src/scenarios/schema.js';
 import { StateStore } from '../src/state/state.js';
-import { buildTriagePrompt } from '../src/triage/triage.js';
+import { ANALYSIS_RULES, buildTriagePrompt } from '../src/triage/triage.js';
 import { makeProject } from './helpers.js';
 
 const page = (route: string, name: string, extra: Partial<PageModel> = {}): PageModel => ({
@@ -407,5 +407,28 @@ describe('fix plan', () => {
     expect(failures[0]!.scenario).toMatchObject({ critical: true });
     expect(failures[1]!.triage).toBeUndefined();
     expect(collectFailures(run, [])[0]!.triage).toBeUndefined();
+  });
+});
+
+describe('triage prompt: steps, evidence and the analysis rules', () => {
+  it('gives the executed steps, the extracted evidence, regression candidates and the taxonomy', () => {
+    const { ctx } = setup([scenario('CHECKOUT-001'), scenario('CHECKOUT-002')]);
+    const prompt = buildTriagePrompt(
+      ctx,
+      outcome('CHECKOUT-001', {
+        steps: [
+          { title: 'Open /checkout', durationMs: 5, status: 'passed' },
+          { title: 'Read the total', durationMs: 5000, status: 'failed', error: 'toHaveText failed' },
+        ],
+      }),
+    );
+    expect(prompt).toContain('2. [FAILED] Read the total (5000 ms)');
+    expect(prompt).toContain('Steps after step 2 did not run.');
+    expect(prompt).toContain(
+      'Not captured: screenshot, DOM snapshot at failure, console and network log, trace, video',
+    );
+    expect(prompt).toContain('- CHECKOUT-002:');
+    expect(ANALYSIS_RULES).toContain('TEST_IMPLEMENTATION: Test implementation issue');
+    expect(ANALYSIS_RULES).toContain('Never propose skipping the test');
   });
 });

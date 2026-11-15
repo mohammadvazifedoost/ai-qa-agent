@@ -18,12 +18,28 @@ const PwError = z.looseObject({
   snippet: z.string().optional(),
   location: z.looseObject({ file: z.string(), line: z.number(), column: z.number() }).optional(),
 });
+interface PwStepT {
+  title: string;
+  duration: number;
+  error?: z.infer<typeof PwError>;
+  steps?: PwStepT[];
+}
+/** A `test.step` as the JSON reporter writes it (it reports only steps of that category), nested. */
+const PwStep: z.ZodType<PwStepT> = z.lazy(() =>
+  z.looseObject({
+    title: z.string(),
+    duration: z.number(),
+    error: PwError.optional(),
+    steps: z.array(PwStep).optional(),
+  }),
+);
 const PwResult = z.looseObject({
   status: z.string(),
   duration: z.number(),
   retry: z.number(),
   errors: z.array(PwError).default([]),
   attachments: z.array(Attachment).default([]),
+  steps: z.array(PwStep).default([]),
 });
 const PwTest = z.looseObject({
   projectName: z.string(),
@@ -66,6 +82,52 @@ export type PwReport = z.infer<typeof PwReportSchema>;
 
 // --- Our normalized outcome ----------------------------------------------------------------
 
+/**
+ * One named step (`test.step`) of the final attempt, in execution order. Steps after the failing
+ * one never ran, so they are not listed: the report says so instead of guessing them.
+ */
+export const ExecutedStepSchema = z.object({
+  title: z.string(),
+  durationMs: z.number(),
+  status: z.enum(['passed', 'failed']),
+  /** First line of the step's error, without terminal colours. */
+  error: z.string().optional(),
+  /** Titles of the nested steps leading to the failure, outermost first (failed steps only). */
+  failedPath: z.array(z.string()).optional(),
+});
+export type ExecutedStep = z.infer<typeof ExecutedStepSchema>;
+
+const firstLine = (s: string): string =>
+  stripAnsi(s)
+    .split('\n')
+    .map((l) => l.trim())
+    .find((l) => l !== '') ?? '';
+
+/** Top-level steps of a Playwright result, each with the nested path to its failure. */
+export function executedSteps(steps: readonly PwStepT[]): ExecutedStep[] {
+  const failedPath = (s: PwStepT): string[] => {
+    const child = (s.steps ?? []).find((c) => c.error);
+    return child ? [child.title, ...failedPath(child)] : [];
+  };
+  return steps.map((s) => {
+    if (!s.error) return { title: s.title, durationMs: s.duration, status: 'passed' as const };
+    const nested = failedPath(s);
+    return {
+      title: s.title,
+      durationMs: s.duration,
+      status: 'failed' as const,
+      error: firstLine(s.error.message ?? s.error.stack ?? '') || 'Unknown error',
+      ...(nested.length ? { failedPath: nested } : {}),
+    };
+  });
+}
+
+/** The step the test stopped at: the first failed step, or null when it failed outside any step. */
+export function failedStepOf(o: Pick<TestOutcome, 'steps'>): { index: number; step: ExecutedStep } | null {
+  const index = (o.steps ?? []).findIndex((s) => s.status === 'failed');
+  return index < 0 ? null : { index, step: o.steps![index]! };
+}
+
 export const TestOutcomeSchema = z.object({
   key: z.string(),
   scenarioId: z.string().nullable(),
@@ -86,6 +148,8 @@ export const TestOutcomeSchema = z.object({
     })
     .nullable(),
   annotations: z.array(z.object({ type: z.string(), description: z.string().optional() })),
+  /** Named steps of the final attempt. Results written before steps were recorded have none. */
+  steps: z.array(ExecutedStepSchema).optional(),
   artifacts: z.object({
     /** The video of the test's first page (the one the test started on). Same as `videos[0]`. */
     video: z.string().nullable(),
@@ -228,6 +292,7 @@ export function collectOutcomes(
               annotations.findIndex((b) => b.type === a.type && b.description === a.description) === i,
           )
           .map((a) => ({ type: a.type, description: a.description })),
+        steps: executedSteps(last?.steps ?? []),
         artifacts: {
           video: videos[0] ?? null,
           videos,

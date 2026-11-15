@@ -366,7 +366,100 @@ export interface Defect {
   scenarioIds: string[];
   /** What POST /api/file needs to create its tracker item. */
   body: { issueId: string } | { failureKey: string };
+  /** The structured analysis of the defect's first failure; null when there is none. */
+  analysis: DefectAnalysis | null;
+  /** The named step the first failed test stopped at, from the run (no AI). */
+  failedStep: string;
+  /** The scenarios' expected results plus the conditions the analysis adds. */
+  acceptance: string[];
 }
+
+export interface DefectAnalysis {
+  category: string;
+  failurePoint: string;
+  difference: string;
+  timing: string;
+  rootCauseStatus: 'verified' | 'hypothesis' | 'unconfirmed';
+  facts: string[];
+  hypotheses: string[];
+  missing: string[];
+  investigation: string[];
+  /** Code locations the engine verified, as "path:line — note". */
+  locations: string[];
+  fix: {
+    target: string;
+    summary: string;
+    changes: string[];
+    steps: string[];
+    alternatives: string[];
+    sideEffects: string;
+    expectedAfterFix: string;
+    verification: string[];
+    regression: string[];
+  };
+  engineNotes: string[];
+}
+
+const CATEGORY: Record<string, string> = {
+  APP_FUNCTIONAL: 'Application functional bug',
+  UI_RENDERING: 'UI / rendering issue',
+  BACKEND_API: 'Backend / API failure',
+  DATA_INTEGRITY: 'Data validation or integrity issue',
+  AUTH: 'Authentication / authorization issue',
+  NAVIGATION: 'Navigation / routing issue',
+  STATE_MANAGEMENT: 'State management issue',
+  PERFORMANCE_TIMEOUT: 'Performance / timeout issue',
+  TEST_IMPLEMENTATION: 'Test implementation issue',
+  ENVIRONMENT_INFRA: 'Test environment / infrastructure issue',
+  FLAKY: 'Flaky or intermittent failure',
+  UNKNOWN: 'Unknown / insufficient evidence',
+};
+
+type Failure = NonNullable<Overview['run']>['failures'][number];
+
+/** The analysis of a failure as the dashboard shows it. */
+export function analysisOf(f: Failure | undefined): DefectAnalysis | null {
+  const a = f?.analysis;
+  if (!a) return null;
+  return {
+    category: CATEGORY[a.category] ?? label(a.category),
+    failurePoint: a.failurePoint,
+    difference: a.difference,
+    timing:
+      (a.timing.suspected ? 'Possibly timing-related: ' : 'Not timing-related: ') + a.timing.explanation,
+    rootCauseStatus: a.rootCause.status,
+    facts: a.rootCause.facts,
+    hypotheses: a.rootCause.hypotheses,
+    missing: a.rootCause.missingEvidence,
+    investigation: a.rootCause.investigation,
+    locations: a.rootCause.locations.map(
+      (l) => l.file + (l.line !== null ? ':' + l.line : '') + (l.note ? ' — ' + l.note : ''),
+    ),
+    fix: {
+      target: a.fix.target,
+      summary: a.fix.summary,
+      changes: a.fix.requiredChanges,
+      steps: a.fix.implementationSteps,
+      alternatives: a.fix.alternatives,
+      sideEffects: a.fix.sideEffects,
+      expectedAfterFix: a.fix.expectedAfterFix,
+      verification: a.fix.verificationSteps,
+      regression: [...a.fix.regressionScenarioIds, ...a.fix.regressionAreas],
+    },
+    engineNotes: f.engineNotes ?? [],
+  };
+}
+
+/** Where a result stopped, from its recorded steps. */
+export function failedStepText(o: Outcome | undefined): string {
+  const steps = o?.steps ?? [];
+  const i = steps.findIndex((s) => s.status === 'failed');
+  if (i < 0) return '';
+  const st = steps[i]!;
+  return 'Step ' + (i + 1) + ' of ' + steps.length + ': ' + [st.title, ...(st.failedPath ?? [])].join(' › ');
+}
+
+const unique = (xs: string[]): string[] => [...new Set(xs)];
 
 const SEVERITY_RANK: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
@@ -415,6 +508,16 @@ export function defectsOf(data: Data): Defect[] {
       keys,
       scenarioIds: [...new Set(keys.map((k) => run.outcomes.find((o) => o.key === k)?.scenarioId ?? k))],
       body: { issueId: issue.id },
+      analysis: analysisOf(first),
+      failedStep: failedStepText(run.outcomes.find((o) => o.key === keys[0])),
+      acceptance: unique([
+        ...keys.flatMap(
+          (k) =>
+            data.scenarios.find((s) => s.id === run.outcomes.find((o) => o.key === k)?.scenarioId)
+              ?.expectedResults ?? [],
+        ),
+        ...(first?.analysis?.fix.acceptanceCriteria ?? []),
+      ]),
     });
   }
 
@@ -438,7 +541,7 @@ export function defectsOf(data: Data): Defect[] {
       kind: f ? (KIND[f.classification] ?? label(f.classification)) : 'Not analyzed',
       confidence: f ? f.confidence : null,
       summary: f?.bug && f.summary !== f.bug.title ? f.summary : '',
-      expected: f?.bug?.expectedResult ?? sc?.expectedResults.join(' ') ?? '',
+      expected: f?.bug?.expectedResult ?? sc?.expectedResults.join('; ') ?? '',
       actual: f?.bug?.actualResult ?? error,
       cause: f?.testProblem ?? f?.bug?.suspectedRootCause ?? '',
       causeTitle: f?.testProblem ? 'What is wrong with the test' : 'Likely cause',
@@ -448,12 +551,39 @@ export function defectsOf(data: Data): Defect[] {
       keys: [o.key],
       scenarioIds: [group],
       body: { failureKey: o.key },
+      analysis: analysisOf(f),
+      failedStep: failedStepText(o),
+      acceptance: unique([...(sc?.expectedResults ?? []), ...(f?.analysis?.fix.acceptanceCriteria ?? [])]),
     });
   }
 
   const order = (d: Defect): number => (d.severity ? SEVERITY_RANK[d.severity] : 9);
   defects.sort((a, b) => order(a) - order(b) || (b.confidence ?? 0) - (a.confidence ?? 0));
   return [...defects, ...rest.values()];
+}
+
+/** A defect as Markdown, for pasting into a chat, a pull request or a tracker without an integration. */
+export function bugReportText(d: Defect): string {
+  const list = (title: string, xs: readonly string[]): string[] =>
+    xs.length ? ['', '## ' + title, ...xs.map((x) => '- ' + x)] : [];
+  const a = d.analysis;
+  return [
+    '# ' + d.title,
+    '',
+    '- Kind: ' + d.kind + (a ? ' (' + a.category + ')' : ''),
+    ...(d.severity ? ['- Severity: ' + label(d.severity)] : []),
+    ...(d.confidence !== null ? ['- Confidence: ' + Math.round(d.confidence * 100) + '%'] : []),
+    '- Tests: ' + d.scenarioIds.join(', '),
+    ...(d.failedStep ? ['- Failed at: ' + d.failedStep] : []),
+    ...(d.summary ? ['', d.summary] : []),
+    ...(d.expected ? ['', '## Expected', d.expected] : []),
+    ...(d.actual ? ['', '## Actual', d.actual] : []),
+    ...(a?.difference ? ['', '## Difference', a.difference] : []),
+    ...(d.cause ? ['', '## ' + d.causeTitle, d.cause] : []),
+    ...list('Steps to reproduce', d.steps),
+    ...(a ? ['', '## Fix', a.fix.summary, ...a.fix.changes.map((x) => '- ' + x)] : []),
+    ...list('Acceptance criteria', d.acceptance),
+  ].join('\n');
 }
 
 /** The defect that explains a scenario's failure in the selected run, if any. */

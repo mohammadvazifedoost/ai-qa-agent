@@ -4,6 +4,7 @@ import {
   defectFor,
   defectsOf,
   esc,
+  failedStepText,
   failureFor,
   isFailing,
   label,
@@ -252,16 +253,21 @@ function resultBlock(sc: ScenarioView, o: Outcome, many: boolean): string {
       (o.attempts > 1 ? ' after ' + o.attempts + ' attempts' : '') +
       '</div>';
   } else if (o.status !== 'skipped') {
+    const step = failedStepText(o);
     html +=
       '<div class="flex flex-col gap-1.5 rounded-[10px] border border-fail-line bg-fail-soft px-4 py-3.5">' +
       '<span class="text-[13px] font-bold text-fail-ink">Why it failed</span>' +
+      (step ? '<span class="text-ink-2">Stopped at ' + esc(step) + '</span>' : '') +
       (defect
         ? '<span class="font-semibold">' +
           esc(defect.title) +
           '</span><span class="text-ink-2">' +
-          esc(defect.kind) +
+          esc(defect.analysis ? defect.analysis.category : defect.kind) +
           (defect.confidence !== null ? ', confidence ' + Math.round(defect.confidence * 100) + '%' : '') +
           '</span>' +
+          (defect.analysis?.fix.summary
+            ? '<span class="text-ink-2">Fix: ' + esc(defect.analysis.fix.summary) + '</span>'
+            : '') +
           (defect.actual ? '<span class="text-ink-2">' + esc(defect.actual) + '</span>' : '') +
           '<a class="link self-start" href="' +
           routeHash('defects', defect.id) +
