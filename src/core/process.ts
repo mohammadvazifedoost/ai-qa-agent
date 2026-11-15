@@ -10,8 +10,9 @@ export interface RunResult {
 
 /** A run stopped through its AbortSignal (e.g. the dashboard's Cancel button). */
 export class Cancelled extends Error {
-  constructor() {
-    super('Cancelled');
+  /** `message` says what was kept when the cancelled work had already saved part of its result. */
+  constructor(message = 'Cancelled') {
+    super(message);
     this.name = 'Cancelled';
   }
 }

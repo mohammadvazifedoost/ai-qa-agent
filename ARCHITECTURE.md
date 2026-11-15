@@ -56,7 +56,7 @@ init ──► analyze ──► design ──► scenarios ──► generate �
 | plan | `plan/plan.ts` | failed outcomes, their scenarios and the triage verdicts | bug-fix plan; starts from the triage verdict instead of re-deriving it | — |
 | file | `bugs/file.ts` | confirmed issues | `filing.json` marking them *pending* — the pipeline never creates tasks | — |
 | (dashboard button) | `bugs/file.ts` `fileIssues`, `integrations/clickup.ts` | one issue or one failure, on a person's click | ClickUp task + attachments (or a comment on the task filed earlier), `filing.json`, `state.bugs` | fingerprint of scenario ids, root-cause files |
-| ui | `ui/server.ts`, `ui/page.ts` | scenarios, run results, triage, filing | local dashboard (`/api/overview`, `/files/*`, `POST /api/file` to log one issue, `POST /api/scenarios/delete` to remove a scenario, `POST /api/media/delete` to delete a result's screenshots/video, `POST /api/runs/critical` to run only critical flows) | — |
+| ui | `ui/server.ts`, `ui/index.html`, `ui/client/*` | scenarios, run results, triage, filing | local dashboard (`/api/overview`, `GET /api/project` for what is out of date, `POST /api/project/analyze|scenarios|critical` to run those stages as cancellable jobs, `/files/*`, `POST /api/file` to log one issue, `POST /api/scenarios/delete` to remove a scenario, `POST /api/media/delete` to delete a result's screenshots/video, `POST /api/runs/critical` to run only critical flows, `GET /api/tracker` + `POST /api/tracker/test|save` to connect ClickUp or Jira (config through `config/edit.ts`, secrets in `.qa/.env.local` through `config/local-env.ts`); every POST must be `application/json`) | — |
 | (remove / restore) | `scenarios/manage.ts`, `scenarios/spec-edit.ts` | scenario ids from the CLI or the dashboard | scenario moved to `removed` in `scenarios/<page>.json`; its test cut from the spec (validated with `--list`, rolled back on failure); `generatedSpecs` kept fresh | — |
 | report | `report/report.ts` | everything above | `reports/<id>/report.md|html`, `bugs/*.md` | — |
 
@@ -87,7 +87,15 @@ src/
                           and requireAppModel, the only way later stages read the model
   changes/detect.ts       deterministic code change detection (per-page + shared-file hashes) and
                           opt-in Figma change detection (frame list + page structure hashes)
-  ui/server.ts, ui/page.ts local dashboard server (node:http) and its single static page
+  ui/server.ts            local dashboard server (node:http): the JSON API and the static files
+  ui/index.html           the dashboard's single page: the frame (menu, top bar, dialog)
+  ui/project.ts           the Project page's server side: what is out of date (file comparison,
+                          no AI) and the analyze / scenarios / critical-flow steps as jobs
+  ui/client/*             browser modules, no framework: logic.ts (filters, routes, defects; no
+                          DOM, unit-tested), shell.ts (menu + top bar), overview.ts / scenarios.ts /
+                          defects.ts / project.ts (the pages), editor.ts (scenario form), actions.ts
+                          (run, write test, log bug, delete), theme.ts (light / dark), main.ts
+                          (event dispatch and hash routing)
   ui/tailwind.css         design tokens + component classes; compiled by the Tailwind CLI during
                           `npm run build` into dist/ui/styles.css, served at /styles.css (no CDN,
                           no build step for users of the package)

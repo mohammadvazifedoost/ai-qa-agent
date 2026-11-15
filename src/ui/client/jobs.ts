@@ -1,4 +1,7 @@
-/** Whole runs and the fix plan run as background jobs on the server; the page polls until done. */
+/**
+ * Whole runs, the fix plan and the AI steps of the Project page run as background jobs on the
+ * server; the page polls until they are done.
+ */
 import type { Job } from '../server.js';
 import { getJson, postJson } from './api.js';
 import { load, loadTrackers } from './app.js';
@@ -11,7 +14,7 @@ let jobTimer: ReturnType<typeof setTimeout> | undefined;
 export async function startJob(url: string, extra: Record<string, unknown> = {}): Promise<void> {
   const { ok, out } = await postJson<Job>(url, { runId: state.data.run?.id, ...extra });
   if (!ok) {
-    toast(out.error || 'Could not start the run.');
+    toast(out.error || 'Could not start it.');
     return;
   }
   state.data.job = out;
@@ -43,6 +46,11 @@ async function pollJob(): Promise<void> {
     render();
     return;
   }
+  // Still running: show what it is doing now (e.g. which page is being written).
+  if (j && j.startedAt === state.watched && j.detail !== state.data.job?.detail) {
+    state.data.job = j;
+    render();
+  }
   jobTimer = setTimeout(pollJob, 2000);
 }
 
@@ -66,8 +74,10 @@ export function createPlan(): void {
 }
 
 export async function refreshAll(btn: HTMLButtonElement): Promise<void> {
+  // The top bar is drawn again when the data arrives, which resets the button.
   btn.disabled = true;
-  btn.textContent = 'Refreshing…';
+  btn.classList.add('is-busy');
+  btn.setAttribute('aria-label', 'Refreshing…');
   await load(state.data.run?.id);
   await loadTrackers(true);
 }

@@ -18,7 +18,7 @@ If a private npm mirror is configured globally and rejects packages, install wit
 | Script | Purpose |
 |---|---|
 | `npm run build` | Compile `src/` to `dist/` (the CLI is `dist/cli.js`) and the dashboard CSS (`dist/ui/styles.css`, Tailwind v4) |
-| `npm run build:css` | Only the dashboard CSS — use while editing `src/ui/page.ts` / `src/ui/tailwind.css` |
+| `npm run build:css` | Only the dashboard CSS — use while editing `src/ui/index.html`, `src/ui/client/*` or `src/ui/tailwind.css` |
 | `npm run typecheck` | `tsc --noEmit` over src and tests |
 | `npm run lint` / `npm run format` | ESLint / Prettier |
 | `npm test` | Vitest unit tests in `test/` |
@@ -72,10 +72,25 @@ analyze, generate and execute tests for `/contact` only.
 
 ### Dashboard
 
-`npx ai-qa-agent ui` in the fixture (with `CLICKUP_API_TOKEN` exported if you want to try the
-*Log bug in ClickUp* button) serves the dashboard on http://127.0.0.1:4310. The page is a single
-static HTML string in `src/ui/page.ts`; the JSON it consumes comes from `buildOverview()` in
-`src/ui/server.ts`.
+`npx ai-qa-agent ui` in the fixture (connect a tracker on its *Bug tracker* page, or export
+`CLICKUP_API_TOKEN`, if you want to try filing bugs) serves the dashboard on http://127.0.0.1:4310. The page is one static
+file, `src/ui/index.html`, plus browser modules in `src/ui/client/` (plain TypeScript, no
+framework; they may import only types from the rest of `src/`). The JSON they consume comes from
+`buildOverview()` in `src/ui/server.ts`. Run `npm run build` after a change and reload the page.
+
+- `logic.ts` holds everything that can be decided without the DOM (filters, counts, routes, the
+  list of defects) and is covered by `test/ui-logic.test.ts`; put new rules there.
+- `shell.ts` draws the menu and the top bar; `overview.ts`, `scenarios.ts`, `defects.ts` and
+  `project.ts` draw the pages; `ui.ts` has the pieces they share. HTML is built as strings and every value
+  from the project goes through `esc()`.
+- Buttons carry `data-action` and are handled in one place, `main.ts`; there are no inline
+  handlers. The current view is the URL hash (`#/scenarios/<id>`), parsed by `parseRoute()`.
+- The menu is dark in both themes: the `.rail` class in `tailwind.css` gives the tokens their own
+  values inside it, so the same token classes work there. Icons are inline stroke SVGs (`ICON` in
+  `shell.ts`) in `currentColor`; a button that shows only an icon gets `btn-icon`, an `aria-label`
+  and a `title`.
+- Colours are tokens in `tailwind.css` with a light and a dark value each. Use the token classes
+  (`bg-surface`, `text-ink`, `text-fail-ink`, …) rather than fixed colours, and check both themes.
 
 ## Testing the ClickUp integration
 

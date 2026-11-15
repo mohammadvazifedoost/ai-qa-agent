@@ -484,14 +484,15 @@ npx ai-qa-agent run --critical               # all of the above, then triage and
 - `test --critical` and `run --critical` select the tests by scenario id, and combine with `--page`,
   `--feature` and `--grep`. `run --critical` skips the Figma extraction and cannot be combined with
   `--changed`.
-- In the dashboard, critical flows show a *critical* chip, and **Run critical flows** starts a new
-  run with only their tests.
+- In the dashboard, critical flows show a *Critical flow* chip, the Overview lists them with their
+  results, and **Run tests → Critical flows** starts a new run with only their tests. *Choose
+  critical flows* on the dashboard's Project page does the same as `scenarios --critical`.
 
 ### Removing scenarios
 
 Some generated scenarios are not worth keeping (duplicates, out of scope, untestable). Delete them
 with `ai-qa-agent scenarios remove <id...> [--reason "<text>"]` (find ids with
-`ai-qa-agent scenarios list`) or with *Delete scenario* in the dashboard's scenario modal.
+`ai-qa-agent scenarios list`) or with *Remove* at the bottom of a scenario's panel in the dashboard.
 
 - The scenario leaves the `scenarios` array of `.qa/scenarios/<page>.json` and its
   `test('<ID>: …')` block is cut out of `.qa/tests/<page>.spec.ts`, without AI; other tests and
@@ -511,42 +512,46 @@ with `ai-qa-agent scenarios remove <id...> [--reason "<text>"]` (find ids with
 In the dashboard, *Add scenario* opens a form (page, title, type, priority, viewport, steps,
 expected results, and optional preconditions, test data, feature and rationale). Either fill it in
 yourself, or write one sentence under *Describe the test* and click *Draft with AI*: the AI fills
-in the fields for you to review, and nothing is saved until you click *Add scenario*. *Edit
-scenario* in a scenario's modal opens the same form for an existing scenario.
+in the fields for you to review, and nothing is saved until you click *Add scenario*. *Edit* at
+the bottom of a scenario's panel opens the same form for an existing scenario.
 
 - Scenarios you add or edit get `"origin": "person"` in `.qa/scenarios/<page>.json` and show a
-  *yours* chip. Scenario generation keeps them exactly as written: the AI is told not to repeat
+  *Yours* chip. Scenario generation keeps them exactly as written: the AI is told not to repeat
   them, and any AI scenario that reuses their id or title is dropped. Editing an AI scenario makes
   it yours.
 - New scenarios get the next free id on the page; ids of removed scenarios are never reused.
-- Saving does not touch the tests. A scenario without a test shows *no test yet*, and one changed
-  after its test was written shows *test out of date*. Its modal then offers *Create test* or
-  *Rewrite test* (always available for approved scenarios): the AI writes only that scenario's
-  test, and it is spliced into `.qa/tests/<page>.spec.ts` in place of the old one (or after the
-  last test), so every other test in the file stays exactly as it was. The edited file is checked
-  with `playwright test --list`; after three failed attempts the original file is kept. A page
-  with no spec file yet gets its whole file generated instead.
-- *Not run (N)* lists scenarios without a result in the selected run; your own scenarios and ones
-  waiting for a test are shown under *All* too. Each one with a test has *Run test* (and its modal
-  *Run again*): Playwright runs only that test, and its result replaces the scenario's result in
-  the selected run (evidence under `.qa/artifacts/runs/<run>/reruns/`), marked as run on its own.
-  An earlier AI analysis of that test is no longer shown, since it described an older failure.
-  With no run yet, a new run is started. `ai-qa-agent test` still runs everything.
-- The toolbar has *Run not-run tests (N)* (every test without a result in the selected run, added
-  to that run), *Run failed tests (N)* (only the failed and flaky tests of the selected run, run
-  again and updated in it), *Run all tests* (a new run with every test, like `ai-qa-agent test`;
-  the dashboard switches to it when done) and *Refresh* (reloads results and re-checks the bug
-  trackers). Runs and fix plans continue in the background; reloading the page keeps showing their
-  progress. *Cancel* in the progress banner stops Playwright or the AI at once (the whole process
-  tree) and changes nothing: no results are merged, no plan is written, and a cancelled *Run all
-  tests* is recorded as failed with "Cancelled".
-- The sidebar shows Jira (always) and ClickUp (when configured): *Connected* (verified against
-  the tracker with your token, with the project or list), *Credentials missing* (which variables to
-  set), *Cannot connect* (the error), or *Not configured*; the one bugs are filed in is marked.
+- Saving does not touch the tests. A scenario without a test shows *No test yet*, and one changed
+  after its test was written shows *Test out of date*; both are listed under the *Needs a test*
+  tab. Its panel then offers *Create test* or *Rewrite test* (always available for approved
+  scenarios): the AI writes only that scenario's test, and it is spliced into
+  `.qa/tests/<page>.spec.ts` in place of the old one (or after the last test), so every other test
+  in the file stays exactly as it was. The edited file is checked with `playwright test --list`;
+  after three failed attempts the original file is kept. A page with no spec file yet gets its
+  whole file generated instead.
+- *All* lists every scenario, the ones with a result in the selected run first; *Not run (N)* lists
+  those without one. A scenario with a test has *Run this test* (*Run this test again* once it has
+  a result) in its panel: Playwright runs only that test, and its result replaces the scenario's
+  result in the selected run (evidence under `.qa/artifacts/runs/<run>/reruns/`), marked as run on
+  its own. An earlier AI analysis of that test is no longer shown, since it described an older
+  failure. With no run yet, a new run is started. `ai-qa-agent test` still runs everything.
+- *Run tests* in the top bar opens a menu: *All tests* (a new run with every test, like
+  `ai-qa-agent test`; the dashboard switches to it when done), *Failed tests (N)* (only the failed
+  and flaky tests of the selected run, run again and updated in it), *Critical flows (N)* (a new
+  run with only those) and *Tests not run yet (N)* (every test without a result in the selected
+  run, added to that run). *Refresh* (the round-arrows icon) reloads results and re-checks the bug
+  tracker. Runs and fix plans continue in the background; reloading the page keeps showing their
+  progress. *Cancel* in
+  the progress banner stops Playwright or the AI at once (the whole process tree) and changes
+  nothing: no results are merged, no plan is written, and a cancelled run of all tests is recorded
+  as failed with "Cancelled".
+- The menu on the left shows how the tests run (production build or development server) and the
+  bug tracker in use: *connected* (verified against the tracker with your token, with the project
+  or list), *credentials missing* (which variables to set), *cannot connect* (the error), or *not
+  set up*. With no tracker configured it lists the ones you can set up.
 
 ### Bug-fix plans
 
-`ai-qa-agent plan` (or *Create fix plan* in the dashboard toolbar) turns the failed tests of a run
+`ai-qa-agent plan` (or *Create fix plan* on the dashboard's Overview and Defects pages) turns the failed tests of a run
 into a document for developers: a summary table in the suggested fix order, then per bug what is
 wrong, steps to reproduce, the root cause with file and line, the proposed fix (with a short code
 hint where it helps), files to change, risks, how to verify, and screenshot evidence. Failed tests
@@ -688,6 +693,10 @@ named in `clickup.tokenEnv`, Jira through the variables named in `jira.tokenEnv`
 OAuth flows. `.qa/.gitignore` excludes artifacts, reports and state; scenarios, tests, config and rules
 are meant to be committed.
 
+The *Bug tracker* page of the dashboard can keep the token (and the Jira email) for you in
+`.qa/.env.local`, a git-ignored file read when any command starts. A variable already set in the
+shell wins over that file.
+
 Setting a variable for the current shell:
 
 ```bash
@@ -784,27 +793,75 @@ the tests it affects.
 `npx ai-qa-agent ui` serves a local page (default `http://127.0.0.1:4310`) built from the files the
 pipeline writes. There is no database and no external service.
 
-- The sidebar lists pages with pass/fail counts; the verdict panel shows the run's pass ratio and
-  distinct defects. Scenarios that were not part of the selected run are hidden unless you ask.
-- Each scenario is one row: status, id, title, and for failures the analyzer's classification.
-  Clicking a row opens a modal with what happened (analysis, root cause, expected vs actual), the
-  evidence (screenshot, video, trace, console/network log, page snapshot) and, collapsed, the test
-  error and the scenario's steps.
-- Every failed row has either an *Open* link or a *Create task* / *Create issue* button. The
-  dashboard checks the tracker (ClickUp or Jira) for the item recorded for that defect (from this
-  run or an earlier run of the same defect, cached for a minute); if it still exists you get the
-  link, otherwise (never created, or deleted there) the button. A click creates it from the bug
-  report (consolidated for confirmed defects; for failures the analyzer did not confirm it is built
-  from the scenario and the error and labelled `needs-verification`). Filters: All / Failures /
-  Passing, type (functional, visual, responsive, accessibility), search, and page.
-- *Delete scenario* in the modal footer removes a scenario and its test after an inline
+The menu on the left has the project, five pages in two groups (*Results*: Overview, Defects,
+Scenarios; *Setup*: Project, Bug tracker; *Set up* next to Bug tracker while it is not connected)
+and, under them, the selected run at a glance (a ring of passed, flaky and failed tests with the
+pass rate). The top bar has the run picker (every run, newest first, with its date,
+counts and verdict; arrow keys move through it, Escape closes it), two icon buttons (dark / light
+mode, and *Refresh*), *Add scenario* and *Run tests*. On a small screen the menu opens from the
+button in the top bar.
+
+- **Overview** answers "how did the run go": passed / failed / flaky / not run with the pass rate
+  against the target, the defects to review, results per page (a page name opens its scenarios),
+  the critical flows with their results, and what to do next. Before the first run it shows the
+  steps to get started instead.
+- **Scenarios** lists every scenario with its result. Filter by result (*All*, *Failed*, *Passed*,
+  *Not run*, *Needs a test*, each with its count), page, type (functional, visual, responsive,
+  accessibility) or search; long lists are paged. Selecting a scenario opens its panel: the result
+  and why it failed (with a link to the defect), the evidence (screenshot, video, trace,
+  console/network log, page snapshot), the test error (collapsed), preconditions, steps and
+  expected results, and the actions *Run this test*, *Create test* / *Rewrite test*, *Edit* and
+  *Remove*.
+- **Defects** lists what needs a decision: the defects the analyzer confirmed, by severity, then
+  the failed tests it did not confirm as a product bug (test problem, environment problem, cause
+  not confirmed, not analyzed). A defect shows what was expected and what happened, the cause with
+  file and line, how the analyzer decided, the steps to reproduce, the tests that found it and
+  their evidence.
+- **Project** shows what the agent knows about the application and brings it up to date without
+  a terminal, in three steps. Each step says whether it is out of date, asks before it starts
+  (what changes, what stays) and then runs in the background with a progress line and *Cancel*:
+  1. *Application analysis*: the pages, journeys and when they were analyzed, and which pages
+     changed in the code since then. *Update the analysis* reads only the changed and new pages
+     (`ai-qa-agent analyze`); *Analyze everything again* reads the whole application
+     (`analyze --refresh`), optionally with the Figma design.
+  2. *Scenarios*: per page, how many there are and whether they are older than the analysis.
+     *Update scenarios* writes the pages that are out of date or have none, *Regenerate all
+     scenarios* writes every page (`scenarios --force`), and each row can be written on its own.
+     Pages are saved one by one, so cancelling keeps the pages already written.
+  3. *Critical flows*: the ones chosen, and *Choose critical flows* (`scenarios --critical`), with
+     an optional maximum.
+
+  Long tables (the pages of the analysis, scenarios per page, results per page on Overview) get a
+  search box, *All* / *Changed* (or *Out of date*, *With failures*) with counts, and ten rows at a
+  time with *Previous* / *Next*.
+
+  These steps call the AI, so they take minutes and are billed by your AI provider; the result
+  line ends with the cost when the provider reports it. Checking what is out of date compares
+  files only and is free. The menu shows *Out of date* next to Project when step 1 or 2 needs an
+  update.
+
+- Every defect has either an *Open task … in ClickUp* / *Open … in Jira* link or a *Create task in
+  ClickUp* / *Create issue in Jira* button. The dashboard checks the tracker for the item recorded
+  for that defect (from this run or an earlier run of the same defect, cached for a minute); if it
+  still exists you get the link, otherwise (never created, or deleted there) the button. A click
+  creates it from the bug report (consolidated for confirmed defects; for failures the analyzer
+  did not confirm it is built from the scenario and the error and labelled `needs-verification`).
+- *Remove* at the bottom of a scenario's panel removes the scenario and its test after an inline
   confirmation (optional reason); see [Removing scenarios](#removing-scenarios).
 - *Delete screenshot* / *Delete video* (and *Delete all media* when there are several) under the
-  evidence in the modal delete those files from the run after an inline confirmation and remove
-  them from its `results.json`. Traces and logs are kept.
-- The tracker credentials must be in the environment of the shell that started the UI
-  (`CLICKUP_API_TOKEN=... npx ai-qa-agent ui`, or `JIRA_API_TOKEN` + `JIRA_EMAIL`). Filing results
-  are written back to the run so the report and the dashboard stay consistent.
+  evidence delete those files from the run after an inline confirmation and remove them from its
+  `results.json`. Traces and logs are kept.
+- The dashboard follows the light or dark setting of your system until you choose one with the
+  button in the top bar; the choice is remembered in the browser. On a wide screen a list and the
+  selected item sit side by side; on a narrow one the item replaces the list, with a link back.
+  Every view has its own address (`#/scenarios/CONTACT-009`, `#/defects/ISSUE-001`), so the
+  browser's back button and bookmarks work.
+- **Bug tracker** connects ClickUp (list ID, API token, optional status of new tasks) or Jira (site
+  address, project key, email, API token). *Test connection* checks them without saving; *Save and
+  connect* tests again, then writes the list or project into `.qa/config.ts` (comments and the rest
+  of the file are kept; `tracker` is set when both are configured) and the token and email into
+  `.qa/.env.local`, never into config. A token set in the shell that started the UI still works and
+  wins. Filing results are written back to the run so the report and the dashboard stay consistent.
 
 ### Accessibility checks
 

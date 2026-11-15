@@ -22,10 +22,10 @@ import type { TestOutcome } from '../runner/results.js';
 import type { BugDraft, Issue } from '../triage/schema.js';
 import { logger } from '../core/logger.js';
 import { isInside, runDir } from '../core/paths.js';
-import type { QaContext } from '../pipeline/context.js';
+import { withSignal, type QaContext } from '../pipeline/context.js';
 import { TestRunResultSchema, type TestRunResult } from '../runner/results.js';
 import { scenarioTestStates, writeScenarioTest, type ScenarioTestState } from '../generate/scenario-test.js';
-import { loadAppModel } from '../analyze/app.js';
+import { criticalFlows, isOutdatedModel, loadAppModel, type PageModel } from '../analyze/app.js';
 import { deleteMedia, MediaDeleteError } from '../runner/media.js';
 import { runScenarioTest, runScenarioTests } from '../runner/rerun.js';
 import { Cancelled } from '../core/process.js';
@@ -38,11 +38,17 @@ import { removeScenarios } from '../scenarios/manage.js';
 import { CATEGORIES, isCriticalScenario } from '../scenarios/schema.js';
 import { TriageResultSchema, type TriageResult } from '../triage/schema.js';
 import { planFile, planStatus, writeBugFixPlan } from '../plan/plan.js';
+import { projectStatus, runAnalysis, runCritical, runScenarios, type Progress } from './project.js';
+import { saveTracker, testTracker, trackerSettings, TrackerSetupError } from './tracker-setup.js';
 
 const log = logger('ui');
 
 export interface Overview {
   project: { name: string; baseUrl: string };
+  /** How the tests reach the app, as configured (`app.mode`). */
+  app: { mode: 'production' | 'development' };
+  /** Pages of the application model, for page names and importance. Null before `analyze`. */
+  model: { pages: Array<{ route: string; name: string; importance: PageModel['importance'] }> } | null;
   /** The configured bug tracker (ClickUp or Jira), without secrets. */
   tracker: {
     kind: 'clickup' | 'jira' | null;
@@ -57,6 +63,8 @@ export interface Overview {
   runs: Array<{ id: string; startedAt: string; status: string; stats: TestRunResult['stats'] | null }>;
   run: {
     id: string;
+    /** What this run's tests ran against. Null for runs recorded before it was stored. */
+    app: NonNullable<TestRunResult['app']> | null;
     stats: TestRunResult['stats'];
     outcomes: TestRunResult['outcomes'];
     failures: TriageResult['failures'];
@@ -192,6 +200,7 @@ export async function buildOverview(ctx: QaContext, runId?: string): Promise<Ove
     const filing = loadFiling(test)?.results ?? [];
     run = {
       id: test.runId,
+      app: test.app ?? null,
       stats: test.stats,
       outcomes: test.outcomes,
       failures: triage?.failures ?? [],
@@ -203,8 +212,13 @@ export async function buildOverview(ctx: QaContext, runId?: string): Promise<Ove
     };
   }
   const info = trackerInfo(ctx.config);
+  const model = loadAppModel(ctx);
   return {
     project: { name: ctx.config.project.name, baseUrl: ctx.config.app.baseUrl },
+    app: { mode: ctx.config.app.mode },
+    model: model
+      ? { pages: model.pages.map((p) => ({ route: p.route, name: p.name, importance: p.importance })) }
+      : null,
     tracker: {
       kind: info.kind,
       name: info.name,
@@ -218,7 +232,7 @@ export async function buildOverview(ctx: QaContext, runId?: string): Promise<Ove
     run,
     scenarios: loadAllScenarios(ctx),
     authoring: {
-      pages: loadAppModel(ctx)?.pages.map((p) => p.route) ?? [],
+      pages: model?.pages.map((p) => p.route) ?? [],
       viewports: Object.keys(ctx.config.viewports),
       categories: CATEGORIES,
     },
@@ -351,10 +365,13 @@ async function handleFile(ctx: QaContext, body: string): Promise<{ status: numbe
 /** Saves, deletions and test generation edit scenario and spec files; run them one at a time. */
 let writing: Promise<unknown> = Promise.resolve();
 
-/** A long test run started from the dashboard; the page polls GET /api/job until it is done. */
+/** Long work started from the dashboard; the page polls GET /api/job until it is done. */
 export interface Job {
-  kind: 'run-all' | 'run-critical' | 'run-not-run' | 'run-failed' | 'plan';
+  kind:
+    'run-all' | 'run-critical' | 'run-not-run' | 'run-failed' | 'plan' | 'analyze' | 'scenarios' | 'critical';
   label: string;
+  /** What a running job is doing right now, e.g. "page 2 of 4: /contact". */
+  detail?: string;
   status: 'running' | 'done' | 'failed' | 'cancelled';
   startedAt: string;
   finishedAt?: string;
@@ -373,7 +390,7 @@ let jobAbort: AbortController | null = null;
 function startJob(
   kind: Job['kind'],
   label: string,
-  work: (setRun: (runId: string) => void, signal: AbortSignal) => Promise<string>,
+  work: (setRun: (runId: string) => void, signal: AbortSignal, progress: Progress) => Promise<string>,
 ): { status: number; payload: unknown } {
   if (job?.status === 'running')
     return { status: 409, payload: { error: `${job.label} is still running.`, job } };
@@ -384,13 +401,19 @@ function startJob(
   serially(() => {
     // Cancelled while waiting in the queue: do not start at all.
     if (abort.signal.aborted) throw new Cancelled();
-    return work((runId) => (current.runId = runId), abort.signal);
+    return work(
+      (runId) => (current.runId = runId),
+      abort.signal,
+      (detail) => (current.detail = detail),
+    );
   })
     .then((message) => Object.assign(current, { status: 'done', message }))
     .catch((err: unknown) => {
       if (err instanceof Cancelled) {
         log.info(`${label}: cancelled`);
-        Object.assign(current, { status: 'cancelled', message: 'Cancelled. Nothing was changed.' });
+        // Work that saves as it goes says what it kept; everything else changed nothing.
+        const message = err.message === 'Cancelled' ? 'Cancelled. Nothing was changed.' : err.message;
+        Object.assign(current, { status: 'cancelled', message });
         return;
       }
       log.error(`${label}: ${(err as Error).message}`);
@@ -398,9 +421,79 @@ function startJob(
     })
     .finally(() => {
       current.finishedAt = new Date().toISOString();
+      current.detail = undefined;
       if (jobAbort === abort) jobAbort = null;
     });
   return { status: 202, payload: current };
+}
+
+/**
+ * One of the Project page's AI steps as a job. The AI stops at once on Cancel, and the message
+ * ends with what the step cost when the provider reports it.
+ */
+function aiStep(
+  ctx: QaContext,
+  kind: Job['kind'],
+  label: string,
+  work: (ctx: QaContext, progress: Progress) => Promise<string>,
+): { status: number; payload: unknown } {
+  return startJob(kind, label, async (_setRun, signal, progress) => {
+    const before = ctx.ai.totalCostUsd;
+    const message = await work(withSignal(ctx, signal), progress);
+    const cost = ctx.ai.totalCostUsd - before;
+    return cost >= 0.005 ? `${message} AI cost: $${cost.toFixed(2)}.` : message;
+  });
+}
+
+const NEEDS_ANALYSIS = 'Analyze the application first (step 1).';
+
+function handleAnalyze(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { all, design } = JSON.parse(body || '{}') as { all?: unknown; design?: unknown };
+  const first = !loadAppModel(ctx);
+  return aiStep(
+    ctx,
+    'analyze',
+    first
+      ? 'Analyzing the application'
+      : all === true
+        ? 'Analyzing everything again'
+        : 'Updating the analysis',
+    (c, progress) => runAnalysis(c, { all: all === true, design: design === true }, progress),
+  );
+}
+
+function handleScenarios(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { page, all } = JSON.parse(body || '{}') as { page?: unknown; all?: unknown };
+  const model = loadAppModel(ctx);
+  if (!model || isOutdatedModel(model)) return { status: 409, payload: { error: NEEDS_ANALYSIS } };
+  if (page !== undefined && (typeof page !== 'string' || !model.pages.some((p) => p.route === page)))
+    return { status: 400, payload: { error: 'That page is not in the analysis.' } };
+  return aiStep(
+    ctx,
+    'scenarios',
+    page ? `Writing the scenarios of ${page}` : 'Writing scenarios',
+    (c, progress) => runScenarios(c, { page, all: all === true }, progress),
+  );
+}
+
+function handleCritical(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { max } = JSON.parse(body || '{}') as { max?: unknown };
+  if (max !== undefined && (typeof max !== 'number' || !Number.isInteger(max) || max < 1))
+    return { status: 400, payload: { error: 'The number of flows must be a whole number, 1 or more.' } };
+  const model = loadAppModel(ctx);
+  if (!model || isOutdatedModel(model)) return { status: 409, payload: { error: NEEDS_ANALYSIS } };
+  if (criticalFlows(model).length === 0) {
+    return {
+      status: 409,
+      payload: {
+        error:
+          'The analysis ranks no journey as critical, so there is nothing to choose from. Analyze everything again (step 1).',
+      },
+    };
+  }
+  return aiStep(ctx, 'critical', 'Choosing the critical flows', (c, progress) =>
+    runCritical(c, { max }, progress),
+  );
 }
 
 function handleCancelJob(): { status: number; payload: unknown } {
@@ -583,6 +676,37 @@ function handleRunNotRun(ctx: QaContext, body: string): { status: number; payloa
 
 /** Tracker checks contact the tracker; reuse the answer for a minute unless a refresh asks. */
 let trackerCache: { at: number; value: TrackerStatus[] } | undefined;
+
+/** Test a tracker connection, or test and save it (Bug tracker page). */
+async function handleTracker(
+  ctx: QaContext,
+  raw: string,
+  save: boolean,
+): Promise<{ status: number; payload: unknown }> {
+  let body: unknown;
+  try {
+    body = JSON.parse(raw || '{}');
+  } catch {
+    return { status: 400, payload: { error: 'invalid JSON body' } };
+  }
+  try {
+    const target = save ? await saveTracker(ctx, body) : await testTracker(ctx.config, body);
+    if (save) trackerCache = undefined;
+    return {
+      status: 200,
+      payload: {
+        target,
+        settings: trackerSettings(ctx.config),
+        trackers: save ? await trackerStatus(ctx, true) : undefined,
+      },
+    };
+  } catch (err) {
+    return {
+      status: err instanceof TrackerSetupError ? 400 : 500,
+      payload: { error: (err as Error).message },
+    };
+  }
+}
 async function trackerStatus(ctx: QaContext, fresh: boolean): Promise<TrackerStatus[]> {
   if (!fresh && trackerCache && Date.now() - trackerCache.at < 60_000) return trackerCache.value;
   trackerCache = { at: Date.now(), value: await trackerStatuses(ctx.config) };
@@ -719,6 +843,12 @@ function serveAsset(urlPath: string, res: http.ServerResponse): void {
 export function startUi(ctx: QaContext, opts: { port: number; host?: string }): Promise<http.Server> {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
+    // Every change is a JSON request from the page itself. A plain form on another site cannot
+    // send one without the browser asking this server first, which it never allows.
+    if (req.method === 'POST' && !/^application\/json/i.test(req.headers['content-type'] ?? '')) {
+      json(res, 415, { error: 'Send JSON (Content-Type: application/json).' });
+      return;
+    }
     try {
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname.startsWith('/client/'))) {
         serveAsset(url.pathname, res);
@@ -748,6 +878,14 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'GET' && url.pathname === '/api/trackers') {
         json(res, 200, { trackers: await trackerStatus(ctx, url.searchParams.has('fresh')) });
+      } else if (req.method === 'GET' && url.pathname === '/api/tracker') {
+        json(res, 200, trackerSettings(ctx.config));
+      } else if (req.method === 'POST' && url.pathname === '/api/tracker/test') {
+        const { status, payload } = await handleTracker(ctx, await readBody(req), false);
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/tracker/save') {
+        const { status, payload } = await handleTracker(ctx, await readBody(req), true);
+        json(res, status, payload);
       } else if (req.method === 'GET' && url.pathname === '/api/job') {
         json(res, 200, { job });
       } else if (req.method === 'POST' && url.pathname === '/api/plan') {
@@ -755,6 +893,17 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'GET' && url.pathname === '/api/plan') {
         const { status, payload } = readPlan(ctx, url.searchParams.get('run') ?? '');
+        json(res, status, payload);
+      } else if (req.method === 'GET' && url.pathname === '/api/project') {
+        json(res, 200, projectStatus(ctx));
+      } else if (req.method === 'POST' && url.pathname === '/api/project/analyze') {
+        const { status, payload } = handleAnalyze(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/project/scenarios') {
+        const { status, payload } = handleScenarios(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/project/critical') {
+        const { status, payload } = handleCritical(ctx, await readBody(req));
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/job/cancel') {
         const { status, payload } = handleCancelJob();

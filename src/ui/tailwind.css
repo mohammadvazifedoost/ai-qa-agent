@@ -4,223 +4,327 @@
 @source './index.html';
 @source './client';
 
-@theme {
-  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+/* Light theme. `static` keeps every variable in the output: the dark theme below overrides them
+   and some are only used through var(). */
+@theme static {
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
 
-  /* main area */
-  --color-bg: #eef1f2;
+  /* surfaces and text */
+  --color-ground: #f5f6f8;
   --color-surface: #ffffff;
-  --color-ink: #0b1f2a;
-  --color-muted: #5c6b73;
-  --color-line: #dbe1e4;
-  --color-line-strong: #b7c2c8;
-  --color-accent: #0f766e;
-  --color-accent-ink: #ffffff;
-  --color-accent-soft: #dcf1ee;
-  /* the rail */
-  --color-rail: #0b1f2a;
-  --color-rail-2: #12303e;
-  --color-rail-ink: #e6eef2;
-  --color-rail-muted: #8fa3ad;
-  --color-rail-line: #1f3a48;
-  /* results */
-  --color-pass: #15803d;
-  --color-pass-soft: #dcfce7;
-  --color-fail: #b91c1c;
-  --color-fail-soft: #fee2e2;
-  --color-flaky: #b45309;
-  --color-flaky-soft: #fef3c7;
-  --color-idle: #9aa9b1;
-  /* scenario types */
-  --color-functional: #475569;
-  --color-functional-soft: #e8edf2;
-  --color-visual: #6d28d9;
-  --color-visual-soft: #ede9fe;
-  --color-responsive: #0369a1;
-  --color-responsive-soft: #e0f2fe;
-  --color-accessibility: #a21caf;
-  --color-accessibility-soft: #fae8ff;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #0c1418;
-    --color-surface: #131f26;
-    --color-ink: #e6eef2;
-    --color-muted: #93a4ad;
-    --color-line: #22333d;
-    --color-line-strong: #34495593;
-    --color-accent: #4fd1c0;
-    --color-accent-ink: #0c1418;
-    --color-accent-soft: #143733;
-    --color-rail: #07121a;
-    --color-rail-2: #0f2430;
-    --color-rail-ink: #e6eef2;
-    --color-rail-muted: #7f95a1;
-    --color-rail-line: #1b3140;
-    --color-pass: #4ade80;
-    --color-pass-soft: #12351f;
-    --color-fail: #f87171;
-    --color-fail-soft: #3f1a1a;
-    --color-flaky: #fbbf24;
-    --color-flaky-soft: #3b2a0c;
-    --color-idle: #55666f;
-    --color-functional: #aab8c2;
-    --color-functional-soft: #24323b;
-    --color-visual: #c4b5fd;
-    --color-visual-soft: #2b2352;
-    --color-responsive: #7dd3fc;
-    --color-responsive-soft: #0f2f42;
-    --color-accessibility: #f0abfc;
-    --color-accessibility-soft: #3b1640;
-  }
+  --color-subtle: #fafbfc;
+  --color-line: #dfe3ea;
+  --color-divider: #ebeef3;
+  --color-control: #c9cfda;
+  --color-ink: #1a2233;
+  --color-ink-2: #3f4a5f;
+  --color-muted: #5b6578;
+  --color-neutral-soft: #eef0f4;
+  /* accent: links and the current item (accent), filled buttons (accent-fill) */
+  --color-accent: #2f4bd8;
+  --color-accent-fill: #2f4bd8;
+  --color-on-accent: #ffffff;
+  --color-accent-soft: #eef1fd;
+  /* results: fill for marks and bars, ink for text, soft and line for boxes */
+  --color-pass: #17835a;
+  --color-pass-ink: #0f5f41;
+  --color-pass-soft: #e6f4ec;
+  --color-pass-line: #bfe3d2;
+  --color-fail: #ee5a5f;
+  --color-fail-ink: #b42318;
+  --color-fail-strong: #b42318;
+  --color-fail-soft: #fdecec;
+  --color-fail-line: #f3c4c0;
+  --color-flaky: #f2b233;
+  --color-flaky-ink: #8a4b00;
+  --color-flaky-soft: #fff1db;
+  --color-idle: #8b95a7;
+  --color-scrim: rgb(26 34 51 / 0.55);
 }
 
 @layer base {
-  html {
-    scroll-behavior: smooth;
+  :root {
+    color-scheme: light;
   }
+  /* Dark theme: chosen with the toggle (data-theme), or the system setting when nothing was chosen. */
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --color-ground: #0f1319;
+    --color-surface: #171c24;
+    --color-subtle: #1b212a;
+    --color-line: #2a313d;
+    --color-divider: #222935;
+    --color-control: #3a4352;
+    --color-ink: #e7eaf0;
+    --color-ink-2: #c3cad6;
+    --color-muted: #9ba5b7;
+    --color-neutral-soft: #262d39;
+    --color-accent: #9db0ff;
+    --color-accent-fill: #4c63e0;
+    --color-on-accent: #ffffff;
+    --color-accent-soft: #1e2747;
+    --color-pass: #34b27b;
+    --color-pass-ink: #5fd3a0;
+    --color-pass-soft: #12301f;
+    --color-pass-line: #1f4a33;
+    --color-fail: #f0666b;
+    --color-fail-ink: #ff8a84;
+    --color-fail-strong: #c8372f;
+    --color-fail-soft: #3a1a1c;
+    --color-fail-line: #5a2a2c;
+    --color-flaky: #f2b233;
+    --color-flaky-ink: #f5c25b;
+    --color-flaky-soft: #3a2a0e;
+    --color-idle: #6f7a8c;
+    --color-scrim: rgb(0 0 0 / 0.65);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      color-scheme: dark;
+      --color-ground: #0f1319;
+      --color-surface: #171c24;
+      --color-subtle: #1b212a;
+      --color-line: #2a313d;
+      --color-divider: #222935;
+      --color-control: #3a4352;
+      --color-ink: #e7eaf0;
+      --color-ink-2: #c3cad6;
+      --color-muted: #9ba5b7;
+      --color-neutral-soft: #262d39;
+      --color-accent: #9db0ff;
+      --color-accent-fill: #4c63e0;
+      --color-on-accent: #ffffff;
+      --color-accent-soft: #1e2747;
+      --color-pass: #34b27b;
+      --color-pass-ink: #5fd3a0;
+      --color-pass-soft: #12301f;
+      --color-pass-line: #1f4a33;
+      --color-fail: #f0666b;
+      --color-fail-ink: #ff8a84;
+      --color-fail-strong: #c8372f;
+      --color-fail-soft: #3a1a1c;
+      --color-fail-line: #5a2a2c;
+      --color-flaky: #f2b233;
+      --color-flaky-ink: #f5c25b;
+      --color-flaky-soft: #3a2a0e;
+      --color-idle: #6f7a8c;
+      --color-scrim: rgb(0 0 0 / 0.65);
+    }
+  }
+
+  /* The menu is dark in both themes. It carries its own values for the tokens, so every class
+     used inside it (text-muted, st-passed, the focus ring) gets a colour that reads on it. */
+  .rail {
+    color-scheme: dark;
+    /* It scrolls when the window is short, without showing a scroll bar. */
+    scrollbar-width: none;
+    --color-ground: #111728;
+    --color-surface: #1a2238;
+    --color-subtle: #202a45;
+    --color-line: #2a3450;
+    --color-divider: #222b45;
+    --color-control: #3b4666;
+    --color-ink: #eef1f8;
+    --color-ink-2: #c9d0e0;
+    --color-muted: #a3adc4;
+    --color-neutral-soft: #232c47;
+    --color-accent: #a9b8ff;
+    --color-accent-fill: #3d57e6;
+    --color-on-accent: #ffffff;
+    --color-accent-soft: #232f5c;
+    --color-pass: #34b27b;
+    --color-pass-ink: #5fd3a0;
+    --color-pass-soft: #12301f;
+    --color-pass-line: #1f4a33;
+    --color-fail: #f0666b;
+    --color-fail-ink: #ffa6a1;
+    --color-fail-strong: #c8372f;
+    --color-fail-soft: #47202a;
+    --color-fail-line: #5a2a2c;
+    --color-flaky: #f2b233;
+    --color-flaky-ink: #f5c25b;
+    --color-flaky-soft: #3d2e12;
+    --color-idle: #7d889c;
+  }
+
+  .rail::-webkit-scrollbar {
+    display: none;
+  }
+
   body {
-    @apply bg-bg text-ink font-sans text-[15px] leading-relaxed;
+    @apply bg-ground text-ink font-sans text-[15px] leading-normal;
+  }
+  a {
+    @apply text-accent;
   }
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-accent;
+    @apply outline-[3px] outline-offset-2 outline-accent;
   }
   input[type='checkbox'] {
-    @apply accent-accent;
+    @apply accent-accent-fill;
+  }
+  code {
+    @apply font-mono text-[0.9em];
   }
 }
 
 @layer components {
+  /* Buttons: one height everywhere so every target is at least 44px. */
   .btn {
-    @apply inline-flex items-center gap-1.5 rounded-lg px-3 py-[7px] font-bold leading-snug no-underline cursor-pointer bg-accent text-accent-ink transition-[filter] hover:brightness-110 disabled:opacity-55 disabled:cursor-default disabled:hover:brightness-100;
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-control bg-surface px-4 font-semibold text-ink no-underline hover:bg-subtle disabled:cursor-default disabled:opacity-50 disabled:hover:bg-surface;
   }
-  .btn-ghost {
-    @apply bg-accent-soft text-accent hover:underline hover:brightness-100;
+  .btn-primary {
+    @apply border-accent-fill bg-accent-fill text-on-accent hover:bg-accent-fill hover:brightness-110 disabled:hover:bg-accent-fill disabled:hover:brightness-100;
   }
   .btn-danger {
-    @apply bg-fail text-surface;
+    @apply border-fail-strong bg-fail-strong text-white hover:bg-fail-strong hover:brightness-110 disabled:hover:bg-fail-strong;
   }
-  /* Secondary actions that must not compete with the primary button. */
-  .btn-quiet {
-    @apply inline-flex items-center rounded-lg border-0 bg-transparent px-2.5 py-[7px] text-sm font-semibold text-muted cursor-pointer hover:bg-line hover:text-ink disabled:opacity-55 disabled:cursor-default;
+  .btn-text {
+    @apply border-transparent bg-transparent px-3 hover:bg-neutral-soft disabled:hover:bg-transparent;
   }
-  .btn-quiet-danger {
-    @apply hover:bg-fail-soft hover:text-fail;
+  /* A button that is only an icon: square, and always named with aria-label and title. */
+  .btn-icon {
+    @apply size-11 shrink-0 px-0 text-ink-2;
   }
-  .chip {
-    @apply inline-block rounded-full px-2 py-px text-[11.5px] font-bold whitespace-nowrap align-[1px] tracking-[0.01em];
+  .btn-text-danger {
+    @apply text-fail-ink hover:bg-fail-soft;
   }
-  .chip-functional {
-    @apply bg-functional-soft text-functional;
+  .link {
+    @apply inline-flex min-h-11 items-center font-semibold text-accent underline-offset-2 hover:underline;
   }
-  .chip-visual {
-    @apply bg-visual-soft text-visual;
-  }
-  .chip-responsive {
-    @apply bg-responsive-soft text-responsive;
-  }
-  .chip-accessibility {
-    @apply bg-accessibility-soft text-accessibility;
-  }
-  .chip-bug {
-    @apply bg-fail-soft text-fail;
-  }
-  .chip-other {
-    @apply bg-line text-muted;
-  }
-  .chip-person {
-    @apply bg-accent-soft text-accent;
-  }
-  .chip-todo {
-    @apply bg-flaky-soft text-flaky;
-  }
-  .chip-critical {
-    @apply bg-ink text-surface;
-  }
-  .pill {
-    @apply inline-block rounded-full px-2.5 py-[3px] text-xs font-bold;
-  }
-  .pill-passed {
-    @apply bg-pass-soft text-pass;
-  }
-  .pill-failed {
-    @apply bg-fail-soft text-fail;
-  }
-  .pill-flaky {
-    @apply bg-flaky-soft text-flaky;
-  }
-  .pill-none {
-    @apply bg-line text-muted;
-  }
-  .dot {
-    @apply inline-block size-2.5 rounded-full bg-idle;
-  }
-  .dot-passed {
-    @apply bg-pass;
-  }
-  .dot-failed {
-    @apply bg-fail;
-  }
-  .dot-flaky {
-    @apply bg-flaky;
-  }
-  .cell {
-    @apply block h-2 w-2 rounded-[2px] bg-rail-line;
-  }
-  .cell-passed {
-    @apply bg-pass;
-  }
-  .cell-failed {
-    @apply bg-fail;
-  }
-  .cell-flaky {
-    @apply bg-flaky;
-  }
-  .seg-btn {
-    @apply border-0 bg-transparent px-3 py-[7px] text-sm font-semibold text-muted cursor-pointer aria-pressed:bg-ink aria-pressed:text-bg;
-  }
-  .rail-btn {
-    @apply flex w-full flex-col gap-1.5 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left text-rail-ink cursor-pointer hover:bg-rail-2 aria-[current=true]:bg-rail-2 aria-[current=true]:shadow-[inset_0_0_0_1px_var(--color-rail-line)];
+
+  .panel {
+    @apply rounded-xl border border-line bg-surface;
   }
   .field {
-    @apply rounded-lg border border-line-strong bg-surface px-2.5 py-[7px] text-sm text-ink;
+    @apply min-h-11 rounded-lg border border-control bg-surface px-3 text-ink placeholder:text-muted;
   }
-  .rail-field {
-    @apply w-full rounded-lg border border-rail-line bg-rail-2 px-2.5 py-[7px] text-sm text-rail-ink;
+  textarea.field {
+    @apply py-2.5;
   }
-  .section-title {
-    @apply mb-2 text-[11.5px] font-bold uppercase tracking-[0.08em] text-muted;
+  .h-section {
+    @apply m-0 text-[15px] font-bold;
   }
+
+  /* Chips: small labels. Result and severity chips always carry text, never colour alone. */
+  .chip {
+    @apply inline-flex items-center gap-2 rounded-md px-2 py-0.5 text-[13px] font-semibold whitespace-nowrap;
+  }
+  .chip-neutral {
+    @apply bg-neutral-soft text-ink-2;
+  }
+  .chip-accent {
+    @apply bg-accent-soft text-accent;
+  }
+  .chip-outline {
+    @apply border border-control text-ink-2;
+  }
+  .chip-warn {
+    @apply bg-flaky-soft text-flaky-ink;
+  }
+  .sev-critical {
+    @apply bg-fail-soft text-fail-ink;
+  }
+  .sev-high {
+    @apply bg-flaky-soft text-flaky-ink;
+  }
+  .sev-medium,
+  .sev-low {
+    @apply bg-neutral-soft text-ink-2;
+  }
+  .pill-passed {
+    @apply bg-pass-soft text-pass-ink;
+  }
+  .pill-failed {
+    @apply bg-fail-soft text-fail-ink;
+  }
+  .pill-flaky {
+    @apply bg-flaky-soft text-flaky-ink;
+  }
+  .pill-none {
+    @apply bg-neutral-soft text-ink-2;
+  }
+  .st-passed {
+    @apply text-pass-ink;
+  }
+  .st-failed {
+    @apply text-fail-ink;
+  }
+  .st-flaky {
+    @apply text-flaky-ink;
+  }
+  .st-none {
+    @apply text-muted;
+  }
+
+  /* Result marks: a different shape per result, next to its label. */
+  .mark {
+    @apply inline-block size-2.5 shrink-0;
+  }
+  .mark-passed {
+    @apply rounded-full bg-pass;
+  }
+  .mark-failed {
+    @apply rounded-[2px] bg-fail;
+  }
+  .mark-flaky {
+    @apply rotate-45 rounded-[2px] bg-flaky;
+  }
+  .mark-none {
+    @apply rounded-full border-2 border-idle;
+  }
+
+  /* Menu links: icon, name, and a badge at the end. The current page is a filled pill. */
+  .nav-link {
+    @apply flex min-h-11 items-center gap-3 rounded-lg px-3 font-medium text-ink-2 no-underline;
+  }
+  .nav-link:hover {
+    @apply bg-neutral-soft text-ink;
+  }
+  .nav-link[aria-current='page'] {
+    @apply bg-accent-fill font-semibold text-on-accent;
+  }
+  .nav-badge {
+    @apply rounded-[10px] bg-neutral-soft px-2 text-[13px] font-semibold text-ink-2;
+  }
+  .nav-badge-fail {
+    @apply bg-fail-soft text-fail-ink;
+  }
+  .nav-badge-warn {
+    @apply bg-flaky-soft text-flaky-ink;
+  }
+  .nav-link[aria-current='page'] .nav-badge {
+    background: rgb(8 12 28 / 0.3);
+    color: var(--color-on-accent);
+  }
+
+  /* List rows and result tabs share the "current" look. */
+  .row-link {
+    @apply block text-ink no-underline hover:bg-subtle aria-[current=true]:bg-accent-soft aria-[current=true]:shadow-[inset_3px_0_0_var(--color-accent)];
+  }
+  .tab {
+    @apply inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-control bg-surface px-3.5 font-semibold text-ink hover:bg-subtle aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent;
+  }
+  .menu-item {
+    @apply flex min-h-11 w-full cursor-pointer flex-col items-start justify-center rounded-md border-0 bg-transparent px-3 py-1.5 text-left text-ink hover:bg-neutral-soft disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent;
+  }
+
   .disclosure > summary {
-    @apply cursor-pointer list-none text-sm font-semibold text-accent;
+    @apply inline-flex min-h-11 cursor-pointer items-center font-semibold text-accent;
   }
-  .disclosure > summary::-webkit-details-marker {
-    display: none;
-  }
-  .disclosure > summary::before {
-    content: '▸ ';
-    color: var(--color-muted);
-  }
-  .disclosure[open] > summary::before {
-    content: '▾ ';
-  }
-  .row-failed {
-    box-shadow: inset 3px 0 0 var(--color-fail);
-  }
-  .row-flaky {
-    box-shadow: inset 3px 0 0 var(--color-flaky);
+  .skip {
+    @apply fixed left-3 top-3 z-50 -translate-y-20 rounded-lg bg-accent-fill px-4 py-2.5 font-semibold text-on-accent no-underline focus:translate-y-0;
   }
 }
 
-/* Pass ring: drawn once on load. */
-.ring-arc {
-  transition: stroke-dashoffset 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-@media (prefers-reduced-motion: reduce) {
-  .ring-arc {
-    transition: none;
+/* List + detail pages: side by side when both fit (xl). On a narrower screen the list shows until
+   an item is opened, then the detail replaces it (with a link back). */
+@media (width < 80rem) {
+  .split[data-detail='open'] > .split-list,
+  .split[data-detail='closed'] > .split-detail {
+    display: none;
   }
 }
 
@@ -232,11 +336,25 @@ dialog[open] {
 body:has(dialog[open]) {
   overflow: hidden;
 }
+/* A confirmation is a short question, not a form: keep it narrow where there is room. */
+@media (width >= 40rem) {
+  dialog[data-mode='confirm'] {
+    width: min(540px, calc(100vw - 32px));
+  }
+}
 dialog::backdrop {
-  background: rgb(11 31 42 / 0.6);
-  backdrop-filter: blur(3px);
+  background: var(--color-scrim);
 }
 @media (prefers-reduced-motion: no-preference) {
+  /* The refresh icon turns while the results are reloaded. */
+  .is-busy > svg {
+    animation: turn 0.8s linear infinite;
+  }
+  @keyframes turn {
+    to {
+      transform: rotate(360deg);
+    }
+  }
   dialog[open] {
     animation: pop 0.16s ease-out;
   }
@@ -250,12 +368,4 @@ dialog::backdrop {
       opacity: 1;
     }
   }
-}
-
-/* The sidebar (and the mobile drawer) scrolls without showing a scrollbar. */
-#rail {
-  scrollbar-width: none;
-}
-#rail::-webkit-scrollbar {
-  display: none;
 }

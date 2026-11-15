@@ -129,6 +129,8 @@ artifacts/
 reports/
 state.json
 test-results/
+# secrets saved by the dashboard (bug-tracker tokens)
+.env.local
 # regenerated from config.ts on every run
 playwright.config.ts
 `;

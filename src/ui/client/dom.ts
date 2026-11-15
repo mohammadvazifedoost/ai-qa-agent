@@ -5,12 +5,18 @@ import { esc } from './logic.js';
 export const $ = <T extends HTMLElement = HTMLElement>(s: string, el: ParentNode = document): T =>
   el.querySelector(s) as T;
 
+/**
+ * True when a list and its detail panel fit side by side (the xl breakpoint; see `.split` in
+ * tailwind.css). Below it the detail replaces the list.
+ */
+export const sideBySide = window.matchMedia('(min-width: 1280px)');
+
 /** URL of a file under the project (evidence), served by the dashboard under /files/. */
 export const fileUrl = (p: string): string => '/files/' + p.split('/').map(encodeURIComponent).join('/');
 
 export const link = (href: string | null | undefined, text: string, blank?: boolean): string =>
   href
-    ? '<a class="text-accent underline-offset-2 hover:underline" href="' +
+    ? '<a class="link" href="' +
       fileUrl(href) +
       '"' +
       (blank ? ' target="_blank" rel="noopener"' : '') +

@@ -92,6 +92,36 @@ function inputHashFor(
   );
 }
 
+export interface ScenarioPageStatus {
+  route: string;
+  scenarios: number;
+  /** Scenarios a person wrote or edited; generation never changes them. */
+  person: number;
+  /** Scenarios a person removed; generation does not bring them back. */
+  removed: number;
+  /** `outdated`: the analysis, design or rules changed since the page's scenarios were written. */
+  state: 'current' | 'outdated' | 'none';
+}
+
+/** Per page of the model: its scenarios and whether `generateScenarios` would write them again. */
+export function scenarioPageStatus(ctx: QaContext, app: AppModelFile): ScenarioPageStatus[] {
+  const design = loadDesign(ctx);
+  return app.pages.map((page) => {
+    const file = readJson(scenarioFilePath(ctx, page.route), ScenarioFileSchema);
+    return {
+      route: page.route,
+      scenarios: file?.scenarios.length ?? 0,
+      person: file?.scenarios.filter(isPersonScenario).length ?? 0,
+      removed: file?.removed.length ?? 0,
+      state: !file
+        ? 'none'
+        : file.inputHash === inputHashFor(ctx, app, page, design)
+          ? 'current'
+          : 'outdated',
+    };
+  });
+}
+
 export interface ScenarioScope {
   page?: string;
   /** Limit to these routes (used by `run --changed`). */

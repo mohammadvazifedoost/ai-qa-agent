@@ -80,7 +80,38 @@ describe('tokenize', () => {
   });
 });
 
+describe('tokenize: division after a value', () => {
+  const regexes = (code: string): number => tokenize(code).filter((t) => t.kind === 'regex').length;
+
+  it("reads a `/` after TypeScript's non-null `!` as a division", () => {
+    const code = "expect(Math.abs(w - before!.width! / 2), `half of ${before!.width}`).toBe(1); // it's fine";
+    expect(regexes(code)).toBe(0);
+    expect(tokenize(code).at(-1)!.kind).toBe('comment');
+    expect(regexes('const a = list[0]! / 2 + fn()! / 3;')).toBe(0);
+  });
+
+  it('still reads a regex after a prefix `!`', () => {
+    expect(regexes("if (!/^it's$/.test(name)) return;")).toBe(1);
+    expect(regexes("const ok = a && !/'/.test(b);")).toBe(1);
+  });
+
+  it('reads a `/` after a postfix `++` or `--` as a division', () => {
+    expect(regexes('const a = i++ / 2; const b = j-- / 2;')).toBe(0);
+    expect(regexes('const a = 1 + /x/.source.length;')).toBe(1);
+  });
+});
+
 describe('listTestIds', () => {
+  it('still lists the ids of a file the lexer cannot follow', () => {
+    const code = `test('A-001: first', async () => {});
+const broken = 'never closed;
+test.skip("A-002: second", async () => {});
+foo.test('A-003: not a test', () => {});
+`;
+    expect(() => tokenize(code)).toThrow();
+    expect(listTestIds(code)).toEqual(['A-001', 'A-002']);
+  });
+
   it('finds test declarations including describe-nested and modifiers, not steps', () => {
     expect(listTestIds(SPEC)).toEqual([
       'CHECKOUT-001',

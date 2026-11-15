@@ -44,10 +44,6 @@ class Lexer {
     const tokens: Token[] = [];
     let braces = 0;
     let i = pos;
-    const lastSignificant = (): Token | undefined => {
-      for (let k = tokens.length - 1; k >= 0; k--) if (tokens[k]!.kind !== 'comment') return tokens[k];
-      return undefined;
-    };
     while (i < s.length) {
       const c = s[i]!;
       if (/\s/.test(c)) {
@@ -75,7 +71,7 @@ class Lexer {
           value: simple ? unescape(s.slice(i + 1, end - 1)) : undefined,
         });
         i = end;
-      } else if (c === '/' && this.regexAllowed(lastSignificant())) {
+      } else if (c === '/' && this.regexAllowed(tokens)) {
         const end = this.scanRegex(i);
         tokens.push({ kind: 'regex', start: i, end });
         i = end;
@@ -146,11 +142,32 @@ class Lexer {
     throw new Error(`Unterminated regular expression at offset ${start}`);
   }
 
-  private regexAllowed(prev: Token | undefined): boolean {
-    if (!prev) return true;
-    if (prev.kind === 'ident') return REGEX_AFTER_KEYWORDS.has(this.src.slice(prev.start, prev.end));
-    if (prev.kind === 'punct') return !/[)\]]/.test(this.src[prev.start]!);
-    return prev.kind === 'comment';
+  /** True when a `/` after these tokens starts a regex literal rather than dividing a value. */
+  private regexAllowed(tokens: readonly Token[]): boolean {
+    const s = this.src;
+    /** Index of the last token at or before `k` that is not a comment (-1 when there is none). */
+    const code = (k: number): number => {
+      while (k >= 0 && tokens[k]!.kind === 'comment') k--;
+      return k;
+    };
+    /** Does the token at `k` end a value (so a `/` after it divides)? */
+    const endsValue = (k: number): boolean => {
+      if (k < 0) return false;
+      const t = tokens[k]!;
+      if (t.kind === 'ident') return !REGEX_AFTER_KEYWORDS.has(s.slice(t.start, t.end));
+      if (t.kind !== 'punct') return true;
+      const c = s[t.start]!;
+      if (c === ')' || c === ']') return true;
+      // TypeScript's non-null `x!` ends a value; the prefix `!x` does not.
+      if (c === '!') return endsValue(code(k - 1));
+      // So does a postfix `x++` / `x--`.
+      if (c === '+' || c === '-') {
+        const p = tokens[k - 1];
+        return !!p && p.kind === 'punct' && s[p.start] === c && p.end === t.start && endsValue(code(k - 2));
+      }
+      return false;
+    };
+    return !endsValue(code(tokens.length - 1));
   }
 }
 
@@ -208,10 +225,22 @@ function findTestCalls(source: string, tokens: Token[]): TestCall[] {
 
 const titleHasId = (title: string, id: string): boolean => title.trimStart().startsWith(`${id}:`);
 
-/** Scenario ids of the tests declared in a spec (titles "<ID>: …"). */
+/**
+ * Scenario ids of the tests declared in a spec (titles "<ID>: …").
+ *
+ * Reading must not fail on a file the lexer cannot follow (it only has to be exact for edits,
+ * which tokenize the file themselves), so such a file is scanned as plain text instead.
+ */
 export function listTestIds(source: string): string[] {
-  return findTestCalls(source, tokenize(source))
-    .map((c) => /^\s*([A-Z0-9]+-\d{3}):/.exec(c.title)?.[1])
+  let titles: string[];
+  try {
+    titles = findTestCalls(source, tokenize(source)).map((c) => c.title);
+  } catch {
+    const call = /(?<![.\w$])test(?:\.(?:only|skip|fixme|fail))?\(\s*(['"`])([^\n]*?)\1/g;
+    titles = [...source.matchAll(call)].map((m) => m[2]!);
+  }
+  return titles
+    .map((title) => /^\s*([A-Z0-9]+-\d{3}):/.exec(title)?.[1])
     .filter((id): id is string => !!id);
 }
 

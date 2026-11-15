@@ -4,15 +4,28 @@ import type { ScenarioDraft } from '../../scenarios/author.js';
 import { postJson } from './api.js';
 import { load } from './app.js';
 import { $, act } from './dom.js';
-import { esc, lines } from './logic.js';
-import { closeButton, openModal } from './modal.js';
-import { state } from './state.js';
+import { esc, label, lines } from './logic.js';
+import { modalHeader } from './modal.js';
+import { render } from './render.js';
+import { go, state } from './state.js';
+import { pageName } from './ui.js';
 
-const options = (list: readonly string[], selected: string | undefined): string =>
+/** `<option>`s for a list of values; `text` turns a stored value into what the user reads. */
+const options = (
+  list: readonly string[],
+  selected: string | undefined,
+  text: (v: string) => string = label,
+): string =>
   list
     .map(
       (v) =>
-        '<option value="' + esc(v) + '"' + (v === selected ? ' selected' : '') + '>' + esc(v) + '</option>',
+        '<option value="' +
+        esc(v) +
+        '"' +
+        (v === selected ? ' selected' : '') +
+        '>' +
+        esc(text(v)) +
+        '</option>',
     )
     .join('');
 
@@ -20,7 +33,7 @@ function field(id: string, label: string, control: string, hint?: string): strin
   return (
     '<div><label for="' +
     id +
-    '" class="block text-sm font-semibold">' +
+    '" class="block font-semibold">' +
     label +
     (hint ? ' <span class="font-normal text-muted">' + hint + '</span>' : '') +
     '</label>' +
@@ -58,22 +71,17 @@ export function openEditor(id?: string): void {
         '<textarea id="f-desc" rows="2" class="field mt-1 block w-full resize-y font-sans" placeholder="e.g. Applying the coupon SAVE10 takes 10% off the total"></textarea>',
         '(optional)',
       ) +
-      '<div class="mt-2 flex flex-wrap items-center gap-3"><button type="button" id="f-draft" class="btn" ' +
+      '<div class="mt-3 flex flex-wrap items-center gap-3"><button type="button" id="f-draft" class="btn" ' +
       act('draft') +
       '>Draft with AI</button>' +
-      '<span id="f-draft-status" class="text-[13px] text-muted" aria-live="polite">The AI fills in the fields below for you to review.</span></div></section>';
+      '<span id="f-draft-status" class="text-[13px] text-ink-2" aria-live="polite">The AI fills in the fields below for you to review.</span></div></section>';
   modal.innerHTML =
-    '<div class="flex items-start gap-4 border-b border-line px-5 pb-4 pt-5 md:px-6 md:pt-[22px]"><div class="min-w-0">' +
-    '<h2 id="m-title" class="m-0 text-xl font-extrabold tracking-tight">' +
-    (sc ? 'Edit scenario' : 'Add scenario') +
-    '</h2>' +
-    '<p class="m-0 mt-1 text-[13px] text-muted">' +
-    (sc
-      ? '<span class="font-mono text-[12.5px]">' + esc(sc.id) + '</span> · ' + esc(sc.page)
-      : 'Scenarios you write are yours: the AI will not change or remove them.') +
-    '</p></div>' +
-    closeButton() +
-    '</div>' +
+    modalHeader(
+      sc ? 'Edit scenario' : 'Add scenario',
+      sc
+        ? '<span class="font-mono">' + esc(sc.id) + '</span>, ' + esc(sc.page)
+        : 'Scenarios you write are yours: the AI will not change or remove them.',
+    ) +
     '<form id="f" class="min-h-0 flex-1 overflow-auto px-5 py-5 md:px-6">' +
     draft +
     '<div class="grid grid-cols-1 gap-4 md:grid-cols-2">' +
@@ -90,7 +98,7 @@ export function openEditor(id?: string): void {
       '<select id="f-page" class="field mt-1 block w-full"' +
         (sc ? ' disabled' : '') +
         '>' +
-        options(pages, page) +
+        options(pages, page, pageName) +
         '</select>',
     ) +
     field(
@@ -149,12 +157,12 @@ export function openEditor(id?: string): void {
       ? '<p class="mb-0 mt-2 text-[13px] text-muted">Its Figma design checks are kept as they are.</p>'
       : '') +
     '</form>' +
-    '<div class="flex flex-wrap items-center gap-3 border-t border-line bg-bg px-5 py-3.5 md:px-6">' +
-    '<p id="f-error" class="m-0 min-w-0 flex-1 text-[13px] text-fail" role="alert"></p>' +
-    '<button type="button" class="btn-quiet" ' +
-    (sc ? act('open-modal', { id: sc.id }) : act('close-modal')) +
+    '<div class="flex flex-wrap items-center gap-3 border-t border-line bg-subtle px-5 py-3.5 md:px-6">' +
+    '<p id="f-error" class="m-0 min-w-0 flex-1 text-[13px] text-fail-ink" role="alert"></p>' +
+    '<button type="button" class="btn" ' +
+    act('close-modal') +
     '>Cancel</button>' +
-    '<button id="f-save" class="btn" type="submit" form="f">' +
+    '<button id="f-save" class="btn btn-primary" type="submit" form="f">' +
     (sc ? 'Save changes' : 'Add scenario') +
     '</button></div>';
   if (!modal.open) modal.showModal();
@@ -241,16 +249,21 @@ export async function saveEditor(): Promise<void> {
     err.textContent = 'Could not save: ' + (out.error || 'unknown error');
     return;
   }
-  // Saved scenarios are yours, so the list shows them even before they run.
   await load(state.data.run?.id);
   const t = state.data.testStates[out.id];
-  openModal(
-    out.id,
-    (id ? 'Saved. ' : 'Added ' + out.id + '. ') +
+  $<HTMLDialogElement>('#modal').close();
+  // Show the saved scenario, with what to do about its test.
+  state.view = { page: '', only: 'all', type: '', q: '' };
+  state.notice = {
+    id: out.id,
+    text:
+      (id ? 'Saved. ' : 'Added ' + out.id + '. ') +
       (t === 'missing'
         ? 'Create its test with the button below.'
         : t
           ? 'Rewrite its test with the button below to match your changes.'
           : ''),
-  );
+  };
+  if (state.route.page === 'scenarios' && state.route.id === out.id) render();
+  else go('scenarios', out.id);
 }
