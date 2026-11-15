@@ -21,7 +21,14 @@ import { closeRail, initDrawer, openRail } from './drawer.js';
 import { draftWithAi, openEditor, saveEditor } from './editor.js';
 import { cancelJob, createPlan, refreshAll, startJob } from './jobs.js';
 import { parseRoute, type StepKind, type View } from './logic.js';
-import { viewPlan } from './modal.js';
+import {
+  askRunsDelete,
+  cancelRunsDelete,
+  confirmRunsDelete,
+  openRunCleanup,
+  selectRuns,
+  viewPlan,
+} from './modal.js';
 import { askStep, startStep } from './project.js';
 import { render } from './render.js';
 import type { MediaTarget } from './scenarios.js';
@@ -187,6 +194,17 @@ document.addEventListener('click', (e) => {
       return createPlan();
     case 'view-plan':
       return void viewPlan();
+    case 'open-run-cleanup':
+      setPopover('run-picker', false);
+      return openRunCleanup();
+    case 'runs-select':
+      return selectRuns(el.dataset.which ?? '');
+    case 'ask-runs-delete':
+      return askRunsDelete();
+    case 'cancel-runs-delete':
+      return cancelRunsDelete();
+    case 'confirm-runs-delete':
+      return void confirmRunsDelete(el as HTMLButtonElement, load);
     case 'dismiss-job':
       state.watched = null;
       return render();

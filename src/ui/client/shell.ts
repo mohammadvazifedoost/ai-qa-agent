@@ -318,7 +318,13 @@ function runPicker(tile: string): string {
     ', newest first</span></div>' +
     '<ul aria-label="Runs" class="m-0 max-h-[min(420px,60vh)] list-none overflow-auto p-1.5">' +
     items +
-    '</ul></div></div>'
+    '</ul>' +
+    (data.runs.length
+      ? '<div class="border-t border-line p-1.5"><button type="button" class="menu-item text-fail-ink" ' +
+        act('open-run-cleanup') +
+        '>Delete old runs…</button></div>'
+      : '') +
+    '</div></div>'
   );
 }
 

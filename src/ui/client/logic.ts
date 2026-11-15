@@ -589,3 +589,27 @@ export function bugReportText(d: Defect): string {
 /** The defect that explains a scenario's failure in the selected run, if any. */
 export const defectFor = (defects: readonly Defect[], scenarioId: string): Defect | undefined =>
   defects.find((d) => d.scenarioIds.includes(scenarioId));
+
+/* ---------- deleting old runs ---------- */
+/** Runs offered for deletion, newest first; every run but the latest starts selected. */
+export function runCleanupChoices(
+  runs: Data['runs'],
+  busyRunId: string | null,
+): Array<{ id: string; selected: boolean; locked: boolean; latest: boolean }> {
+  return runs.map((r, i) => {
+    const locked = r.id === busyRunId || r.status === 'running';
+    return { id: r.id, latest: i === 0, locked, selected: i > 0 && !locked };
+  });
+}
+
+/** 1536 → "1.5 KB". */
+export function formatBytes(n: number): string {
+  const units = ['bytes', 'KB', 'MB', 'GB'];
+  let v = n;
+  let u = 0;
+  while (v >= 1024 && u < units.length - 1) {
+    v /= 1024;
+    u++;
+  }
+  return (u === 0 ? String(v) : v.toFixed(v < 10 ? 1 : 0)) + ' ' + units[u];
+}

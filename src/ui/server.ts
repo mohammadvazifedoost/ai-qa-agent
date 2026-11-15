@@ -28,6 +28,7 @@ import { TestRunResultSchema, type TestRunResult } from '../runner/results.js';
 import { scenarioTestStates, writeScenarioTest, type ScenarioTestState } from '../generate/scenario-test.js';
 import { criticalFlows, isOutdatedModel, loadAppModel, type PageModel } from '../analyze/app.js';
 import { deleteMedia, MediaDeleteError } from '../runner/media.js';
+import { deleteRuns, RunDeleteError } from '../runner/delete-runs.js';
 import { runScenarioTest, runScenarioTests } from '../runner/rerun.js';
 import { Cancelled } from '../core/process.js';
 import { runTests } from '../runner/run.js';
@@ -777,6 +778,18 @@ function handleDeleteMedia(ctx: QaContext, body: string): { status: number; payl
   }
 }
 
+/** Delete old runs with their evidence and reports; a run a job is using is refused. */
+function handleDeleteRuns(ctx: QaContext, body: string): { status: number; payload: unknown } {
+  const { ids } = JSON.parse(body || '{}') as { ids?: unknown };
+  const inUse = job?.status === 'running' && job.runId ? [job.runId] : [];
+  try {
+    return { status: 200, payload: deleteRuns(ctx, { ids, inUse }) };
+  } catch (err) {
+    if (err instanceof RunDeleteError) return { status: err.status, payload: { error: err.message } };
+    throw err;
+  }
+}
+
 async function handleSaveScenario(
   ctx: QaContext,
   body: string,
@@ -893,6 +906,9 @@ export function startUi(ctx: QaContext, opts: { port: number; host?: string }): 
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/scenarios/delete') {
         const { status, payload } = await handleDeleteScenario(ctx, await readBody(req));
+        json(res, status, payload);
+      } else if (req.method === 'POST' && url.pathname === '/api/runs/delete') {
+        const { status, payload } = handleDeleteRuns(ctx, await readBody(req));
         json(res, status, payload);
       } else if (req.method === 'POST' && url.pathname === '/api/media/delete') {
         const { status, payload } = handleDeleteMedia(ctx, await readBody(req));
