@@ -2,6 +2,8 @@
 import { Command } from 'commander';
 import pc from 'picocolors';
 import { checkProvider } from './ai/index.js';
+import { ENV_OVERRIDES } from './config/load.js';
+import type { QaConfig } from './config/schema.js';
 import { logger, setLogLevel } from './core/logger.js';
 import { rel } from './core/paths.js';
 import { initProject, type InitOptions } from './init/init.js';
@@ -49,6 +51,12 @@ interface Scope {
   feature?: string;
   grep?: string[];
   critical?: boolean;
+}
+
+/** The project and app URL in effect, and whether this environment overrides config.ts. */
+function projectLine(config: QaConfig): string {
+  const from = (name: string): string => (process.env[name]?.trim() ? ` (from ${name})` : '');
+  return `Project: ${config.project.name}${from(ENV_OVERRIDES.projectName)}, app at ${config.app.baseUrl}${from(ENV_OVERRIDES.appUrl)}`;
 }
 
 function scopeToFilter(o: Scope): TestFilter {
@@ -135,6 +143,7 @@ program
       if (ok === false) failed = true;
       console.log(`${mark} ${text}`);
     };
+    line(null, projectLine(ctx.config));
     const claude = await checkProvider(ctx.config);
     line(claude.ok, `AI engine: ${claude.detail}`);
 
@@ -441,6 +450,7 @@ program
     const port = typeof addr === 'object' && addr ? addr.port : o.port;
     const url = `http://${o.host}:${port}${basePath}/`;
     console.log(`AI QA Agent dashboard: ${pc.bold(url)}  (Ctrl+C to stop)`);
+    console.log(pc.dim(projectLine(ctx.config)));
     const info = trackerInfo(ctx.config);
     if (info.kind && !info.credentialsPresent) {
       console.log(

@@ -700,6 +700,20 @@ The _Bug tracker_ page of the dashboard can keep the token (and the Jira email) 
 `.qa/.env.local`, a git-ignored file read when any command starts. A variable already set in the
 shell wins over that file.
 
+#### Project name and app URL per environment
+
+`config.ts` is committed, so every environment (your laptop, a staging server, CI) reads the same
+`project.name` and `app.baseUrl`. To show and test the right values in each one, set these in the
+shell or in that machine's `.qa/.env.local`:
+
+| Variable             | Replaces       | Example                       |
+| -------------------- | -------------- | ----------------------------- |
+| `AI_QA_PROJECT_NAME` | `project.name` | `VLS Blog (staging)`          |
+| `AI_QA_APP_URL`      | `app.baseUrl`  | `https://staging.example.com` |
+
+The dashboard sidebar, reports, filed bugs and the tests all use them. `ai-qa-agent doctor` and
+`ai-qa-agent ui` print the values in effect and where they came from.
+
 Setting a variable for the current shell:
 
 ```bash
