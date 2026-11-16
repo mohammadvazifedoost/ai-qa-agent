@@ -40,10 +40,16 @@ export function listFiles(dir: string, exclude: readonly string[] = []): string[
   return out;
 }
 
-/** Stable hash of a set of files' contents keyed by relative path. */
+/**
+ * Stable hash of a set of files' contents keyed by relative path. A directory in the list stands
+ * for every file inside it: file lists written by the AI analyst sometimes name a folder.
+ */
 export function hashFiles(root: string, files: readonly string[]): string {
   const h = crypto.createHash('sha256');
-  for (const f of [...files].sort()) {
+  const expanded = files.flatMap((f) =>
+    fs.statSync(f).isDirectory() ? listFiles(f, ['node_modules']) : [f],
+  );
+  for (const f of [...new Set(expanded)].sort()) {
     h.update(path.relative(root, f).split(path.sep).join('/'));
     h.update('\0');
     h.update(fs.readFileSync(f));

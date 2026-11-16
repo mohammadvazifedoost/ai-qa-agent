@@ -95,6 +95,19 @@ describe('detectCodeChanges', () => {
     expect(describeChanges(c)).toEqual(['code: no changes since the last analysis']);
   });
 
+  it('hashes a directory listed in a page model through the files inside it', () => {
+    const { root, ctx } = project();
+    // The analyst sometimes lists a folder ("src/pages") instead of the files in it.
+    const pages = [
+      page('/', ['src/main.tsx', 'src/Layout.tsx', 'src/pages']),
+      page('/login', ['src/main.tsx', 'src/Layout.tsx', 'src/pages/Login.tsx']),
+    ];
+    const m = model(root, pages);
+    expect(detectCodeChanges(ctx, m).changedPages).toEqual([]);
+    fs.writeFileSync(path.join(root, 'src/pages/Home.tsx'), 'home v2');
+    expect(detectCodeChanges(ctx, m).changedPages).toEqual(['/']);
+  });
+
   it('detects a new route, a changed page and a changed global file independently', () => {
     const { root, ctx } = project();
     const pages = [
