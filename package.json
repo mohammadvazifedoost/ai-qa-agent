@@ -37,11 +37,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./playwright": {
       "types": "./dist/playwright/index.d.ts",
-      "import": "./dist/playwright/index.js"
+      "import": "./dist/playwright/index.js",
+      "default": "./dist/playwright/index.js"
     }
   },
   "files": [
