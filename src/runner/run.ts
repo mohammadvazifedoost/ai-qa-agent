@@ -53,6 +53,16 @@ export function playwrightEnv(ctx: QaContext, extra: Record<string, string> = {}
 }
 
 /**
+ * Saves Playwright's console output with the run. The run's `logs` folder exists only when this
+ * run started the app (the server log creates it), not when an already running server is reused.
+ */
+export function writePlaywrightLog(dir: string, stdout: string, stderr: string): void {
+  const file = path.join(dir, 'logs', 'playwright-stdout.log');
+  ensureDir(path.dirname(file));
+  fs.writeFileSync(file, stripAnsi(stdout + '\n' + stderr));
+}
+
+/**
  * Run Playwright for the given filter, starting/stopping the app as needed. Evidence and
  * results.json go to the run's directory, or to `dir` when given (a single-test re-run).
  */
@@ -90,10 +100,7 @@ export async function runTests(
       onStdoutLine: (l) => log.debug(stripAnsi(l)),
       signal,
     });
-    fs.writeFileSync(
-      path.join(dir, 'logs', 'playwright-stdout.log'),
-      stripAnsi(proc.stdout + '\n' + proc.stderr),
-    );
+    writePlaywrightLog(dir, proc.stdout, proc.stderr);
     const report = readJson(jsonReport, PwReportSchema);
     if (!report) {
       throw new Error(

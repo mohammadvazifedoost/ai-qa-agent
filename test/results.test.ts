@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildGrep, fileFilterArg } from '../src/runner/run.js';
+import { buildGrep, fileFilterArg, writePlaywrightLog } from '../src/runner/run.js';
 import { collectOutcomes, PwReportSchema, scenarioIdFromTitle } from '../src/runner/results.js';
 import { normalizePageArg } from '../src/scenarios/generate.js';
 import { makeProject } from './helpers.js';
@@ -31,6 +31,16 @@ describe('buildGrep / fileFilterArg', () => {
     const testsDir = path.join('C:', 'proj', '.qa', 'tests');
     expect(fileFilterArg(testsDir, 'home.spec.ts')).toBe('home\\.spec\\.ts');
     expect(fileFilterArg(testsDir, path.join(testsDir, 'sub', 'a.spec.ts'))).toBe('sub/a\\.spec\\.ts');
+  });
+});
+
+describe('writePlaywrightLog', () => {
+  it('writes the log when the run directory has no logs folder yet', () => {
+    // Nothing creates <run>/logs when an already running server is reused.
+    const dir = path.join(makeProject({}), 'run');
+    fs.mkdirSync(dir);
+    writePlaywrightLog(dir, '\u001b[32mout\u001b[39m', 'err');
+    expect(fs.readFileSync(path.join(dir, 'logs', 'playwright-stdout.log'), 'utf8')).toBe('out\nerr');
   });
 });
 
