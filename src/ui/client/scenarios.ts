@@ -93,7 +93,39 @@ function toolbar(m: ReturnType<typeof listModel>): string {
           '</span></button>',
       )
       .join('') +
-    '</div></div>'
+    '</div>' +
+    runNotRun(m) +
+    '</div>'
+  );
+}
+
+/** On the Not run tab: run every listed scenario that has a test, and add the results to this run. */
+function runNotRun(m: ReturnType<typeof listModel>): string {
+  const { data } = state;
+  if (m.only !== 'notrun') return '';
+  const ids = m.rows
+    .filter((x) => x.sc.approved && data.testStates[x.sc.id] !== 'missing')
+    .map((x) => x.sc.id);
+  const skipped = m.rows.length - ids.length;
+  return (
+    '<div class="flex flex-wrap items-center gap-x-3 gap-y-2">' +
+    (ids.length
+      ? '<button type="button" id="run-not-run" class="btn btn-primary"' +
+        (data.job?.status === 'running' ? ' disabled' : '') +
+        ' ' +
+        act('start-job', { url: '/api/runs/not-run', extra: JSON.stringify({ ids }) }) +
+        ' title="Adds their results to this run">' +
+        (ids.length === 1 ? 'Run this test' : 'Run these ' + ids.length + ' tests') +
+        '</button>'
+      : '') +
+    (skipped
+      ? '<span class="text-[13px] text-muted">' +
+        (skipped === 1
+          ? '1 scenario cannot run: it has no test or is not approved.'
+          : skipped + ' scenarios cannot run: they have no test or are not approved.') +
+        '</span>'
+      : '') +
+    '</div>'
   );
 }
 

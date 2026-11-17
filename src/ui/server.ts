@@ -688,12 +688,22 @@ function readPlan(ctx: QaContext, runId: string): { status: number; payload: unk
 }
 
 function handleRunNotRun(ctx: QaContext, body: string): { status: number; payload: unknown } {
-  const { runId } = JSON.parse(body || '{}') as { runId?: unknown };
+  const { runId, ids: only } = JSON.parse(body || '{}') as { runId?: unknown; ids?: unknown };
   if (runId !== undefined && typeof runId !== 'string')
     return { status: 400, payload: { error: 'runId must be a string' } };
-  const ids = notRunIds(ctx, runId);
+  if (only !== undefined && !(Array.isArray(only) && only.every((x) => typeof x === 'string')))
+    return { status: 400, payload: { error: 'ids must be a list of scenario ids' } };
+  // Optionally only some of them (the ones the Scenarios list filters leave).
+  const ids = notRunIds(ctx, runId).filter((id) => !only || (only as string[]).includes(id));
   if (ids.length === 0)
-    return { status: 400, payload: { error: 'Every test already has a result in this run.' } };
+    return {
+      status: 400,
+      payload: {
+        error: only
+          ? 'None of these tests can run: they have a result in this run already, or no test.'
+          : 'Every test already has a result in this run.',
+      },
+    };
   return rerunJob(
     ctx,
     'run-not-run',
