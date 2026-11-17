@@ -76,7 +76,7 @@ program
   .description(
     'AI QA Agent: design + code analysis, Playwright test generation, failure triage, ClickUp / Jira bugs',
   )
-  .version('0.4.3')
+  .version('0.4.4')
   .option('-C, --cwd <dir>', 'target project root', process.cwd())
   .option('--debug', 'verbose logging')
   .hook('preAction', (cmd) => {
