@@ -562,11 +562,22 @@ function handleRunCritical(ctx: QaContext): { status: number; payload: unknown }
   });
 }
 
-/** Approved scenarios that have a test but no result in the run. */
-function notRunIds(ctx: QaContext, runId: string | undefined): string[] {
-  const ran = new Set(
-    (runId ? (loadRun(ctx, runId)?.outcomes ?? []) : []).map((o) => o.scenarioId).filter(Boolean),
+/**
+ * Scenarios that ran in a run. A scenario whose results are all "skipped" did not run (Playwright
+ * skips the rest of a file when its setup fails), matching the dashboard's "Not run" list.
+ */
+export function ranScenarioIds(outcomes: readonly Pick<TestOutcome, 'scenarioId' | 'status'>[]): Set<string> {
+  return new Set(
+    outcomes
+      .filter((o) => o.status !== 'skipped')
+      .map((o) => o.scenarioId)
+      .filter((id): id is string => !!id),
   );
+}
+
+/** Approved scenarios that have a test but did not run in the run. */
+function notRunIds(ctx: QaContext, runId: string | undefined): string[] {
+  const ran = ranScenarioIds(runId ? (loadRun(ctx, runId)?.outcomes ?? []) : []);
   return withTests(ctx, (s) => !ran.has(s.id));
 }
 
