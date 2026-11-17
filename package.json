@@ -1,6 +1,6 @@
 {
   "name": "@mohammadvazifedoost/ai-qa-agent",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "AI QA agent for web apps: Figma + source analysis, Playwright test generation, failure triage, and ClickUp/Jira bug reports.",
   "keywords": [
     "qa",
